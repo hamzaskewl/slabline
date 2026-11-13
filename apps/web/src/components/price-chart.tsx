@@ -5,177 +5,300 @@ import {
   createChart,
   ColorType,
   CrosshairMode,
-  LastPriceAnimationMode,
+  LineStyle,
+  type IChartApi,
+  type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import type { ChartRange, PricePoint } from "@collectible/domain";
+import {
+  appendTrade,
+  buyPercent,
+  eventVolume,
+  type Contract,
+  type ChartRange,
+  type PricePoint,
+} from "@collectible/domain";
 import { createPriceSeries } from "@/lib/price-series";
+import { api } from "@/lib/trpc";
 
-const percent = (value: number) =>
-  value < 0 || value > 1 ? "" : `${Math.round(value * 100)}%`;
+type Outcome = Contract & { color: string };
+const percent = (n: number) =>
+  n < 0 || n > 1 ? "" : Math.round(n * 100) + "%";
+type Trace = {
+  series: ISeriesApi<"Line">;
+  render: ReturnType<typeof createPriceSeries>;
+  points: PricePoint[];
+  key: string;
+  color: string;
+};
 export default function PriceChart({
-  points,
+  outcomes,
+  volume,
+  eventTime,
   range,
   onRangeChange,
-  loading,
-  error,
-  retry,
+  latestTrade,
 }: {
-  points: PricePoint[];
+  outcomes: Outcome[];
+  volume?: string | null;
+  eventTime: string | null;
   range: ChartRange;
-  onRangeChange: (range: ChartRange) => void;
-  loading: boolean;
-  error: string | null;
-  retry: () => void;
+  onRangeChange: (r: ChartRange) => void;
+  latestTrade: (PricePoint & { symbol: string }) | null;
 }) {
-  const host = useRef<HTMLDivElement>(null);
-  const render = useRef<ReturnType<typeof createPriceSeries> | null>(null);
-  const [hover, setHover] = useState<{ time: number; value: number } | null>(
-    null,
+  const host = useRef<HTMLDivElement>(null),
+    chartRef = useRef<IChartApi | null>(null),
+    traces = useRef(new Map<string, Trace>());
+  const [hover, setHover] = useState<{
+    time: number;
+    values: Record<string, number>;
+  } | null>(null);
+  const queries = api.useQueries((t) =>
+    outcomes.map((o) =>
+      t.history(
+        { symbol: o.symbol, range },
+        { staleTime: 15000, refetchInterval: 30000 },
+      ),
+    ),
   );
+  const datasets = outcomes.map((o, i) => {
+    const q = queries[i],
+      h = q?.data?.data;
+    const points =
+      h?.symbol === o.symbol && h.range === range
+        ? appendTrade(h, latestTrade?.symbol === o.symbol ? latestTrade : null)
+        : [];
+    return {
+      o,
+      points,
+      loading: q?.isLoading,
+      error: q?.error || q?.data?.error,
+    };
+  });
+  const count = datasets.reduce((n, d) => n + d.points.length, 0);
   useEffect(() => {
     if (!host.current) return;
     const chart = createChart(host.current, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: "#080b0e" },
-        textColor: "#9ca3aa",
-        fontFamily: "Inter Variable",
+        background: { type: ColorType.Solid, color: "#010304" },
+        textColor: "#93999d",
+        fontFamily: "Inter Variable, Arial, sans-serif",
         fontSize: 12,
-        attributionLogo: true,
+        attributionLogo: false,
       },
       grid: { vertLines: { visible: false }, horzLines: { visible: false } },
       rightPriceScale: {
         borderVisible: false,
-        scaleMargins: { top: 0.06, bottom: 0.04 },
-        minimumWidth: 48,
+        scaleMargins: { top: 0.09, bottom: 0.09 },
+        minimumWidth: 43,
       },
       timeScale: {
-        borderColor: "#34383c",
+        borderColor: "#22272b",
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 3,
+        rightOffset: 1,
         fixLeftEdge: true,
         fixRightEdge: true,
       },
-      handleScroll: {
-        mouseWheel: false,
-        pressedMouseMove: true,
-        horzTouchDrag: true,
-        vertTouchDrag: false,
-      },
       handleScale: false,
+      handleScroll: false,
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { visible: false },
-        horzLine: { visible: false },
+        vertLine: {
+          color: "#7f858a",
+          width: 1,
+          style: LineStyle.Dotted,
+          labelVisible: false,
+        },
+        horzLine: { visible: false, labelVisible: false },
       },
       localization: { priceFormatter: percent },
     });
-    const series = chart.addSeries(LineSeries, {
-      color: "#229dca",
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      lastPriceAnimation: LastPriceAnimationMode.Continuous,
-      crosshairMarkerRadius: 4,
-      crosshairMarkerBorderColor: "#229dca",
-      crosshairMarkerBackgroundColor: "#080b0e",
-      priceFormat: { type: "custom", minMove: 0.01, formatter: percent },
-      autoscaleInfoProvider: () => ({
-        priceRange: { minValue: 0, maxValue: 1 },
-      }),
-    });
-    render.current = createPriceSeries({
-      setData: (data) =>
-        series.setData(
-          data.map((p) => ({ ...p, time: p.time as UTCTimestamp })),
-        ),
-      update: (p) => series.update({ ...p, time: p.time as UTCTimestamp }),
-      fit: () => chart.timeScale().fitContent(),
-    });
-    chart.subscribeCrosshairMove((event) => {
-      const point = event.seriesData.get(series);
-      if (
-        event.time &&
-        typeof event.time === "number" &&
-        point &&
-        "value" in point
-      )
-        setHover({ time: event.time, value: point.value });
-      else setHover(null);
+    chartRef.current = chart;
+    chart.subscribeCrosshairMove((e) => {
+      if (typeof e.time !== "number" || !e.point) {
+        setHover(null);
+        return;
+      }
+      const values: Record<string, number> = {};
+      for (const [symbol, t] of traces.current) {
+        const p = e.seriesData.get(t.series);
+        if (p && "value" in p) values[symbol] = p.value;
+      }
+      setHover({ time: e.time, values });
     });
     return () => {
-      render.current = null;
+      traces.current.clear();
+      chartRef.current = null;
       chart.remove();
     };
   }, []);
   useEffect(() => {
-    render.current?.(points, range);
-    setHover(null);
-  }, [points, range]);
+    const chart = chartRef.current;
+    if (!chart) return;
+    for (const [id, t] of traces.current)
+      if (!outcomes.some((o) => o.symbol === id)) {
+        chart.removeSeries(t.series);
+        traces.current.delete(id);
+      }
+    for (const { o, points } of datasets) {
+      let t = traces.current.get(o.symbol);
+      if (!t) {
+        const series = chart.addSeries(LineSeries, {
+          color: o.color,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerRadius: 4,
+          priceFormat: { type: "custom", minMove: 0.001, formatter: percent },
+        });
+        t = {
+          series,
+          points: [],
+          key: "",
+          color: o.color,
+          render: createPriceSeries({
+            setData: (p) =>
+              series.setData(
+                p.map((v) => ({ ...v, time: v.time as UTCTimestamp })),
+              ),
+            update: (p) =>
+              series.update({ ...p, time: p.time as UTCTimestamp }),
+            fit: () => chart.timeScale().fitContent(),
+          }),
+        };
+        traces.current.set(o.symbol, t);
+      }
+      if (t.color !== o.color) {
+        t.series.applyOptions({ color: o.color });
+        t.color = o.color;
+      }
+      if (
+        t.key === range &&
+        (t.points === points ||
+          (points.length === t.points.length &&
+            points.every(
+              (p, i) =>
+                p.time === t!.points[i]?.time &&
+                p.value === t!.points[i]?.value,
+            )))
+      )
+        continue;
+      t.series.applyOptions({
+        pointMarkersVisible: points.length === 1,
+        pointMarkersRadius: 3,
+      });
+      t.render(points, range);
+      t.key = range;
+      t.points = points;
+    }
+  });
+  const loading = datasets.some((d) => d.loading),
+    error = datasets.some((d) => d.error);
   return (
     <div className="market-chart">
+      <div className="outcome-legend" aria-label="Charted outcomes">
+        {datasets.map(({ o, points, loading }) => (
+          <div
+            key={o.symbol}
+            title={
+              o.label +
+              (loading
+                ? " · Loading history"
+                : !points.length
+                  ? " · No history available"
+                  : "")
+            }
+          >
+            <i style={{ background: o.color }} />
+            <span>{o.label}</span>
+            <b>
+              {hover
+                ? hover.values[o.symbol] != null
+                  ? percent(hover.values[o.symbol]!)
+                  : "—"
+                : buyPercent(o.buyYes)}
+            </b>
+          </div>
+        ))}
+      </div>
       <div
         className="chart-wrap"
-        aria-label="Gemini YES probability history"
+        aria-label="Gemini outcome price histories"
         data-range={range}
-        data-point-count={points.length}
+        data-series-count={datasets.filter((d) => d.points.length).length}
+        data-point-count={count}
       >
         <div ref={host} className="chart-canvas" />
-        {hover ? (
-          <div className="chart-tooltip">
-            <strong>{percent(hover.value)}</strong>
-            <span>
-              {new Date(hover.time * 1000).toLocaleString("en-US", {
+        {hover && count > 0 && (
+          <time className="chart-tooltip">
+            {new Date(hover.time * 1000).toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </time>
+        )}
+        {!count && (
+          <div className="chart-empty" role="status">
+            {loading
+              ? "Loading market history…"
+              : error
+                ? "Price history unavailable"
+                : "No recorded trades in this range"}
+            {error && (
+              <button
+                className="chart-retry"
+                onClick={() => queries.forEach((q) => void q.refetch())}
+              >
+                Retry history
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="chart-controls">
+        <div className="chart-meta">
+          {eventTime && (
+            <time dateTime={eventTime}>
+              {new Date(eventTime).toLocaleString("en-US", {
                 month: "short",
                 day: "numeric",
                 hour: "numeric",
                 minute: "2-digit",
+                timeZoneName: "short",
               })}
-            </span>
-          </div>
-        ) : null}
-        {!points.length ? (
-          <div className="chart-empty" role="status">
-            {loading
-              ? "Loading price history…"
-              : error
-                ? "Price history unavailable"
-                : "No trades yet"}
-            <span>
-              {loading
-                ? "Gemini public market data"
-                : error
-                  ? "Retry to load Gemini’s recorded prices."
-                  : "A chart appears when Gemini reports price history."}
-            </span>
-            {error ? (
-              <button className="chart-retry" onClick={retry}>
-                Retry history
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-      <div className="chart-controls">
-        <span className="chart-source" role="status">
-          {error && points.length
-            ? "History refresh unavailable"
-            : "Gemini · YES price history"}
-        </span>
+            </time>
+          )}
+          <strong className="chart-volume">{eventVolume(volume)}</strong>
+        </div>
         <div className="chart-ranges" aria-label="Chart time range">
           {(["1D", "1W", "1M", "ALL"] as const).map((r) => (
             <button
               key={r}
               aria-pressed={range === r}
-              onClick={() => onRangeChange(r)}
+              onClick={() => {
+                setHover(null);
+                onRangeChange(r);
+              }}
             >
               {r === "ALL" ? "All" : r}
             </button>
           ))}
         </div>
       </div>
+      {count > 0 && datasets.some((d) => !d.points.length && !d.loading) && (
+        <div className="missing-history" role="status">
+          History unavailable for{" "}
+          {datasets
+            .filter((d) => !d.points.length && !d.loading)
+            .map((d) => d.o.label)
+            .join(", ")}
+          .
+        </div>
+      )}
     </div>
   );
 }

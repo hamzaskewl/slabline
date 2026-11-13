@@ -4,17 +4,16 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ side?: string; outcome?: string }>;
+  searchParams: Promise<{ side?: string; outcome?: string; contract?: string }>;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const outcome = Number(query.outcome ?? 0);
   return (
     <MarketApp
       selectedId={id}
+      initialSymbol={query.contract}
       initialSide={query.side === "no" ? "no" : "yes"}
-      initialOutcome={
-        Number.isInteger(outcome) && outcome >= 0 && outcome < 100 ? outcome : 0
-      }
+      initialOutcome={Number.isInteger(outcome) && outcome >= 0 ? outcome : 0}
     />
   );
 }
