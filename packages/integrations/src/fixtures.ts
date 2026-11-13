@@ -1,4 +1,42 @@
-import type { Market, Book } from '@collectible/domain';
+import type { Market, Book } from "@collectible/domain";
 // Deliberately invented practice market; never returned as live provider data.
-export const PRACTICE_MARKET:Market={id:'fixture-championship',title:'Practice: Will the home team win?',category:'Practice',status:'simulated',description:'Named SIMULATED fixture. No actual event, execution or settlement.',imageUrl:null,closesAt:null,children:[],contracts:[{symbol:'SIMULATED-HOME-YES',label:'Home team',status:'simulated',lastPrice:'0.42',quantityIncrement:'1',priceIncrement:'0.01'}]};
-export function practiceBook():Book {return {symbol:'SIMULATED-HOME-YES',bids:[{price:'0.40',quantity:'80'},{price:'0.39',quantity:'200'}],asks:[{price:'0.42',quantity:'40'},{price:'0.45',quantity:'100'},{price:'0.49',quantity:'200'}],updatedAt:new Date().toISOString(),stale:false,source:'fixture',quantityIncrement:'1',priceIncrement:'0.01'};}
+export const PRACTICE_MARKET: Market = {
+  id: "fixture-championship",
+  title: "Practice: Will the home team win?",
+  category: "Practice",
+  status: "simulated",
+  description:
+    "Named SIMULATED fixture. No actual event, execution or settlement.",
+  imageUrl: null,
+  closesAt: null,
+  children: [],
+  contracts: [
+    {
+      symbol: "SIMULATED-HOME-YES",
+      label: "Home team",
+      status: "simulated",
+      lastPrice: "0.42",
+      quantityIncrement: "1",
+      priceIncrement: "0.01",
+    },
+  ],
+};
+export function practiceBook(): Book {
+  return {
+    symbol: "SIMULATED-HOME-YES",
+    bids: [
+      { price: "0.40", quantity: "80" },
+      { price: "0.39", quantity: "200" },
+    ],
+    asks: [
+      { price: "0.42", quantity: "40" },
+      { price: "0.45", quantity: "100" },
+      { price: "0.49", quantity: "200" },
+    ],
+    updatedAt: new Date().toISOString(),
+    stale: false,
+    source: "fixture",
+    quantityIncrement: "1",
+    priceIncrement: "0.01",
+  };
+}

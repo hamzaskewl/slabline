@@ -1,1 +1,16 @@
-{"name":"@collectible/db","private":true,"type":"module","exports":"./src/index.ts","scripts":{"generate":"drizzle-kit generate"},"dependencies":{"drizzle-orm":"latest","postgres":"latest"},"devDependencies":{"drizzle-kit":"latest"}}
+{
+  "name": "@collectible/db",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "drizzle-orm": "latest",
+    "postgres": "latest"
+  },
+  "devDependencies": {
+    "drizzle-kit": "latest"
+  }
+}
