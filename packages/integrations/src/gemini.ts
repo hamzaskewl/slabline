@@ -1,5 +1,11 @@
 import { createClient } from "@gemini-markets/sdk/server";
-import type { Market } from "@collectible/domain";
+import {
+  historyIntervals,
+  normalizePricePoints,
+  type ChartRange,
+  type PriceHistory,
+  type Market,
+} from "@collectible/domain";
 import { z } from "zod";
 
 const contract = z.object({
@@ -13,9 +19,10 @@ const contract = z.object({
   quoteAssetPrecision: z.number().nullable().optional(),
   prices: z
     .object({
-      lastTradePrice: z.string().optional(),
-      bestAsk: z.string().optional(),
+      lastTradePrice: z.string().nullable().optional(),
+      bestAsk: z.string().nullable().optional(),
     })
+    .nullable()
     .optional(),
 });
 type RawEvent = {
@@ -84,16 +91,151 @@ export async function listMarkets(
   category?: string,
 ): Promise<Market[]> {
   const client = await geminiClient();
-  const response = await client.predictions.listEvents({
-    status: ["active"],
-    limit: 100,
-    ...(search ? { search } : {}),
-    ...(category ? { category: [category] } : {}),
+  // Unfiltered reads currently omit older active categories such as Business.
+  // Page every provider category and deduplicate overlapping category views.
+  const categories = category
+    ? [category]
+    : z
+        .object({ categories: z.array(z.string()) })
+        .parse(await client.predictions.getCategories({ status: ["active"] }))
+        .categories;
+  const groups: Market[][] = [];
+  const queue = (categories.length ? categories : [undefined]).map(
+    (category, index) => ({ category, index }),
+  );
+  await Promise.all(
+    Array.from({ length: Math.min(3, queue.length) }, async () => {
+      while (queue.length) {
+        const next = queue.shift()!;
+        groups[next.index] = await collectMarketPages((offset, limit) =>
+          client.predictions.listEvents({
+            status: ["active"],
+            limit,
+            offset,
+            ...(search ? { search } : {}),
+            ...(next.category ? { category: [next.category] } : {}),
+          }),
+        );
+      }
+    }),
+  );
+  return [...new Map(groups.flat().map((m) => [m.id, m])).values()];
+}
+
+// Never publish the first page as the complete catalog. Failure of any page fails the read.
+export async function collectMarketPages(
+  load: (offset: number, limit: number) => PromiseLike<unknown>,
+): Promise<Market[]> {
+  const result = new Map<string, Market>();
+  const pageSchema = z.object({
+    data: z.array(event),
+    pagination: z.object({ total: z.number().int().nonnegative() }),
   });
-  return z
-    .object({ data: z.array(event) })
-    .parse(response)
-    .data.map(normalizeEvent);
+  // A 500-event sports page can exceed the SDK's 16 MiB safety limit.
+  // Use bounded pages, with no cap on the number of pages.
+  const limit = 100;
+  for (let offset = 0; ; offset += limit) {
+    const page = pageSchema.parse(await load(offset, limit));
+    for (const raw of page.data) result.set(raw.id, normalizeEvent(raw));
+    if (offset + page.data.length >= page.pagination.total) break;
+    if (page.data.length < limit)
+      throw new Error("Incomplete Gemini catalog page");
+  }
+  return [...result.values()];
+}
+
+const candleSchema = z.array(
+  z.tuple([
+    z.number(),
+    z.number(),
+    z.number(),
+    z.number(),
+    z.number(),
+    z.number(),
+  ]),
+);
+export function normalizeCandles(
+  raw: unknown,
+  symbol: string,
+  range: ChartRange,
+): PriceHistory {
+  const candles = candleSchema.parse(raw);
+  return {
+    symbol,
+    range,
+    intervalSeconds: historyIntervals[range],
+    points: normalizePricePoints(
+      candles.map((c) => ({ time: Math.floor(c[0] / 1000), value: c[4] })),
+    ),
+  };
+}
+
+export async function getPriceHistory(
+  symbol: string,
+  range: ChartRange,
+): Promise<PriceHistory> {
+  if (!/^GEMI-[A-Z0-9-]{1,115}$/.test(symbol))
+    throw new Error("Invalid prediction symbol");
+  const client = await geminiClient();
+  return readPriceHistory(symbol, range, async (frame) => {
+    if (frame === "1day") {
+      // SDK 0.1.1 types expose `1d`, which Gemini rejects (400). The documented,
+      // verified daily wire value is `1day`: https://developer.gemini.com/trading/rest-api/market-data/list-candles
+      const origin =
+        process.env.GEMINI_ENVIRONMENT === "sandbox"
+          ? "https://api.sandbox.gemini.com"
+          : "https://api.gemini.com";
+      const response = await fetch(
+        `${origin}/v2/candles/${encodeURIComponent(symbol)}/1day`,
+        { signal: AbortSignal.timeout(12000) },
+      );
+      if (!response.ok) throw new CandleRequestError(response.status);
+      return response.json();
+    } else {
+      return client.marketData.listCandles({
+        symbol,
+        time_frame: frame,
+      });
+    }
+  });
+}
+export class CandleRequestError extends Error {
+  constructor(public statusCode: number) {
+    super(`Gemini history unavailable (${statusCode})`);
+  }
+}
+type CandleFrame = "1day" | "1m" | "5m" | "30m";
+export async function readPriceHistory(
+  symbol: string,
+  range: ChartRange,
+  load: (frame: CandleFrame) => PromiseLike<unknown>,
+): Promise<PriceHistory> {
+  let frame: CandleFrame = (
+    { ALL: "1day", "1D": "1m", "1W": "5m", "1M": "30m" } as const
+  )[range];
+  let raw: unknown;
+  try {
+    raw = await load(frame);
+  } catch (error) {
+    // Newly opened contracts can have minute candles but no daily candle yet.
+    if (
+      frame !== "1day" ||
+      !(error instanceof CandleRequestError) ||
+      ![400, 404].includes(error.statusCode)
+    )
+      throw error;
+    frame = "1m";
+    raw = await load(frame);
+  }
+  let history = normalizeCandles(raw, symbol, range);
+  if (!history.points.length && frame !== "1m") {
+    frame = "1m";
+    history = normalizeCandles(await load(frame), symbol, range);
+  }
+  return {
+    ...history,
+    intervalSeconds: { "1day": 86400, "1m": 60, "5m": 300, "30m": 1800 }[frame],
+  };
 }
 export async function getMarketByTicker(ticker: string): Promise<Market> {
   const client = await geminiClient();

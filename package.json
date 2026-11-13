@@ -10,7 +10,7 @@
     "dev": "bun --filter '*' --parallel dev",
     "build": "bun run --cwd apps/web build",
     "check": "tsc --noEmit && bun run --cwd apps/web check",
-    "test": "bun test packages apps/worker",
+    "test": "bun test packages apps",
     "format": "prettier --write apps packages scripts docs *.md *.json .github/workflows/ci.yml",
     "format:check": "prettier --check apps packages scripts docs *.md *.json .github/workflows/ci.yml",
     "db:generate": "bun run --cwd packages/db generate",

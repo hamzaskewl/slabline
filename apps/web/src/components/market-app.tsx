@@ -34,6 +34,9 @@ import {
   validateCart,
   storedListingSchema,
   matchingCards,
+  appendTrade,
+  type ChartRange,
+  type PricePoint,
   type Book,
   type Listing,
   type Market,
@@ -45,7 +48,6 @@ import {
 import { api } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { usd } from "@/lib/utils";
-import type { PricePoint } from "./price-chart";
 import { Discovery } from "./discovery";
 import { ChainInspector } from "./chain-inspector";
 const PriceChart = dynamic(() => import("./price-chart"), {
@@ -100,17 +102,12 @@ export function MarketApp({
   const [cart, setCart] = useState<Listing[]>([]),
     [orders, setOrders] = useState<PracticeOrder[]>([]),
     [notice, setNotice] = useState("");
-  const [serverSearch, setServerSearch] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(() => setServerSearch(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
   const marketQuery = api.markets.useQuery(
+    { search: "" },
     {
-      search: serverSearch,
-      category: category === "All markets" ? undefined : category,
+      refetchInterval: 60000,
+      enabled: section === "markets" && !selectedId && !practice,
     },
-    { refetchInterval: 60000 },
   );
   const cardQuery = api.cards.useQuery({ search: "" }, { staleTime: 60000 });
   const packQuery = api.packs.useQuery(undefined, {
@@ -247,6 +244,8 @@ export function MarketApp({
             {[
               "Sports",
               "Crypto",
+              "Commodities",
+              "Weather",
               "Economics",
               "Politics",
               "Tech",
@@ -437,6 +436,12 @@ export function MarketApp({
                         initialSide={initialSide}
                         initialOutcome={initialOutcome}
                       />
+                    ) : selectedId && selectedQuery.isLoading && !practice ? (
+                      <section className="panel no-market" role="status">
+                        <RefreshCw className="spin" size={24} />
+                        <h2>Loading market…</h2>
+                        <p>Fetching Gemini’s public event and outcomes.</p>
+                      </section>
                     ) : (
                       <section className="panel no-market">
                         <Compass size={30} />
@@ -733,7 +738,10 @@ function MarketDetail({
     [book, setBook] = useState<Book | null>(null),
     [streamError, setStreamError] = useState<string | null>(null),
     [now, setNow] = useState(0),
-    [points, setPoints] = useState<PricePoint[]>([]),
+    [latestTrade, setLatestTrade] = useState<
+      (PricePoint & { symbol: string }) | null
+    >(null),
+    [range, setRange] = useState<ChartRange>("ALL"),
     [review, setReview] = useState(false);
   const contracts = [
     ...market.contracts,
@@ -741,9 +749,28 @@ function MarketDetail({
   ];
   const contract = contracts[contractIndex];
   const symbol = contract?.symbol;
+  const historyQuery = api.history.useQuery(
+    { symbol: symbol ?? "GEMI-UNAVAILABLE", range },
+    {
+      enabled: !!symbol && !practice,
+      staleTime: 15000,
+      refetchInterval: 30000,
+    },
+  );
+  const history = historyQuery.data?.data;
+  const points = useMemo(
+    () =>
+      history && history.symbol === symbol
+        ? appendTrade(
+            history,
+            latestTrade?.symbol === symbol ? latestTrade : null,
+          )
+        : [],
+    [history, latestTrade, symbol],
+  );
   useEffect(() => {
     setBook(null);
-    setPoints([]);
+    setLatestTrade(null);
     setStreamError(null);
     if (practice) {
       setBook(practiceBook());
@@ -758,17 +785,18 @@ function MarketDetail({
         const update = JSON.parse(e.data) as {
           book: Book | null;
           error: string | null;
+          latestTrade?: PricePoint | null;
         };
         setBook(update.book);
         setStreamError(update.error);
-        const ask = update.book?.asks[0];
-        if (ask && !update.book?.stale) {
-          const time = Math.floor(Date.now() / 1000);
-          setPoints((prev) => {
-            const point = { time, value: Number(ask.price) };
-            return [...prev.filter((p) => p.time !== time), point].slice(-300);
-          });
-        }
+        if (update.latestTrade)
+          setLatestTrade((previous) =>
+            previous?.symbol === symbol &&
+            previous?.time === update.latestTrade?.time &&
+            previous?.value === update.latestTrade?.value
+              ? previous
+              : { ...update.latestTrade!, symbol },
+          );
       } catch {
         setStreamError("Unsupported book update");
       }
@@ -785,6 +813,7 @@ function MarketDetail({
   }, []);
   const stale =
     book?.stale ||
+    (!!book && book.symbol !== symbol) ||
     (!practice && book && now - Date.parse(book.updatedAt) > 15000);
   const quote = useMemo(() => {
     if (
@@ -810,7 +839,6 @@ function MarketDetail({
       return null;
     }
   }, [stake, book, side, stale, practice]);
-  const best = book ? asksForSide(book, side)[0]?.price : null;
   const possibleMatches = matchingCards(market, cards);
   const attainable = quote
     ? (possibleMatches.length ? possibleMatches : cards)
@@ -876,11 +904,12 @@ function MarketDetail({
           <div>
             <span>{contract?.label ?? "No contract"}</span>
             <strong>
-              {best && !stale ? `${Math.round(Number(best) * 100)}¢` : "—"}
-              <small>{side.toUpperCase()} ask</small>
+              {points.length
+                ? `${Math.round(points.at(-1)!.value * 100)}%`
+                : "—"}
+              <small>YES probability</small>
             </strong>
           </div>
-          <div className="chart-period">This session</div>
         </div>
         {practice ? (
           <div className="practice-chart">
@@ -891,7 +920,19 @@ function MarketDetail({
             </span>
           </div>
         ) : (
-          <PriceChart points={points} />
+          <PriceChart
+            key={symbol}
+            points={points}
+            range={range}
+            onRangeChange={setRange}
+            loading={historyQuery.isLoading}
+            error={
+              historyQuery.error
+                ? "History connection interrupted"
+                : (historyQuery.data?.error ?? null)
+            }
+            retry={() => void historyQuery.refetch()}
+          />
         )}
         <div className="depth-section">
           <div className="panel-label">

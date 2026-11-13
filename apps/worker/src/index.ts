@@ -10,8 +10,15 @@ import {
   processValuationJob,
   recoverValuationJobs,
   getMarketByTicker,
+  getPriceHistory,
 } from "@collectible/integrations";
-import type { Book, Market } from "@collectible/domain";
+import {
+  marketPreview,
+  type Book,
+  type Market,
+  type PricePoint,
+  type ChartRange,
+} from "@collectible/domain";
 import {
   getDb,
   marketSnapshots,
@@ -22,7 +29,12 @@ import {
 } from "@collectible/db";
 import { processWebhookDelivery } from "./reconciliation";
 
-type Session = { book: Book | null; lastAccess: number; close: () => void };
+type Session = {
+  book: Book | null;
+  latestTrade: PricePoint | null;
+  lastAccess: number;
+  close: () => void;
+};
 const books = new Map<string, Session>();
 let knownMarkets: Market[] = [];
 const allContracts = (items: Market[]): Market["contracts"] =>
@@ -30,38 +42,37 @@ const allContracts = (items: Market[]): Market["contracts"] =>
 let metadataSavedAt = 0;
 async function markets(search = "", category = "") {
   const data = await cached(
-    `gemini:markets:v3:${category}:${search}`,
-    30000,
-    () => listMarkets(search, category || undefined),
+    "gemini:markets:v5:all-active-categories",
+    60000,
+    () => listMarkets(),
   );
-  knownMarkets = [
-    ...new Map([...knownMarkets, ...data].map((m) => [m.id, m])).values(),
-  ].slice(-2000);
+  knownMarkets = data;
   if (process.env.DATABASE_URL && Date.now() - metadataSavedAt > 60000) {
     const flatten = (items: Market[]): Market[] =>
       items.flatMap((m) => [m, ...flatten(m.children)]);
     const rows = [...new Map(flatten(data).map((m) => [m.id, m])).values()];
     try {
       if (rows.length) {
-        await getDb()
-          .insert(marketTable)
-          .values(
-            rows.map((m) => ({
-              id: m.id,
-              provider: "gemini",
-              category: m.category,
-              status: m.status,
-              data: m,
-            })),
-          )
-          .onConflictDoUpdate({
-            target: marketTable.id,
-            set: {
-              data: sql`excluded.data`,
-              status: sql`excluded.status`,
-              updatedAt: new Date(),
-            },
-          });
+        for (let start = 0; start < rows.length; start += 500)
+          await getDb()
+            .insert(marketTable)
+            .values(
+              rows.slice(start, start + 500).map((m) => ({
+                id: m.id,
+                provider: "gemini",
+                category: m.category,
+                status: m.status,
+                data: m,
+              })),
+            )
+            .onConflictDoUpdate({
+              target: marketTable.id,
+              set: {
+                data: sql`excluded.data`,
+                status: sql`excluded.status`,
+                updatedAt: new Date(),
+              },
+            });
         const contracts = [
           ...new Map(
             rows
@@ -75,10 +86,10 @@ async function markets(search = "", category = "") {
               .map((c) => [c.symbol, c]),
           ).values(),
         ];
-        if (contracts.length)
+        for (let start = 0; start < contracts.length; start += 500)
           await getDb()
             .insert(contractTable)
-            .values(contracts)
+            .values(contracts.slice(start, start + 500))
             .onConflictDoUpdate({
               target: contractTable.symbol,
               set: { data: sql`excluded.data` },
@@ -89,7 +100,16 @@ async function markets(search = "", category = "") {
       console.warn("Market metadata persistence unavailable");
     }
   }
-  return data;
+  const searchText = search.trim().toLowerCase();
+  const searchable = (m: Market): string =>
+    [m.title, ...m.contracts.map((c) => c.label), ...m.children.map(searchable)]
+      .join(" ")
+      .toLowerCase();
+  return data.filter(
+    (m) =>
+      (!category || m.category === category) &&
+      (!searchText || searchable(m).includes(searchText)),
+  );
 }
 async function subscribe(symbol: string) {
   const existing = books.get(symbol);
@@ -105,12 +125,34 @@ async function subscribe(symbol: string) {
     throw new Error("Instrument increments unavailable");
   const client = await geminiClient();
   const book = client.orderBook(symbol);
+  const trades = client.websocket.public.trades(symbol, { highWaterMark: 1 });
   const session: Session = {
     book: null,
+    latestTrade: null,
     lastAccess: Date.now(),
-    close: () => book.close(),
+    close: () => {
+      book.close();
+      void trades.close().catch(() => {});
+    },
   };
   books.set(symbol, session);
+  trades.on("message", (trade) => {
+    const time = Math.floor(Number(trade.E) / 1000),
+      value = Number(trade.p);
+    if (
+      trade.s === symbol &&
+      Number.isSafeInteger(time) &&
+      time > 0 &&
+      Number.isFinite(value) &&
+      value >= 0 &&
+      value <= 1 &&
+      (!session.latestTrade || time >= session.latestTrade.time)
+    ) {
+      session.latestTrade = { time, value };
+    }
+  });
+  // Historical candles also refresh after reconnect; the chart never fabricates missed ticks.
+  void trades.ready.catch(() => {});
   book.on("update", (lob) => {
     session.book = {
       symbol,
@@ -231,10 +273,34 @@ const server = Bun.serve({
               getMarketByTicker(id),
             );
           }
-          if (market) knownMarkets = [...knownMarkets, market].slice(-2000);
+          if (market)
+            knownMarkets = [
+              ...new Map(
+                [...knownMarkets, market].map((m) => [m.id, m]),
+              ).values(),
+            ];
           return market;
         }, null),
       );
+    if (url.pathname === "/history") {
+      const symbol = url.searchParams.get("symbol") ?? "",
+        range = url.searchParams.get("range") ?? "ALL";
+      if (
+        !/^GEMI-[A-Z0-9-]{1,115}$/.test(symbol) ||
+        !["1D", "1W", "1M", "ALL"].includes(range)
+      )
+        return new Response("Invalid history request", { status: 400 });
+      return Response.json(
+        await providerRead(async () => {
+          if (!knownMarkets.length) await markets();
+          if (!allContracts(knownMarkets).some((c) => c.symbol === symbol))
+            throw new Error("Unknown public contract");
+          return cached(`gemini:history:v1:${symbol}:${range}`, 30000, () =>
+            getPriceHistory(symbol, range as ChartRange),
+          );
+        }, null),
+      );
+    }
     if (url.pathname === "/markets")
       return Response.json(
         await providerRead(
@@ -242,7 +308,7 @@ const server = Bun.serve({
             markets(
               url.searchParams.get("search")?.slice(0, 100) ?? "",
               url.searchParams.get("category")?.slice(0, 50) ?? "",
-            ),
+            ).then((data) => data.map(marketPreview)),
           [],
         ),
       );
@@ -294,7 +360,7 @@ const server = Bun.serve({
             try {
               controller.enqueue(
                 encoder.encode(
-                  `data: ${JSON.stringify({ book: session.book, error: session.book ? null : "Waiting for Gemini snapshot" })}\n\n`,
+                  `data: ${JSON.stringify({ book: session.book, latestTrade: session.latestTrade, error: session.book ? null : "Waiting for Gemini snapshot" })}\n\n`,
                 ),
               );
             } catch {

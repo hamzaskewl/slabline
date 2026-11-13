@@ -1,4 +1,5 @@
 import { z } from "zod";
+export * from "./history";
 
 export const decimal = z.string().regex(/^\d+(\.\d{1,6})?$/);
 export const levelSchema = z.object({ price: decimal, quantity: decimal });
@@ -38,7 +39,26 @@ export type Market = {
   children: Market[];
   description: string;
   closesAt: string | null;
+  // Discovery responses carry a compact preview; full outcomes remain on /market.
+  outcomeCount?: number;
+  searchText?: string;
 };
+export function marketPreview(market: Market): Market {
+  const flatten = (m: Market): Market[] => [m, ...m.children.flatMap(flatten)];
+  const events = flatten(market),
+    contracts = events.flatMap((m) => m.contracts);
+  return {
+    ...market,
+    description: "",
+    contracts: contracts.slice(0, 2),
+    children: [],
+    outcomeCount: contracts.length,
+    searchText: events
+      .flatMap((m) => [m.title, ...m.contracts.map((c) => c.label)])
+      .join(" ")
+      .toLowerCase(),
+  };
+}
 export type Listing = {
   id: string;
   mint: string;
