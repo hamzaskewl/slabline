@@ -292,9 +292,8 @@ const server = Bun.serve({
         return new Response("Invalid history request", { status: 400 });
       return Response.json(
         await providerRead(async () => {
-          if (!knownMarkets.length) await markets();
-          if (!allContracts(knownMarkets).some((c) => c.symbol === symbol))
-            throw new Error("Unknown public contract");
+          // Public history remains available after a contract leaves the active
+          // catalog. getPriceHistory validates the fixed-origin GEMI symbol.
           return cached(`gemini:history:v1:${symbol}:${range}`, 30000, () =>
             getPriceHistory(symbol, range as ChartRange),
           );
