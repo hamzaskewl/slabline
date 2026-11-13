@@ -13,5 +13,9 @@
     "start:web": "bun run --cwd apps/web start",
     "start:worker": "bun run apps/worker/src/index.ts"
   },
-  "devDependencies": { "@types/bun": "latest", "typescript": "latest" }
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "24",
+    "typescript": "5.9.3"
+  }
 }

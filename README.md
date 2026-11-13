@@ -2,7 +2,7 @@
 
 UBC 2026 hackathon prototype. Source of truth: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-Implementation is in progress. Public market/catalog reads and simulated trading are separate from permission-gated financial integrations. No end-to-end live purchase or funding is claimed.
+Public market discovery, Gemini WebSocket books through SSE, exact depth estimates, actual slab catalog images, separate Phygitals packs, cart planning and explicitly simulated positions are implemented. The dark discovery interface follows the user's Gemini/Polymarket references. No end-to-end live purchase or funding is claimed.
 
 ## Development
 
@@ -23,3 +23,7 @@ Web: http://localhost:3000. Worker: http://localhost:4001. Credentials belong in
 ## Checkpoints
 
 Every major implementation step is a branch and pull request, checked before merge. GitHub Actions runs type checking, tests and a production build.
+
+Identity configuration: [docs/IDENTITY_SETUP.md](docs/IDENTITY_SETUP.md). Integration evidence and exact blockers: [docs/INTEGRATION_VERIFICATION.md](docs/INTEGRATION_VERIFICATION.md). Railway settings: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Security boundaries: [docs/SECURITY.md](docs/SECURITY.md).
+
+The app remains useful without credentials. It reports provider outages and unknown FMV/fees rather than inventing data. Practice is a named fixture selected explicitly, never an automatic live-data fallback.
