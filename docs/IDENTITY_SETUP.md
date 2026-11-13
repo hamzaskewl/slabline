@@ -1,0 +1,12 @@
+# Identity and devnet setup
+
+1. Create a Privy app, enable Google and email, enable Solana embedded wallets, and add the localhost and Railway app origins. Set `NEXT_PUBLIC_PRIVY_APP_ID` for web builds, matching server `PRIVY_APP_ID` and server-only `PRIVY_APP_SECRET`. Rebuild web after changing the public ID.
+2. Login uses official Privy React SDK 3.51.4, its Solana wallet connectors and @solana/kit; no second wallet-adapter stack. Users without wallets get an embedded Solana wallet; Phantom/Solflare/Backpack can connect separately.
+3. Wallet linking asks for a short-lived message signature containing app origin, user, address, nonce and expiry. Server verifies Ed25519, binds to the authenticated Privy user and atomically consumes a Postgres nonce. A wallet cannot be linked to two app users.
+4. Set a randomly generated 32-byte base64 `TOKEN_ENCRYPTION_KEY` in server secrets. Never commit the key. Gemini confidential OAuth uses SDK-generated state, a matching HttpOnly callback cookie, expiring one-use Postgres state and AES-256-GCM token bundles. Token refresh is serialized with a Postgres advisory lock. Public/private data and account identity are separate.
+5. Start with `GEMINI_ENVIRONMENT=sandbox`, configure a confidential Gemini OAuth app and the exact `/api/gemini/callback` redirect. Requested connection scopes are `balances:read,orders:read`; trading and crypto-send scopes are not requested by this read-only connection. Production start refuses unless `GEMINI_OAUTH_PRODUCTION_APPROVED=true` records actual Gemini review. No flag alone enables financial actions.
+6. Wallet RPC defaults to devnet. Set `SOLANA_USDC_MINT` only to a verified mint for the selected network; otherwise USDC remains explicitly unknown. RPC URLs with keys are server-only; browser wallet SDK uses public endpoints.
+
+`bun run scripts/verify-devnet.ts` verifies an existing public devnet transaction. It does not move funds or claim app-owned assets. `bun run scripts/devnet-smoke.ts` attempts a 0.01 SOL faucet request to an ephemeral key in memory; the public faucet returned HTTP 410 during this session, so no airdrop/signing success is claimed. Supply a supported devnet RPC/faucet through the documented provider setup for a full signed test.
+
+Pending real tests: Google/email login, embedded wallet creation, Phantom linking, OAuth authorization/refresh, wallet account isolation with real sessions. Credentials and dashboard configuration are absent in this checkout. Configure them in Railway/Privy/Gemini dashboards, not chat.

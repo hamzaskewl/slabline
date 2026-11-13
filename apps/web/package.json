@@ -15,6 +15,9 @@
     "@fontsource-variable/manrope": "latest",
     "@privy-io/node": "0.39.0",
     "@privy-io/react-auth": "3.51.4",
+    "@solana-program/memo": "^0.16.0",
+    "@solana-program/system": "^0.16.0",
+    "@solana-program/token": "^0.18.0",
     "@solana/kit": "latest",
     "@tanstack/react-query": "latest",
     "@trpc/client": "latest",
@@ -33,10 +36,10 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "latest",
-    "@types/node": "^26.6.6",
+    "@types/node": "24",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "tailwindcss": "latest",
-    "typescript": "^7.0.2"
+    "typescript": "5.9.3"
   }
 }

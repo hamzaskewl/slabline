@@ -1,0 +1,10 @@
+import { createCipheriv,createDecipheriv,randomBytes,createHmac,timingSafeEqual,verify,createPublicKey } from 'node:crypto';
+import { getAddressEncoder,address } from '@solana/kit';
+export function encryptSecret(plaintext:string,keyBase64:string){const key=Buffer.from(keyBase64,'base64');if(key.length!==32)throw new Error('TOKEN_ENCRYPTION_KEY must decode to 32 bytes');const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,iv);const encrypted=Buffer.concat([cipher.update(plaintext,'utf8'),cipher.final()]);return Buffer.concat([iv,cipher.getAuthTag(),encrypted]).toString('base64');}
+export function decryptSecret(sealed:string,keyBase64:string){const key=Buffer.from(keyBase64,'base64'),raw=Buffer.from(sealed,'base64');if(key.length!==32||raw.length<29)throw new Error('Invalid encrypted token');const decipher=createDecipheriv('aes-256-gcm',key,raw.subarray(0,12));decipher.setAuthTag(raw.subarray(12,28));return Buffer.concat([decipher.update(raw.subarray(28)),decipher.final()]).toString('utf8');}
+export function verifyWalletProof(walletAddress:string,message:string,signatureBase64:string){try{const key=Buffer.from(getAddressEncoder().encode(address(walletAddress)));const spki=Buffer.concat([Buffer.from('302a300506032b6570032100','hex'),key]);const sig=Buffer.from(signatureBase64,'base64');return sig.length===64&&verify(null,Buffer.from(message),createPublicKey({key:spki,format:'der',type:'spki'}),sig);}catch{return false;}}
+export function verifyQuickNode(input:{payload:string;nonce:string;timestamp:string;signature:string;secret:string;now?:number}) {
+  if(!input.secret||!input.nonce||input.nonce.length>256||!/^\d+$/.test(input.timestamp)||!/^[a-f0-9]{64}$/i.test(input.signature))return false;
+  const timestamp=Number(input.timestamp)*(input.timestamp.length<=10?1000:1);if(Math.abs((input.now??Date.now())-timestamp)>300000)return false;
+  const expected=createHmac('sha256',input.secret).update(input.nonce+input.timestamp+input.payload).digest();return timingSafeEqual(expected,Buffer.from(input.signature,'hex'));
+}
