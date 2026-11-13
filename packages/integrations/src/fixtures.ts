@@ -16,6 +16,8 @@ export const PRACTICE_MARKET: Market = {
       label: "Home team",
       status: "simulated",
       lastPrice: "0.42",
+      buyYes: "0.42",
+      buyNo: "0.60",
       quantityIncrement: "1",
       priceIncrement: "0.01",
     },

@@ -11,6 +11,8 @@ import { z } from "zod";
 const contract = z.object({
   instrumentSymbol: z.string(),
   label: z.string().optional(),
+  color: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
   status: z.string().optional(),
   quantityIncrement: z.string().nullable().optional(),
   priceIncrement: z.string().nullable().optional(),
@@ -21,6 +23,9 @@ const contract = z.object({
     .object({
       lastTradePrice: z.string().nullable().optional(),
       bestAsk: z.string().nullable().optional(),
+      buy: z
+        .object({ yes: z.string().nullish(), no: z.string().nullish() })
+        .nullish(),
     })
     .nullable()
     .optional(),
@@ -30,12 +35,15 @@ type RawEvent = {
   ticker?: string;
   title: string;
   category?: string;
+  volume?: string | number | null;
+  subcategory?: { name?: string | null } | null;
   status?: string;
   imageUrl?: string | null;
   contracts?: z.infer<typeof contract>[];
   events?: RawEvent[];
   description?: string | null;
   expiryDate?: string | null;
+  startTime?: string | null;
 };
 const event: z.ZodType<RawEvent> = z.lazy(() =>
   z.object({
@@ -43,12 +51,15 @@ const event: z.ZodType<RawEvent> = z.lazy(() =>
     ticker: z.string().optional(),
     title: z.string(),
     category: z.string().optional(),
+    volume: z.union([z.string(), z.number()]).nullish(),
+    subcategory: z.object({ name: z.string().nullish() }).nullish(),
     status: z.string().optional(),
     imageUrl: z.string().nullable().optional(),
     contracts: z.array(contract).optional(),
     events: z.array(event).optional(),
     description: z.string().nullable().optional(),
     expiryDate: z.string().nullable().optional(),
+    startTime: z.string().nullish(),
   }),
 );
 export function normalizeEvent(raw: RawEvent): Market {
@@ -57,13 +68,23 @@ export function normalizeEvent(raw: RawEvent): Market {
     ticker: raw.ticker,
     title: raw.title,
     category: raw.category ?? "Other",
+    volume:
+      raw.volume != null && /^\d+(?:\.\d+)?$/.test(String(raw.volume))
+        ? String(raw.volume)
+        : null,
+    subcategory: raw.subcategory?.name ?? null,
     status: raw.status ?? "unknown",
     imageUrl: safeImage(raw.imageUrl),
     description: raw.description ?? "",
     closesAt: raw.expiryDate ?? null,
+    startsAt: raw.startTime ?? null,
     contracts: (raw.contracts ?? []).map((c) => ({
       symbol: c.instrumentSymbol,
       label: c.label ?? c.instrumentSymbol,
+      color: c.color && /^#[\da-f]{6}$/i.test(c.color) ? c.color : null,
+      imageUrl: safeImage(c.imageUrl),
+      buyYes: c.prices?.buy?.yes ?? null,
+      buyNo: c.prices?.buy?.no ?? null,
       status: c.status ?? "unknown",
       lastPrice: c.prices?.lastTradePrice ?? c.prices?.bestAsk ?? null,
       quantityIncrement: c.quantityIncrement ?? null,
@@ -209,6 +230,7 @@ export async function readPriceHistory(
   symbol: string,
   range: ChartRange,
   load: (frame: CandleFrame) => PromiseLike<unknown>,
+  now = Date.now(),
 ): Promise<PriceHistory> {
   let frame: CandleFrame = (
     { ALL: "1day", "1D": "1m", "1W": "5m", "1M": "30m" } as const
@@ -234,6 +256,15 @@ export async function readPriceHistory(
   }
   return {
     ...history,
+    points:
+      range === "ALL"
+        ? history.points
+        : history.points.filter(
+            (p) =>
+              p.time >=
+              Math.floor(now / 1000) -
+                { "1D": 1, "1W": 7, "1M": 30 }[range] * 86400,
+          ),
     intervalSeconds: { "1day": 86400, "1m": 60, "5m": 300, "30m": 1800 }[frame],
   };
 }
