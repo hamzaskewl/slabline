@@ -20,6 +20,10 @@ export type Book = {
 export type Contract = {
   symbol: string;
   label: string;
+  color?: string | null;
+  imageUrl?: string | null;
+  buyYes?: string | null;
+  buyNo?: string | null;
   status: string;
   lastPrice: string | null;
   quantityIncrement: string | null;
@@ -33,6 +37,9 @@ export type Market = {
   ticker?: string;
   title: string;
   category: string;
+  volume?: string | null;
+  startsAt?: string | null;
+  subcategory?: string | null;
   status: string;
   imageUrl: string | null;
   contracts: Contract[];
@@ -43,10 +50,68 @@ export type Market = {
   outcomeCount?: number;
   searchText?: string;
 };
+const palette = [
+  "#0f9ee7",
+  "#005cf0",
+  "#fb6832",
+  "#b184f4",
+  "#40b77a",
+  "#edb544",
+];
+export function marketOutcomes(market: Market) {
+  const seen = new Set<string>();
+  const colors = new Set<string>();
+  function visit(m: Market, nested: boolean): (Contract & { color: string })[] {
+    const rows = m.contracts.flatMap((c) => {
+      if (seen.has(c.symbol)) return [];
+      const preferred =
+        c.color && /^#[a-f\d]{6}$/i.test(c.color)
+          ? c.color.toLowerCase()
+          : null;
+      const color =
+        preferred && !colors.has(preferred)
+          ? preferred
+          : (palette.find((p) => !colors.has(p)) ??
+            `hsl(${Math.round((seen.size * 137.5) % 360)}, 76%, 63%)`);
+      colors.add(color);
+      seen.add(c.symbol);
+      return [
+        {
+          ...c,
+          label: nested
+            ? c.label.toLowerCase() === "yes"
+              ? m.title
+              : m.title + " · " + c.label
+            : c.label,
+          color,
+        },
+      ];
+    });
+    return [...rows, ...m.children.flatMap((child) => visit(child, true))];
+  }
+  return visit(market, false);
+}
+export function buyPercent(value?: string | null) {
+  return value != null && /^\d+(?:\.\d+)?$/.test(value) && Number(value) <= 1
+    ? new Intl.NumberFormat("en-US", {
+        style: "percent",
+        maximumFractionDigits: 1,
+      }).format(Number(value))
+    : "—";
+}
+export function eventVolume(value?: string | null) {
+  return value != null &&
+    /^\d+(?:\.\d+)?$/.test(value) &&
+    Number.isFinite(Number(value))
+    ? "$" +
+        Number(value).toLocaleString("en-US", { maximumFractionDigits: 0 }) +
+        " vol."
+    : "Volume unavailable";
+}
 export function marketPreview(market: Market): Market {
   const flatten = (m: Market): Market[] => [m, ...m.children.flatMap(flatten)];
   const events = flatten(market),
-    contracts = events.flatMap((m) => m.contracts);
+    contracts = marketOutcomes(market);
   return {
     ...market,
     description: "",

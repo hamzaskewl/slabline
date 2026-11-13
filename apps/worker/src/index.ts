@@ -42,7 +42,7 @@ const allContracts = (items: Market[]): Market["contracts"] =>
 let metadataSavedAt = 0;
 async function markets(search = "", category = "") {
   const data = await cached(
-    "gemini:markets:v5:all-active-categories",
+    "gemini:markets:v6:all-active-categories",
     60000,
     () => listMarkets(),
   );
@@ -259,7 +259,7 @@ const server = Bun.serve({
           const existing = knownMarkets.find(
             (m) => m.id === id || m.ticker === id,
           );
-          if (existing) return existing;
+          if (existing && /^\d+$/.test(id)) return existing;
           let market: Market | null = null;
           if (/^\d+$/.test(id) && process.env.DATABASE_URL) {
             const [row] = await getDb()
@@ -269,7 +269,7 @@ const server = Bun.serve({
               .limit(1);
             market = (row?.data as Market | undefined) ?? null;
           } else if (!/^\d+$/.test(id)) {
-            market = await cached(`gemini:event:${id}`, 30000, () =>
+            market = await cached(`gemini:event:v2:${id}`, 30000, () =>
               getMarketByTicker(id),
             );
           }
@@ -294,7 +294,7 @@ const server = Bun.serve({
         await providerRead(async () => {
           // Public history remains available after a contract leaves the active
           // catalog. getPriceHistory validates the fixed-origin GEMI symbol.
-          return cached(`gemini:history:v1:${symbol}:${range}`, 30000, () =>
+          return cached(`gemini:history:v2:${symbol}:${range}`, 30000, () =>
             getPriceHistory(symbol, range as ChartRange),
           );
         }, null),

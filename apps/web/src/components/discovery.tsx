@@ -14,7 +14,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useState } from "react";
-import type { Market } from "@collectible/domain";
+import { buyPercent, eventVolume, type Market } from "@collectible/domain";
 
 export function Discovery({
   markets,
@@ -197,28 +197,25 @@ function PredictionCard({ market }: { market: Market }) {
         </Link>
       </div>
       <div className="prediction-outcomes">
-        {outcomes.map((c, i) => (
+        {outcomes.map((c) => (
           <div className="prediction-outcome" key={c.symbol}>
             <Link
-              href={`/markets/${market.ticker ?? market.id}?outcome=${i}`}
+              href={`/markets/${market.ticker ?? market.id}?contract=${encodeURIComponent(c.symbol)}`}
               className="outcome-label"
             >
               {c.label}
             </Link>
-            <strong title="Public catalog price snapshot; executable depth is available on the market page">
-              {c.lastPrice ? `${Math.round(Number(c.lastPrice) * 100)}%` : "—"}
-            </strong>
             <Link
-              href={`/markets/${market.ticker ?? market.id}?outcome=${i}&side=yes`}
+              href={`/markets/${market.ticker ?? market.id}?contract=${encodeURIComponent(c.symbol)}&side=yes`}
               className="outcome-yes"
             >
-              Yes
+              Yes {buyPercent(c.buyYes)}
             </Link>
             <Link
-              href={`/markets/${market.ticker ?? market.id}?outcome=${i}&side=no`}
+              href={`/markets/${market.ticker ?? market.id}?contract=${encodeURIComponent(c.symbol)}&side=no`}
               className="outcome-no"
             >
-              No
+              No {buyPercent(c.buyNo)}
             </Link>
           </div>
         ))}
@@ -229,9 +226,9 @@ function PredictionCard({ market }: { market: Market }) {
           <span className="footer-divider">·</span> {market.category}
         </Link>
         {(market.outcomeCount ?? market.contracts.length) > 2 ? (
-          <span>
-            + {(market.outcomeCount ?? market.contracts.length) - 2} more
-          </span>
+          <Link href={`/markets/${market.ticker ?? market.id}`}>
+            +{(market.outcomeCount ?? market.contracts.length) - 2} more
+          </Link>
         ) : null}
         <button
           onClick={() => setSaved(!saved)}

@@ -5,7 +5,12 @@ import {
   readPriceHistory,
   CandleRequestError,
 } from "./gemini";
-import { marketPreview } from "@collectible/domain";
+import {
+  marketPreview,
+  marketOutcomes,
+  eventVolume,
+  buyPercent,
+} from "@collectible/domain";
 
 test("new contracts fall back to real minute candles, while outages stay errors", async () => {
   const requests: string[] = [];
@@ -106,4 +111,81 @@ test("history sorts real candle closes and rejects impossible prices", () => {
     normalizeCandles({ error: "outage" }, "GEMI-TEST-YES", "ALL"),
   ).toThrow();
   expect(normalizeCandles([], "GEMI-TEST-YES", "ALL").points).toEqual([]);
+});
+
+test("the outcome board preserves the two-sided spread, missing prices, provider colors and nested selections", async () => {
+  const [m] = await collectMarketPages(async () => ({
+    data: [
+      {
+        id: "e",
+        title: "Final",
+        volume: "4403",
+        contracts: [
+          {
+            instrumentSymbol: "GEMI-A",
+            label: "A",
+            color: "#0f9ee7",
+            prices: { buy: { yes: "0.88", no: "0.17" } },
+          },
+          { instrumentSymbol: "GEMI-B", label: "B", color: "#0f9ee7" },
+          { instrumentSymbol: "GEMI-C", label: "C", color: "#0f9ee7" },
+        ],
+        events: [
+          {
+            id: "p",
+            title: "Team total over 100",
+            contracts: [
+              { instrumentSymbol: "GEMI-P", label: "Yes", color: "#007AC1" },
+            ],
+          },
+        ],
+      },
+    ],
+    pagination: { total: 1 },
+  }));
+  const rows = marketOutcomes(m!);
+  expect(rows.map((c) => c.color)).toEqual([
+    "#0f9ee7",
+    "#005cf0",
+    "#fb6832",
+    "#007ac1",
+  ]);
+  expect(rows.map((c) => c.label)).toEqual([
+    "A",
+    "B",
+    "C",
+    "Team total over 100",
+  ]);
+  expect([buyPercent(rows[0]?.buyYes), buyPercent(rows[0]?.buyNo)]).toEqual([
+    "88%",
+    "17%",
+  ]);
+  expect(buyPercent(rows[1]?.buyNo)).toBe("—");
+  expect(eventVolume(m!.volume)).toBe("$4,403 vol.");
+  expect(eventVolume(null)).toBe("Volume unavailable");
+  expect(eventVolume("0")).toBe("$0 vol.");
+  expect(marketPreview(m!).contracts[1]?.symbol).toBe("GEMI-B");
+});
+
+test("range controls exclude trades older than the selected window", async () => {
+  const now = Date.UTC(2026, 10, 13, 12);
+  const raw = [10, 5, 0].map((days) => [
+    now - days * 86400000,
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    1,
+  ]);
+  for (const [range, expected] of [
+    ["1D", 1],
+    ["1W", 2],
+    ["1M", 3],
+    ["ALL", 3],
+  ] as const) {
+    expect(
+      (await readPriceHistory("GEMI-TEST-YES", range, async () => raw, now))
+        .points,
+    ).toHaveLength(expected);
+  }
 });
