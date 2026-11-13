@@ -1,0 +1,181 @@
+import {
+  IntegrationBlocked,
+  assertFreshListing,
+  type Listing,
+  type FundingState,
+} from "@collectible/domain";
+import { z } from "zod";
+export type FinancialApproval = {
+  userId: string;
+  wallet: string;
+  network: "devnet" | "mainnet";
+  idempotencyKey: string;
+  approvedAt: string;
+};
+export type FundingQuote = {
+  route: "manual" | "direct_solana" | "owned_evm_then_relay";
+  amount: string;
+  networkFee: string | null;
+  conversionFee: string | null;
+  bridgeFee: string | null;
+  netSpendable: string | null;
+  state: FundingState;
+  blockers: string[];
+};
+export interface GeminiTradingAdapter {
+  placeOrder(input: {
+    symbol: string;
+    side: "yes" | "no";
+    quantity: string;
+    limitPrice: string;
+    approval: FinancialApproval;
+  }): Promise<{ providerOrderId: string }>;
+  cancelOrder(orderId: string, approval: FinancialApproval): Promise<void>;
+  withdrawUSDC(input: {
+    amount: string;
+    network: "solana" | "ethereum";
+    approval: FinancialApproval;
+  }): Promise<{ transferId: string }>;
+}
+export const blockedGeminiTrading: GeminiTradingAdapter = {
+  async placeOrder() {
+    throw new IntegrationBlocked(
+      "Gemini trading",
+      "OAuth orders:create, current terms, jurisdiction eligibility and production review are unverified",
+    );
+  },
+  async cancelOrder() {
+    throw new IntegrationBlocked(
+      "Gemini trading",
+      "Authorized trading session is not configured",
+    );
+  },
+  async withdrawUSDC() {
+    throw new IntegrationBlocked(
+      "Gemini withdrawal",
+      "Account-specific v2 network access, crypto:send, approved destination/hold, available balance, conversion and fee reconciliation have not been verified",
+    );
+  },
+};
+export function getFundingQuote(amount: string): FundingQuote {
+  return {
+    route: "manual",
+    amount,
+    networkFee: null,
+    conversionFee: null,
+    bridgeFee: null,
+    netSpendable: null,
+    state: "unsupported",
+    blockers: [
+      "Gemini available USD and conversion fills must be verified",
+      "Account-specific GET /v2/network/USDC and crypto:send must be authorized",
+      "Approved user-owned destination, address hold and withdrawal fees must be verified",
+      "Relay fallback requires a live owned-EVM-wallet quote, screening and expiry checks",
+    ],
+  };
+}
+export interface CollectorCryptTransactionAdapter {
+  buildBuyTransaction(
+    card: Listing,
+    buyer: string,
+  ): Promise<{
+    unsignedBase64: string;
+    inspection: "required";
+    network: "devnet";
+  }>;
+  broadcastSignedTransaction(
+    signedBase64: string,
+    approval: FinancialApproval,
+  ): Promise<{ signature: string }>;
+}
+export const collectorCryptTransactions: CollectorCryptTransactionAdapter = {
+  async buildBuyTransaction(card, buyer) {
+    assertFreshListing(card);
+    if (card.network !== "devnet")
+      throw new IntegrationBlocked(
+        "Collector Crypt",
+        "Mainnet purchase builders are disabled until signed devnet tests and instruction inspection pass",
+      );
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(buyer))
+      throw new Error("Invalid buyer");
+    const response = await fetch(
+      "https://dev-api.collectorcrypt.com/marketplace/buy",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: buyer,
+          nftAddress: card.mint,
+          price: Number(card.ask),
+          isV2Listing: true,
+        }),
+        signal: AbortSignal.timeout(15000),
+      },
+    );
+    if (!response.ok)
+      throw new Error(`Collector Crypt builder HTTP ${response.status}`);
+    let body: unknown = await response.text();
+    if (typeof body === "string" && body.startsWith('"'))
+      body = JSON.parse(body);
+    const unsignedBase64 = z
+      .string()
+      .min(64)
+      .max(4096)
+      .regex(/^[A-Za-z0-9+/=]+$/)
+      .parse(body);
+    return { unsignedBase64, inspection: "required", network: "devnet" };
+  },
+  async broadcastSignedTransaction() {
+    throw new IntegrationBlocked(
+      "Collector Crypt",
+      "Transaction program/recipient/amount inspection and a signed devnet purchase test are required before broadcast is released",
+    );
+  },
+};
+export interface RelayAdapter {
+  quote(input: {
+    amount: string;
+    ownedEvmWallet: string;
+    solanaWallet: string;
+  }): Promise<{
+    requestId: string;
+    expiresAt: string;
+    expectedOutput: string;
+    fees: string;
+  }>;
+  execute(approval: FinancialApproval): Promise<{ requestId: string }>;
+}
+export const blockedRelay: RelayAdapter = {
+  async quote() {
+    throw new IntegrationBlocked(
+      "Relay",
+      "No verified live chain/token route, gas quote or user-owned EVM source. Direct Gemini-to-Relay deposit addresses are not supported by this app.",
+    );
+  },
+  async execute() {
+    throw new IntegrationBlocked(
+      "Relay",
+      "A fresh permitted quote and explicit user-signed source transaction are required",
+    );
+  },
+};
+export const blockedPhygitals = {
+  async buyPack(_input: {
+    slug: string;
+    approval: FinancialApproval;
+  }): Promise<{ orderId: string }> {
+    throw new IntegrationBlocked(
+      "Phygitals",
+      "User-scoped API key with vm.buy.crypto and a verified signed payment are required",
+    );
+  },
+};
+export const SIMULATED_PARTIAL_CART_FIXTURE = {
+  name: "SIMULATED_PARTIAL_CART_FAILURE",
+  network: "fixture",
+  items: [
+    { mint: "FIXTURE-CARD-A", state: "owner_verified" },
+    { mint: "FIXTURE-CARD-B", state: "failed" },
+  ],
+  note: "Invented test states only. No chain transaction, ownership or funds.",
+} as const;

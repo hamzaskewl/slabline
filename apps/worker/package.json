@@ -1,1 +1,13 @@
-{"name":"@collectible/worker","private":true,"type":"module","scripts":{"dev":"bun --watch src/index.ts"},"dependencies":{"@collectible/domain":"workspace:*","@collectible/integrations":"workspace:*","@collectible/db":"workspace:*"}}
+{
+  "name": "@collectible/worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts"
+  },
+  "dependencies": {
+    "@collectible/domain": "workspace:*",
+    "@collectible/integrations": "workspace:*",
+    "@collectible/db": "workspace:*"
+  }
+}

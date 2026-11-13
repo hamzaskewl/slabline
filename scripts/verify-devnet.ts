@@ -1,10 +1,22 @@
-import { createSolanaRpc,address } from '../packages/integrations/node_modules/@solana/kit';
-import { confirmSolanaTransaction } from '../packages/integrations/src/solana';
-if(process.env.SOLANA_NETWORK==='mainnet')throw new Error('This verification script refuses mainnet');
-process.env.SOLANA_NETWORK='devnet';
-const rpc=createSolanaRpc('https://api.devnet.solana.com');
-const [recent]=await rpc.getSignaturesForAddress(address('11111111111111111111111111111111'),{limit:1,commitment:'confirmed'}).send({abortSignal:AbortSignal.timeout(15000)});
-if(!recent)throw new Error('No recent devnet transaction returned');
-const result=await confirmSolanaTransaction(recent.signature);
-if(!result.confirmed)throw new Error('Independent devnet transaction confirmation failed');
-console.log(JSON.stringify({test:'public-read-only-devnet-confirmation',...result}));
+import {
+  createSolanaRpc,
+  address,
+} from "../packages/integrations/node_modules/@solana/kit";
+import { confirmSolanaTransaction } from "../packages/integrations/src/solana";
+if (process.env.SOLANA_NETWORK === "mainnet")
+  throw new Error("This verification script refuses mainnet");
+process.env.SOLANA_NETWORK = "devnet";
+const rpc = createSolanaRpc("https://api.devnet.solana.com");
+const [recent] = await rpc
+  .getSignaturesForAddress(address("11111111111111111111111111111111"), {
+    limit: 1,
+    commitment: "confirmed",
+  })
+  .send({ abortSignal: AbortSignal.timeout(15000) });
+if (!recent) throw new Error("No recent devnet transaction returned");
+const result = await confirmSolanaTransaction(recent.signature);
+if (!result.confirmed)
+  throw new Error("Independent devnet transaction confirmation failed");
+console.log(
+  JSON.stringify({ test: "public-read-only-devnet-confirmation", ...result }),
+);
