@@ -36,7 +36,7 @@ export function Discovery({
   setSearch: (value: string) => void;
 }) {
   const [limit, setLimit] = useState(24);
-  const categories = [
+  const preferredCategories = [
     "All markets",
     "Sports",
     "Crypto",
@@ -45,11 +45,22 @@ export function Discovery({
     "Tech",
     "Culture",
     "Business",
+    "Commodities",
+    "Weather",
+    "Other",
   ];
+  const categories = [
+    ...new Set([...preferredCategories, ...markets.map((m) => m.category)]),
+  ];
+  const searchable = (m: Market): string =>
+    m.searchText ??
+    [m.title, ...m.contracts.map((c) => c.label), ...m.children.map(searchable)]
+      .join(" ")
+      .toLowerCase();
   const visible = markets.filter(
     (m) =>
       (category === "All markets" || m.category === category) &&
-      m.title.toLowerCase().includes(search.toLowerCase()),
+      searchable(m).includes(search.trim().toLowerCase()),
   );
   return (
     <div className="discovery-layout">
@@ -217,8 +228,10 @@ function PredictionCard({ market }: { market: Market }) {
           <span className="live-dot" /> Active{" "}
           <span className="footer-divider">·</span> {market.category}
         </Link>
-        {market.children.length ? (
-          <span>{market.children.length} related</span>
+        {(market.outcomeCount ?? market.contracts.length) > 2 ? (
+          <span>
+            + {(market.outcomeCount ?? market.contracts.length) - 2} more
+          </span>
         ) : null}
         <button
           onClick={() => setSaved(!saved)}

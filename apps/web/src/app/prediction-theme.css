@@ -601,8 +601,97 @@ main {
 }
 .chart-wrap {
   margin: 0 15px;
+  height: 300px;
+  min-height: 300px;
+  max-height: 300px;
+  overflow: hidden;
+  contain: layout size;
+}
+.chart-canvas {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+}
+.market-detail.panel {
+  background: #080b0e;
+  min-width: 0;
+}
+.chart-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 24px 12px;
+}
+.chart-source {
+  color: #929aa3;
+  font-size: 11px;
+}
+.chart-ranges {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.chart-ranges button {
+  padding: 8px 12px;
+  border-radius: 24px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f3f4f6;
+}
+.chart-ranges button[aria-pressed="true"] {
+  background: #25282b;
+}
+.chart-ranges button:hover {
+  background: #1c2024;
+}
+.chart-tooltip {
+  z-index: 3;
+  position: absolute;
+  left: 12px;
+  top: 0;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  pointer-events: none;
+  background: #11171e;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: #e3e7eb;
+  font-size: 12px;
+}
+.chart-tooltip span {
+  color: #9ca3aa;
+  font-size: 11px;
+}
+.chart-retry {
+  pointer-events: auto;
+  margin-top: 12px;
+  padding: 6px 12px;
+  border: 1px solid #37424e;
+  border-radius: 6px;
+}
+.chart-loading {
+  height: 358px;
+}
+@media (max-width: 500px) {
+  .chart-controls {
+    padding: 12px 15px;
+    flex-wrap: wrap;
+  }
+  .chart-ranges {
+    margin-left: auto;
+  }
+  .chart-ranges button {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 8px 10px;
+  }
 }
 .chart-empty {
+  z-index: 3;
   color: #b6bfce;
 }
 .chart-empty span {

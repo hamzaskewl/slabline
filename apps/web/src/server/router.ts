@@ -5,6 +5,7 @@ import type {
   Listing,
   Pack,
   ProviderResult,
+  PriceHistory,
 } from "@collectible/domain";
 const t = initTRPC.create();
 export async function workerRead<T>(path: string): Promise<T> {
@@ -48,6 +49,19 @@ export const appRouter = t.router({
     .input(z.object({ id: z.string().max(150) }))
     .query(({ input }) =>
       safe<Market | null>(`/market?id=${encodeURIComponent(input.id)}`, null),
+    ),
+  history: t.procedure
+    .input(
+      z.object({
+        symbol: z.string().regex(/^GEMI-[A-Z0-9-]{1,115}$/),
+        range: z.enum(["1D", "1W", "1M", "ALL"]),
+      }),
+    )
+    .query(({ input }) =>
+      safe<PriceHistory | null>(
+        `/history?symbol=${encodeURIComponent(input.symbol)}&range=${input.range}`,
+        null,
+      ),
     ),
   cards: t.procedure
     .input(
