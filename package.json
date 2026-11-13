@@ -19,9 +19,11 @@
     "start:worker": "bun run apps/worker/src/index.ts"
   },
   "devDependencies": {
+    "@solana/kit": "^8.6.0",
     "@types/bun": "latest",
     "@types/node": "24",
     "prettier": "^3.10.1",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "zod": "^4.6.7"
   }
 }

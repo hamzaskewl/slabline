@@ -1,8 +1,4 @@
-import {
-  createSolanaRpc,
-  generateKeyPairSigner,
-  lamports,
-} from "../packages/integrations/node_modules/@solana/kit";
+import { createSolanaRpc, generateKeyPairSigner, lamports } from "@solana/kit";
 // Ephemeral devnet key only, never written or logged. This is not a Privy/login test.
 if (process.env.SOLANA_NETWORK === "mainnet")
   throw new Error("Devnet test refuses mainnet");

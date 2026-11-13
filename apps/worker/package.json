@@ -3,11 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --watch src/index.ts"
+    "dev": "bun --cwd ../.. --watch apps/worker/src/index.ts"
   },
   "dependencies": {
+    "@collectible/db": "workspace:*",
     "@collectible/domain": "workspace:*",
     "@collectible/integrations": "workspace:*",
-    "@collectible/db": "workspace:*"
+    "zod": "^4.6.7"
   }
 }

@@ -1,7 +1,4 @@
-import {
-  createSolanaRpc,
-  address,
-} from "../packages/integrations/node_modules/@solana/kit";
+import { createSolanaRpc, address } from "@solana/kit";
 import { confirmSolanaTransaction } from "../packages/integrations/src/solana";
 if (process.env.SOLANA_NETWORK === "mainnet")
   throw new Error("This verification script refuses mainnet");
