@@ -1,0 +1,249 @@
+.prediction-surface .exchange-grid:has(.prediction-panels) {
+  max-width: 1520px;
+  grid-template-columns: minmax(0, 1fr) minmax(540px, 1.1fr);
+  gap: 24px;
+}
+.prediction-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  grid-column: 2;
+  min-width: 0;
+  align-items: start;
+  position: sticky;
+  top: 80px;
+}
+.prediction-surface .prediction-panels > .order-ticket {
+  grid-column: auto;
+  grid-row: auto;
+  position: static;
+  padding: 18px;
+  border-radius: 12px;
+  border-color: #29343b;
+}
+.prediction-panels .prediction-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--ink);
+}
+.prediction-title > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 450;
+}
+.prediction-panels .stake-presets {
+  gap: 4px;
+}
+.prediction-panels .stake-presets button {
+  padding-inline: 5px;
+}
+.prediction-panels .execution-estimate {
+  margin-bottom: 0;
+}
+.shares-limit {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.reward-target.panel {
+  min-width: 0;
+  padding: 18px;
+  background: #010304;
+  border: 1px solid #29343b;
+  border-radius: 12px;
+}
+.reward-target h2 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.reward-target > select {
+  width: 100%;
+  min-height: 40px;
+  color: var(--ink);
+  background: #13171d;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.reward-target-image {
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.reward-target-image img {
+  max-width: 100%;
+  width: auto;
+  height: 100%;
+  object-fit: contain;
+}
+.reward-target-image span {
+  font-size: 13px;
+}
+.reward-target h3 {
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 1.45;
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+.reward-team-link {
+  color: #a2abb6;
+  font-size: 12px;
+  text-decoration: none;
+  display: block;
+  line-height: 1.5;
+}
+.reward-team-link:hover {
+  text-decoration: underline;
+}
+.reward-ask {
+  margin: 12px 0;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.reward-ask span {
+  font-size: 12px;
+  font-weight: 450;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.reward-target-stats {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+  margin: 0;
+  border-top: 1px solid var(--rule);
+}
+.reward-target-stats > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+.reward-target-stats dt {
+  color: var(--muted);
+}
+.reward-target-stats dd {
+  margin: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.reward-target-stats small {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.reward-set-stake {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #465161;
+  border-radius: 8px;
+  background: #17212c;
+  color: #f4f7fb;
+  font-size: 13px;
+  font-weight: 550;
+  padding: 8px;
+  cursor: pointer;
+}
+.reward-set-stake:hover:not(:disabled) {
+  background: #243343;
+}
+.reward-set-stake:disabled {
+  color: var(--muted);
+  cursor: default;
+  background: transparent;
+}
+.reward-current-payout {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 13px;
+  margin-top: 16px;
+}
+.reward-current-payout > span {
+  color: var(--muted);
+}
+.reward-current-payout strong {
+  font-variant-numeric: tabular-nums;
+}
+.reward-target-note,
+.reward-assumptions {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.reward-target-note {
+  margin: 8px 0;
+}
+.reward-assumptions summary {
+  cursor: pointer;
+  padding-block: 4px;
+}
+.reward-assumptions p {
+  margin-bottom: 0;
+}
+.reward-target-empty {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 12px;
+  color: var(--muted);
+  padding: 36px 0;
+  font-size: 14px;
+}
+@media (max-width: 1099px) {
+  .prediction-surface .exchange-grid:has(.prediction-panels) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .prediction-panels {
+    grid-column: 1;
+    position: static;
+  }
+}
+@media (max-width: 600px) {
+  .prediction-panels {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .prediction-surface .prediction-panels > .order-ticket,
+  .reward-target.panel {
+    border-radius: 0;
+    border-width: 1px 0 0;
+    padding: 20px 0 0;
+  }
+  .reward-target-image {
+    height: 230px;
+  }
+  .reward-target h3 {
+    font-size: 16px;
+  }
+  .reward-target-stats > div,
+  .reward-current-payout {
+    font-size: 14px;
+  }
+  .reward-target-note,
+  .reward-assumptions {
+    font-size: 12px;
+  }
+  .reward-set-stake {
+    min-height: 44px;
+    font-size: 14px;
+  }
+}
