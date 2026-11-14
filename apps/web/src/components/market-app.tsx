@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   ArrowRight,
+  ArrowLeft,
   ArrowUpRight,
   BarChart3,
   Check,
@@ -344,22 +345,24 @@ export function MarketApp({
                 />
               ) : (
                 <>
-                  <div className="detail-breadcrumb">
-                    <Link href="/">‹ &nbsp; All markets</Link>
-                    <span>/</span>
-                    <span>
-                      {[selected?.category, selected?.subcategory]
-                        .filter(Boolean)
-                        .join(" / ") || "Market"}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setPractice(!practice)}
-                    >
-                      {practice ? "Exit practice" : "Try practice market"}
-                    </Button>
-                  </div>
+                  <nav
+                    className="detail-breadcrumb"
+                    aria-label="Back to markets"
+                  >
+                    <Link href="/">
+                      <ArrowLeft size={16} aria-hidden="true" />
+                      All markets
+                    </Link>
+                    {practice ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setPractice(false)}
+                      >
+                        Exit practice
+                      </Button>
+                    ) : null}
+                  </nav>
                   <div className="exchange-grid">
                     {selected ? (
                       <MarketDetail
