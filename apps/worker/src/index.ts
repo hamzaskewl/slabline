@@ -39,6 +39,7 @@ type Session = {
   close: () => void;
 };
 const books = new Map<string, Session>();
+const pendingBooks = new Map<string, Promise<Session>>();
 let knownMarkets: Market[] = [];
 const allContracts = (items: Market[]): Market["contracts"] =>
   items.flatMap((m) => [...m.contracts, ...allContracts(m.children)]);
@@ -131,7 +132,18 @@ async function rewardInventory(data: Market[]) {
         .join(" ") || null,
   };
 }
-async function subscribe(symbol: string) {
+async function subscribe(symbol: string): Promise<Session> {
+  const pending = pendingBooks.get(symbol);
+  if (pending) return pending;
+  const request = openBook(symbol);
+  pendingBooks.set(symbol, request);
+  try {
+    return await request;
+  } finally {
+    pendingBooks.delete(symbol);
+  }
+}
+async function openBook(symbol: string) {
   const existing = books.get(symbol);
   if (existing) {
     existing.lastAccess = Date.now();
@@ -144,13 +156,14 @@ async function subscribe(symbol: string) {
   if (!contract.quantityIncrement || !contract.priceIncrement)
     throw new Error("Instrument increments unavailable");
   const client = await geminiClient();
-  const book = client.orderBook(symbol);
+  let book = client.orderBook(symbol);
   const trades = client.websocket.public.trades(symbol, { highWaterMark: 1 });
   const session: Session = {
     book: null,
     latestTrade: null,
     lastAccess: Date.now(),
     close: () => {
+      clearInterval(recoveryTimer);
       book.close();
       void trades.close().catch(() => {});
     },
@@ -173,15 +186,14 @@ async function subscribe(symbol: string) {
   });
   // Historical candles also refresh after reconnect; the chart never fabricates missed ticks.
   void trades.ready.catch(() => {});
-  book.on("update", (lob) => {
+  let awaitingSnapshotSince = Date.now();
+  let recoveryAttempts = 0;
+  const onUpdate = (lob: typeof book) => {
+    const snapshot = lob.snapshot();
     session.book = {
       symbol,
-      bids: lob
-        .topN("bids", 100)
-        .map((l) => ({ price: l.price, quantity: l.qty })),
-      asks: lob
-        .topN("asks", 100)
-        .map((l) => ({ price: l.price, quantity: l.qty })),
+      bids: snapshot.bids.map((l) => ({ price: l.price, quantity: l.qty })),
+      asks: snapshot.asks.map((l) => ({ price: l.price, quantity: l.qty })),
       updatedAt: new Date().toISOString(),
       stale: false,
       source: "gemini",
@@ -191,12 +203,32 @@ async function subscribe(symbol: string) {
       priceMinimum: contract.priceMinimum,
       quoteAssetPrecision: contract.quoteAssetPrecision,
     };
-  });
+    awaitingSnapshotSince = 0;
+    recoveryAttempts = 0;
+  };
   const stale = () => {
     if (session.book) session.book = { ...session.book, stale: true };
+    if (!awaitingSnapshotSince) awaitingSnapshotSince = Date.now();
   };
-  book.on("resync", stale);
-  book.on("error", stale);
+  const listen = () => {
+    book.on("update", onUpdate);
+    book.on("resync", stale);
+    book.on("error", stale);
+  };
+  listen();
+  // SDK reconnects transport failures; also recover subscriptions that never
+  // deliver an initial/resync snapshot. A quiet, healthy book never times out.
+  const recoveryTimer = setInterval(() => {
+    const timeout = Math.min(60000, 20000 * 2 ** recoveryAttempts);
+    if (!awaitingSnapshotSince || Date.now() - awaitingSnapshotSince < timeout)
+      return;
+    book.close();
+    book = client.orderBook(symbol);
+    awaitingSnapshotSince = Date.now();
+    recoveryAttempts = Math.min(3, recoveryAttempts + 1);
+    listen();
+    console.warn("Gemini book snapshot timeout; resubscribed", symbol);
+  }, 5000);
   return session;
 }
 setInterval(() => {
