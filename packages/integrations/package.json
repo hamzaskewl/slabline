@@ -7,10 +7,11 @@
     "./fixtures": "./src/fixtures.ts"
   },
   "dependencies": {
-    "@collectible/domain": "workspace:*",
     "@collectible/db": "workspace:*",
+    "@collectible/domain": "workspace:*",
     "@gemini-markets/sdk": "0.1.1",
     "@solana/kit": "latest",
+    "viem": "^2.57.19",
     "zod": "latest"
   }
 }

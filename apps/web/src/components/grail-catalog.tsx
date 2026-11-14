@@ -1,6 +1,7 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
-import { ExternalLink, Layers3 } from "lucide-react";
+import { ArrowRight, Layers3 } from "lucide-react";
 import type { GrailToken } from "@collectible/domain";
 
 export function GrailCatalog({ tokens }: { tokens: GrailToken[] }) {
@@ -16,12 +17,10 @@ function GrailTile({ token }: { token: GrailToken }) {
   const [failed, setFailed] = useState(false);
   return (
     <article className="collectible-tile grail-tile">
-      <a
+      <Link
         className="card-image-well"
-        href={token.url}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={`View ${token.name} on Grail`}
+        href={`/tokens/${token.chainId}/${token.address}`}
+        aria-label={`View ${token.name}`}
       >
         <span className="grade-badge">{token.chain}</span>
         {token.image && !failed ? (
@@ -35,19 +34,17 @@ function GrailTile({ token }: { token: GrailToken }) {
         ) : (
           <Layers3 size={36} />
         )}
-      </a>
+      </Link>
       <div className="card-information">
         <span className="card-category">Grail token · {token.symbol}</span>
         <h3>{token.name}</h3>
         <p>{token.tags.filter((t) => t !== "WTM").join(" · ")}</p>
-        <a
+        <Link
           className="grail-action"
-          href={token.url}
-          target="_blank"
-          rel="noreferrer"
+          href={`/tokens/${token.chainId}/${token.address}`}
         >
-          View on Grail <ExternalLink size={14} />
-        </a>
+          Buy token <ArrowRight size={14} />
+        </Link>
         <details className="token-details">
           <summary>Token details</summary>
           <p>

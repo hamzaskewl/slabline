@@ -1,5 +1,8 @@
 "use client";
 import type { ReactNode } from "react";
+import { base } from "viem/chains";
+import { defineChain } from "viem";
+import { evmChains } from "@collectible/domain";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
@@ -19,10 +22,33 @@ export default function AuthProvider({
         appearance: {
           theme: "dark",
           accentColor: "#2e5cff",
-          walletChainType: "solana-only",
-          walletList: ["phantom", "solflare", "backpack"],
+          walletChainType: "ethereum-and-solana",
+          walletList: [
+            "detected_wallets",
+            "metamask",
+            "coinbase_wallet",
+            "phantom",
+            "solflare",
+            "backpack",
+          ],
         },
-        embeddedWallets: { solana: { createOnLogin: "users-without-wallets" } },
+        defaultChain: base,
+        supportedChains: [
+          base,
+          defineChain({
+            id: 4663,
+            name: "Robinhood",
+            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+            rpcUrls: { default: { http: [evmChains[4663].rpc] } },
+            blockExplorers: {
+              default: { name: "Blockscout", url: evmChains[4663].explorer },
+            },
+          }),
+        ],
+        embeddedWallets: {
+          solana: { createOnLogin: "users-without-wallets" },
+          ethereum: { createOnLogin: "users-without-wallets" },
+        },
         externalWallets: { solana: { connectors } },
         solana: {
           rpcs: {

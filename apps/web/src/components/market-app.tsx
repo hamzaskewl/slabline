@@ -1155,10 +1155,8 @@ function MarketDetail({
             .map((t) => (
               <a
                 className="related-token"
-                href={t.url}
+                href={`/tokens/${t.chainId}/${t.address}`}
                 key={t.id}
-                target="_blank"
-                rel="noreferrer"
               >
                 {t.name}{" "}
                 <span>

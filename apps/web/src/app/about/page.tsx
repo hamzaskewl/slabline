@@ -25,9 +25,10 @@ export default function About() {
           Practice orders are simulated and saved on this device.
         </p>
         <p>
-          Grail links open its website. Token purchases, gas sponsorship and
-          physical redemption are not integrated. Owning a fraction of a token
-          does not by itself qualify for a physical card.
+          Grail purchases use the connected EVM wallet and require a live 0x
+          quote. Purchases remain disabled pending setup and a verified test.
+          Gas sponsorship is off; physical redemption remains on Grail. Owning a
+          fraction of a token does not by itself qualify for a physical card.
         </p>
       </section>
       <section>

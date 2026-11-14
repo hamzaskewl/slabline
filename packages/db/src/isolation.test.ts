@@ -4,6 +4,7 @@ import {
   users,
   walletChallenges,
   fundingIntents,
+  orders,
   eq,
   and,
   isNull,
@@ -87,6 +88,43 @@ test.skipIf(!process.env.DATABASE_URL)(
             .select()
             .from(fundingIntents)
             .where(eq(fundingIntents.userId, b.id)),
+        ).toHaveLength(0);
+        const [order] = await tx
+          .insert(orders)
+          .values({
+            userId: a.id,
+            idempotencyKey: `grail:${key}`,
+            state: "quoted",
+            data: { fixture: true },
+          })
+          .returning();
+        if (!order) throw new Error("Order fixture missing");
+        const claim = (userId: string) =>
+          tx
+            .update(orders)
+            .set({ state: "submitting" })
+            .where(
+              and(
+                eq(orders.id, order.id),
+                eq(orders.userId, userId),
+                eq(orders.state, "quoted"),
+              ),
+            )
+            .returning();
+        expect(await claim(b.id)).toHaveLength(0);
+        expect(await claim(a.id)).toHaveLength(1);
+        expect(await claim(a.id)).toHaveLength(0);
+        expect(
+          await tx
+            .insert(orders)
+            .values({
+              userId: a.id,
+              idempotencyKey: `grail:${key}`,
+              state: "quoted",
+              data: { fixture: true },
+            })
+            .onConflictDoNothing()
+            .returning(),
         ).toHaveLength(0);
         throw new Error(marker);
       });
