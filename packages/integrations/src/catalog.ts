@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Listing, Pack, ProviderResult } from "@collectible/domain";
+import { sportCategories } from "@collectible/domain";
 import { safeImage } from "./gemini";
 import { getDb, providerCache, eq } from "@collectible/db";
 
@@ -93,6 +94,7 @@ const rawCard = z.object({
   id: z.string(),
   nftAddress: z.string(),
   itemName: z.string(),
+  autographed: z.boolean().optional(),
   category: z.string().nullable().optional(),
   grade: z.union([z.string(), z.number()]).nullable().optional(),
   gradingCompany: z.string().nullable().optional(),
@@ -120,58 +122,78 @@ const rawCard = z.object({
     .nullable()
     .optional(),
 });
-export async function listCards(search = ""): Promise<Listing[]> {
+export async function listCards(
+  search = "",
+  categories: string[] = sportCategories,
+): Promise<Listing[]> {
   const network =
     process.env.COLLECTOR_CRYPT_NETWORK === "devnet" ? "devnet" : "mainnet";
-  return cached(`cards:v2:${network}:${search}`, 60000, async () => {
-    const base =
-      network === "devnet"
-        ? "https://dev-api.collectorcrypt.com"
-        : "https://api.collectorcrypt.com";
-    const params = new URLSearchParams({
-      step: "100",
-      marketplaceSource: "CC",
-      orderBy: "listedPriceAsc",
-      listPriceMin: "5",
-      listPriceMax: "1000",
-      ...(search ? { search } : {}),
-    });
-    const data = z
-      .object({ filterNFtCard: z.array(rawCard) })
-      .parse(await json(`${base}/marketplace?${params}`));
-    return data.filterNFtCard
-      .filter(
-        (c) =>
-          c.listing?.currency === "USDC" &&
-          c.grade &&
-          c.gradingCompany &&
-          /^(PSA|BGS|CGC|SGC|TAG|CSG|ACE)$/i.test(c.gradingCompany),
-      )
-      .map((c) => ({
-        id: c.id,
-        mint: c.nftAddress,
-        name: c.itemName,
-        category: c.category ?? "Collectible",
-        player: null,
-        grade: String(c.grade),
-        grader: c.gradingCompany ?? null,
-        cert: c.gradingID ?? null,
-        year: c.year ? String(c.year) : null,
-        set: c.set ?? null,
-        frontImage:
-          safeImage(c.frontImage) ??
-          safeImage(c.images?.frontM) ??
-          safeImage(c.images?.frontS),
-        backImage: safeImage(c.backImage) ?? safeImage(c.images?.backS),
-        ask: String(c.listing!.price),
-        currency: "USDC" as const,
-        seller: c.owner?.wallet ?? null,
-        network,
-        source: "collectorcrypt" as const,
-        observedAt: new Date().toISOString(),
-        valuation: null,
-      }));
-  });
+  return cached(
+    `cards:v4:${network}:${categories.join(",")}:${search}`,
+    60000,
+    async () => {
+      const base =
+        network === "devnet"
+          ? "https://dev-api.collectorcrypt.com"
+          : "https://api.collectorcrypt.com";
+      const params = new URLSearchParams({
+        step: "100",
+        marketplaceSource: "CC",
+        orderBy: "listedPriceDesc",
+        categories: categories.join(","),
+        ...(search ? { search } : {}),
+      });
+      const rows: z.infer<typeof rawCard>[] = [];
+      const cursors = new Set<string>();
+      for (let page = 0; page < 100; page++) {
+        const data = z
+          .object({
+            filterNFtCard: z.array(rawCard),
+            nextCursor: z.string().nullish(),
+          })
+          .parse(await json(`${base}/marketplace?${params}`));
+        rows.push(...data.filterNFtCard);
+        if (!data.nextCursor) break;
+        if (cursors.has(data.nextCursor) || page === 99)
+          throw new Error("Collector Crypt catalog pagination incomplete");
+        cursors.add(data.nextCursor);
+        params.set("cursor", data.nextCursor);
+      }
+      return [...new Map(rows.map((c) => [c.nftAddress, c])).values()]
+        .filter(
+          (c) =>
+            c.listing?.currency === "USDC" &&
+            c.grade &&
+            c.gradingCompany &&
+            /^(PSA|BGS|CGC|SGC|TAG|CSG|ACE)$/i.test(c.gradingCompany),
+        )
+        .map((c) => ({
+          id: c.id,
+          mint: c.nftAddress,
+          name: c.itemName,
+          category: c.category ?? "Collectible",
+          player: null,
+          autographed: c.autographed,
+          grade: String(c.grade),
+          grader: c.gradingCompany ?? null,
+          cert: c.gradingID ?? null,
+          year: c.year ? String(c.year) : null,
+          set: c.set ?? null,
+          frontImage:
+            safeImage(c.frontImage) ??
+            safeImage(c.images?.frontM) ??
+            safeImage(c.images?.frontS),
+          backImage: safeImage(c.backImage) ?? safeImage(c.images?.backS),
+          ask: String(c.listing!.price),
+          currency: "USDC" as const,
+          seller: c.owner?.wallet ?? null,
+          network,
+          source: "collectorcrypt" as const,
+          observedAt: new Date().toISOString(),
+          valuation: null,
+        }));
+    },
+  );
 }
 export async function listPacks(): Promise<Pack[]> {
   return cached("phygitals:packs:v1", 300000, async () => {

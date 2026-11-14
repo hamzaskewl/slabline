@@ -1,5 +1,7 @@
 import { z } from "zod";
 export * from "./history";
+export * from "./rewards";
+import { relatedCards } from "./rewards";
 
 export const decimal = z.string().regex(/^\d+(\.\d{1,6})?$/);
 export const levelSchema = z.object({ price: decimal, quantity: decimal });
@@ -130,6 +132,7 @@ export type Listing = {
   name: string;
   category: string;
   player: string | null;
+  autographed?: boolean;
   grade: string | null;
   grader: string | null;
   cert: string | null;
@@ -369,37 +372,7 @@ export function transitionPurchase(from: PurchaseState, to: PurchaseState) {
     throw new Error(`Invalid purchase transition ${from} -> ${to}`);
   return to;
 }
-export function matchingCards(market: Market, listings: Listing[]) {
-  const words = new Set(
-    `${market.title} ${market.contracts.map((c) => c.label).join(" ")}`
-      .toLowerCase()
-      .split(/[^a-z]+/)
-      .filter(
-        (w) =>
-          w.length > 3 &&
-          ![
-            "above",
-            "below",
-            "price",
-            "will",
-            "today",
-            "this",
-            "week",
-            "year",
-            "home",
-            "away",
-            "total",
-            "points",
-            "than",
-            "more",
-          ].includes(w),
-      ),
-  );
-  return listings.filter((l) => {
-    const name = `${l.player ?? ""} ${l.name}`.toLowerCase();
-    return [...words].some((w) => name.split(/[^a-z]+/).includes(w));
-  });
-}
+export const matchingCards = relatedCards;
 
 export const fundingStates = [
   "draft",
