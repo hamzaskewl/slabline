@@ -142,7 +142,7 @@ export function Discovery({
               <div className="market-skeleton" key={i} />
             ))}
           </div>
-        ) : error ? (
+        ) : error && !markets.length ? (
           <div className="empty-state">
             <Radio size={28} />
             <h2>Market feed unavailable</h2>

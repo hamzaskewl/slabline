@@ -1,7 +1,7 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { httpBatchLink } from "@trpc/client";
+import { httpLink } from "@trpc/client";
 import { api } from "@/lib/trpc";
 import dynamic from "next/dynamic";
 const AuthProvider = dynamic(() => import("./auth-provider"), { ssr: false });
@@ -15,7 +15,7 @@ export function Providers({ children }: { children: ReactNode }) {
       }),
   );
   const [client] = useState(() =>
-    api.createClient({ links: [httpBatchLink({ url: "/api/trpc" })] }),
+    api.createClient({ links: [httpLink({ url: "/api/trpc" })] }),
   );
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
   const content = (
