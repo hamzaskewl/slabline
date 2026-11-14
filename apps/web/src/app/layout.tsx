@@ -5,6 +5,7 @@ import "./globals.css";
 import "./prediction-theme.css";
 import "./mobile.css";
 import "./order-book.css";
+import "./reward-target.css";
 import { Providers } from "@/components/providers";
 export const metadata: Metadata = {
   applicationName: "Collectible Markets",

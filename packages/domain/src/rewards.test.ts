@@ -7,6 +7,7 @@ import {
   relatedCards,
   matchingTokens,
   outcomeRewardMarket,
+  teamRewardMatch,
   type Market,
   type Listing,
   type GrailToken,
@@ -72,6 +73,52 @@ const tokens = [
   token("gELON", ["Founder"]),
   token("gPIKA", ["TCG"]),
 ];
+
+test("team rewards require the exact selected NBA team and an unexpired roster link", () => {
+  const phoenix = {
+    symbol: "GEMI-NBA-2611152100-LAL-PHX-M-PHX",
+    label: "Phoenix",
+    status: "active",
+    lastPrice: null,
+    quantityIncrement: "0.01",
+    priceIncrement: "0.01",
+  };
+  const lakers = {
+    ...phoenix,
+    symbol: "GEMI-NBA-2611152100-LAL-PHX-M-LAL",
+    label: "Los Angeles L",
+  };
+  const event = {
+    ...market("Los Angeles L vs Phoenix", "Pro Basketball"),
+    contracts: [lakers, phoenix],
+  };
+  const booker = card("2015 Devin Booker PSA 9", "Basketball", "125");
+  const now = Date.parse("2026-11-14T00:00:00Z");
+  expect(
+    teamRewardMatch(outcomeRewardMarket(event, phoenix), booker, now)?.name,
+  ).toBe("Phoenix Suns");
+  expect(
+    teamRewardMatch(outcomeRewardMarket(event, lakers), booker, now),
+  ).toBeNull();
+  expect(
+    teamRewardMatch(event, card("Random football player", "Football"), now),
+  ).toBeNull();
+  expect(
+    teamRewardMatch(
+      {
+        ...event,
+        contracts: [
+          { ...phoenix, symbol: phoenix.symbol.replace("NBA", "NCAAB") },
+        ],
+      },
+      booker,
+      now,
+    ),
+  ).toBeNull();
+  expect(
+    teamRewardMatch(event, booker, Date.parse("2026-12-15T00:00:00Z")),
+  ).toBeNull();
+});
 
 test("only active markets with a real inventory relationship qualify", () => {
   const nba = market("Michael Jordan award", "NBA");

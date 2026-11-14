@@ -6,7 +6,54 @@ import {
   depthRows,
   quoteDepth,
   sidePrice,
+  payoutTarget,
+  type Book,
 } from "./index";
+
+const targetBook: Book = {
+  symbol: "GEMI-TEST",
+  source: "gemini",
+  updatedAt: "2026-11-14T00:00:00Z",
+  stale: false,
+  bids: [{ price: "0.37", quantity: "500" }],
+  asks: [
+    { price: "0.38", quantity: "357" },
+    { price: "0.39", quantity: "200" },
+  ],
+  quantityIncrement: "0.01",
+  priceIncrement: "0.01",
+  quantityMinimum: "0.01",
+  priceMinimum: "0.01",
+  quoteAssetPrecision: 2,
+};
+test("a 125 dollar gross target costs 47.50 at actual 38 cent depth", () => {
+  expect(payoutTarget("125", targetBook, "yes")).toEqual({
+    sharesNeeded: "125.000000",
+    availableShares: "557.000000",
+    stake: "47.500000",
+    averagePrice: "0.380000",
+  });
+  const higher = payoutTarget("400", targetBook, "yes");
+  expect(higher.stake).toBe("152.430000");
+  expect(higher.averagePrice).toBe("0.381075");
+});
+test("target estimates respect lots, NO inversion, stale data and insufficient depth", () => {
+  expect(
+    payoutTarget(
+      "125.01",
+      { ...targetBook, quantityIncrement: "1", quantityMinimum: "1" },
+      "yes",
+    ).sharesNeeded,
+  ).toBe("126.000000");
+  expect(payoutTarget("125", targetBook, "no").stake).toBe("78.750000");
+  expect(payoutTarget("600", targetBook, "yes").stake).toBeNull();
+  expect(
+    payoutTarget("125", { ...targetBook, stale: true }, "yes").stake,
+  ).toBeNull();
+  expect(
+    payoutTarget("125", { ...targetBook, asks: [] }, "yes").stake,
+  ).toBeNull();
+});
 
 test("depth totals accumulate from the best price, preserving ungrouped notional", () => {
   const asks = [

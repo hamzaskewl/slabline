@@ -156,6 +156,7 @@ export function relatedCards(market: Market, cards: Listing[]) {
       : [];
   });
   return cards.filter((card) => {
+    if (teamRewardMatch(market, card)) return true;
     if (card.player && includes(text, card.player)) return true;
     if (
       ["Pokemon", "One Piece", "Riftbound"].includes(card.category) &&
@@ -167,6 +168,49 @@ export function relatedCards(market: Market, cards: Listing[]) {
       outcomeSubjects.some((subject) => includes(card.name, subject))
     );
   });
+}
+
+// Explicit roster relationships, verified from NBA player profiles 2026-11-14.
+// Expire until reverified; never infer a player from the sport alone.
+const verifiedTeamRewards = [
+  {
+    team: "PHX",
+    name: "Phoenix Suns",
+    player: "Devin Booker",
+    source: "https://www.nba.com/player/1626164/devin-booker",
+  },
+  {
+    team: "SAS",
+    name: "San Antonio Spurs",
+    player: "Victor Wembanyama",
+    source: "https://www.nba.com/player/1641705/victor-wembanyama",
+  },
+] as const;
+export function teamRewardMatch(
+  market: Market,
+  card: Listing,
+  now = Date.now(),
+) {
+  if (
+    card.category !== "Basketball" ||
+    now >= Date.parse("2026-12-14T00:00:00Z")
+  )
+    return null;
+  const contracts = [
+    ...market.contracts,
+    ...market.children.flatMap((child) => child.contracts),
+  ];
+  return (
+    verifiedTeamRewards.find(
+      (team) =>
+        includes(card.name, team.player) &&
+        contracts.some(
+          (c) =>
+            c.symbol.startsWith("GEMI-NBA-") &&
+            c.symbol.endsWith(`-M-${team.team}`),
+        ),
+    ) ?? null
+  );
 }
 export function outcomeRewardMarket(
   market: Market,

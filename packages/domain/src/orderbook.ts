@@ -1,6 +1,58 @@
-import { decimal, money, units, type Book, type Level } from "./index";
+import {
+  decimal,
+  money,
+  units,
+  quoteDepth,
+  type Book,
+  type Level,
+} from "./index";
 
 const SCALE = 1_000_000n;
+
+/** Gross $1/share payout target. Conversion and provider fees are not included. */
+export function payoutTarget(target: string, book: Book, side: "yes" | "no") {
+  const lot = units(book.quantityIncrement);
+  if (lot <= 0n) throw new Error("Invalid quantity increment");
+  const ceil = (value: bigint, step: bigint) =>
+    ((value + step - 1n) / step) * step;
+  const minimum = ceil(
+    units(book.quantityMinimum ?? book.quantityIncrement),
+    lot,
+  );
+  const roundedTarget = ceil(units(target), lot);
+  const sharesNeeded = roundedTarget > minimum ? roundedTarget : minimum;
+  const asks = bookForSide(book, side).asks;
+  const levels = asks
+    .map((l) => ({
+      price: units(l.price),
+      quantity: (units(l.quantity) / lot) * lot,
+    }))
+    .sort((a, b) => (a.price < b.price ? -1 : a.price > b.price ? 1 : 0));
+  const available = levels.reduce((sum, l) => sum + l.quantity, 0n);
+  const precision = book.quoteAssetPrecision ?? 6;
+  if (!Number.isInteger(precision) || precision < 0 || precision > 6)
+    throw new Error("Invalid quote precision");
+  const cashUnit = 10n ** BigInt(6 - precision);
+  let remaining = sharesNeeded,
+    cost = 0n;
+  for (const l of levels) {
+    const q = remaining < l.quantity ? remaining : l.quantity;
+    cost +=
+      ((l.price * q + SCALE * cashUnit - 1n) / (SCALE * cashUnit)) * cashUnit;
+    remaining -= q;
+    if (!remaining) break;
+  }
+  const base = {
+    sharesNeeded: money(sharesNeeded),
+    availableShares: money(available),
+  };
+  if (remaining || book.stale || cost > units("1000000"))
+    return { ...base, stake: null, averagePrice: null };
+  const quote = quoteDepth({ ...book, asks, stake: money(cost), feeBps: null });
+  return units(quote.contracts) >= sharesNeeded
+    ? { ...base, stake: money(cost), averagePrice: quote.averagePrice }
+    : { ...base, stake: null, averagePrice: null };
+}
 export type DepthRow = Level & {
   minPrice: string;
   maxPrice: string;

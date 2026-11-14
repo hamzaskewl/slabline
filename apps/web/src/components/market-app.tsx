@@ -49,6 +49,7 @@ import { usd } from "@/lib/utils";
 import { GrailCatalog } from "./grail-catalog";
 import { Discovery } from "./discovery";
 import { OutcomeDetail } from "./outcome-detail";
+import { RewardTarget } from "./reward-target";
 import { useLiveBook } from "@/lib/use-live-book";
 const PriceChart = dynamic(() => import("./price-chart"), {
   ssr: false,
@@ -693,7 +694,7 @@ function MarketDetail({
   const possibleMatches = rewardMarket
     ? matchingCards(rewardMarket, cards)
     : [];
-  const attainable = possibleMatches.slice(0, 3);
+
   return (
     <>
       <section className="market-detail panel">
@@ -825,262 +826,168 @@ function MarketDetail({
           </a>
         </details>
       </section>
-      <aside className="order-ticket panel" id="prediction-ticket">
-        <h2 className="prediction-title">The prediction</h2>
-        <p className="ticket-event">{market.title}</p>
-        <label className="ticket-outcome">
-          <i style={{ background: contract?.color }} />
-          <select
-            aria-label="Prediction outcome"
-            value={symbol ?? ""}
-            onChange={(e) => selectOutcome(e.target.value, side)}
-          >
-            {!contract && <option value="">Choose an outcome</option>}
-            {contracts.map((c) => (
-              <option key={c.symbol} value={c.symbol}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown size={18} />
-        </label>
-        <div className="side-toggle">
-          {(["yes", "no"] as const).map((s) => (
-            <button
-              key={s}
-              aria-pressed={s === side}
-              className={s + (s === side ? " selected" : "")}
-              disabled={!contract}
-              onClick={() => contract && selectOutcome(contract.symbol, s)}
+      <div className="prediction-panels">
+        <aside className="order-ticket panel" id="prediction-ticket">
+          <h2 className="prediction-title">
+            The prediction{" "}
+            <span title="Live trading is disabled">Estimate</span>
+          </h2>
+          <p className="ticket-event">{market.title}</p>
+          <label className="ticket-outcome">
+            <i style={{ background: contract?.color }} />
+            <select
+              aria-label="Prediction outcome"
+              value={symbol ?? ""}
+              onChange={(e) => selectOutcome(e.target.value, side)}
             >
-              {s === "yes" ? "Yes" : "No"}{" "}
-              <b>
-                {buyPercent(s === "yes" ? contract?.buyYes : contract?.buyNo)}
-              </b>
-            </button>
-          ))}
-        </div>
-        <label className="stake-label" htmlFor="stake">
-          Your stake <span>USD</span>
-        </label>
-        <div className="stake-input">
-          <span>$</span>
-          <input
-            id="stake"
-            inputMode="decimal"
-            value={stake}
-            onChange={(e) => {
-              setStake(e.target.value);
-              setReview(false);
-            }}
-            aria-describedby="quote-note"
-          />
-        </div>
-        <div className="stake-presets">
-          {[50, 100, 500].map((v) => (
-            <button
-              key={v}
-              onClick={() => {
-                setStake(
-                  String(
-                    Math.min(
-                      1000000,
-                      Math.round(((Number(stake) || 0) + v) * 100) / 100,
-                    ),
-                  ),
-                );
+              {!contract && <option value="">Choose an outcome</option>}
+              {contracts.map((c) => (
+                <option key={c.symbol} value={c.symbol}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={18} />
+          </label>
+          <div className="side-toggle">
+            {(["yes", "no"] as const).map((s) => (
+              <button
+                key={s}
+                aria-pressed={s === side}
+                className={s + (s === side ? " selected" : "")}
+                disabled={!contract}
+                onClick={() => contract && selectOutcome(contract.symbol, s)}
+              >
+                {s === "yes" ? "Yes" : "No"}{" "}
+                <b>
+                  {buyPercent(s === "yes" ? contract?.buyYes : contract?.buyNo)}
+                </b>
+              </button>
+            ))}
+          </div>
+          <p id="quote-note" className="sr-only">
+            Estimates use available depth before fees. A losing prediction pays
+            zero. Live trading is disabled.
+          </p>
+          <label className="stake-label" htmlFor="stake">
+            Your stake <span>USD</span>
+          </label>
+          <div className="stake-input">
+            <span>$</span>
+            <input
+              id="stake"
+              inputMode="decimal"
+              value={stake}
+              onChange={(e) => {
+                setStake(e.target.value);
                 setReview(false);
               }}
+              aria-describedby="quote-note"
+            />
+          </div>
+          <div className="stake-presets">
+            {[50, 100, 500].map((v) => (
+              <button
+                key={v}
+                onClick={() => {
+                  setStake(
+                    String(
+                      Math.min(
+                        1000000,
+                        Math.round(((Number(stake) || 0) + v) * 100) / 100,
+                      ),
+                    ),
+                  );
+                  setReview(false);
+                }}
+              >
+                +${v}
+              </button>
+            ))}
+            <button
+              disabled
+              title="A verified spendable USD balance is required"
             >
-              +${v}
+              Max
             </button>
-          ))}
-          <button disabled title="A verified spendable USD balance is required">
-            Max
-          </button>
-        </div>
-        <div className="execution-estimate" aria-label="Execution estimate">
-          <div>
-            <span>Average price</span>
-            <strong>
-              {cents(quote?.averagePrice ?? null, book?.priceIncrement, true)}
-            </strong>
           </div>
-          <div>
-            <span>Shares</span>
-            <strong>
-              {quote
-                ? Number(quote.contracts).toLocaleString("en-US", {
-                    maximumFractionDigits: 6,
-                  })
-                : "—"}
-            </strong>
-          </div>
-          {quote?.exhausted && (
-            <p>
-              Not enough depth for this stake. {usd(quote.unspent)} would remain
-              unspent{practice ? "." : " before fees."}
-            </p>
-          )}
-        </div>
-        <details className="estimate-details">
-          <summary>Estimate details</summary>
-          <div className="quote-lines">
+          {practice ? (
+            <>
+              <Button
+                className="ticket-action"
+                disabled={!quote || units(quote.contracts) === 0n}
+                onClick={() => setReview(true)}
+              >
+                Review simulated order <ArrowRight size={16} />
+              </Button>
+              {review && quote ? (
+                <div className="review-box">
+                  <strong>SIMULATED order review</strong>
+                  <p>
+                    {side.toUpperCase()} on {contract?.label} ·{" "}
+                    {quote.contracts} contracts · {usd(quote.cost)} +{" "}
+                    {usd(quote.fees ?? "0")} fixture fee. No funds move.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      onSimulate({
+                        symbol: symbol ?? "SIMULATED",
+                        side,
+                        stake,
+                        cost: quote.cost,
+                        contracts: quote.contracts,
+                      } as Omit<PracticeOrder, "id" | "createdAt">);
+                      setReview(false);
+                    }}
+                  >
+                    Confirm simulation
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+          <div className="execution-estimate" aria-label="Execution estimate">
             <div>
-              <span>Gross odds at listed price</span>
+              <span title="Weighted average across available orders, before fees">
+                Average price
+              </span>
               <strong>
-                {(() => {
-                  const p = side === "yes" ? contract?.buyYes : contract?.buyNo;
-                  return buyPercent(p) !== "—" && Number(p) > 0
-                    ? (1 / Number(p)).toFixed(2) + "×"
-                    : "—";
-                })()}
+                {cents(quote?.averagePrice ?? null, book?.priceIncrement, true)}
               </strong>
             </div>
             <div>
-              <span>Executable quantity</span>
+              <span>
+                Shares
+                {quote?.exhausted && (
+                  <small className="shares-limit">max available</small>
+                )}
+              </span>
               <strong>
                 {quote
-                  ? Number(quote.contracts).toLocaleString(undefined, {
-                      maximumFractionDigits: 2,
+                  ? Number(quote.contracts).toLocaleString("en-US", {
+                      maximumFractionDigits: 6,
                     })
                   : "—"}
               </strong>
             </div>
-            <div>
-              <span>Estimated cost</span>
-              <strong>{quote ? usd(quote.cost) : "—"}</strong>
-            </div>
-            <div>
-              <span>{practice ? "Fixture fee (1%)" : "Gemini fee"}</span>
-              <strong>{quote?.fees ? usd(quote.fees) : "Unverified"}</strong>
-            </div>
-            <div>
-              <span>Unspent stake{!practice ? " before fees" : ""}</span>
-              <strong>{quote ? usd(quote.unspent) : "—"}</strong>
-            </div>
           </div>
-        </details>
-        <div className="payout-box">
-          <span>
-            Estimated payout · {side.toUpperCase()} on{" "}
-            {contract?.label ?? "unselected outcome"}
-          </span>
-          <strong>
-            {quote ? usd(quote.totalPayout) : "—"}
-            <ArrowUpRight size={24} />
-          </strong>
-          <small>
-            {practice
-              ? "SIMULATED · includes stake in payout"
-              : "Before unverified fees · estimate only"}
-          </small>
-        </div>
-        <p className="quote-note" id="quote-note">
-          {stale
-            ? "Book is stale. Estimates paused until a fresh snapshot arrives."
-            : "Walks available depth. Prices can change; a losing outcome pays $0."}
-        </p>
-        {practice ? (
-          <>
-            <Button
-              className="ticket-action"
-              disabled={!quote || units(quote.contracts) === 0n}
-              onClick={() => setReview(true)}
-            >
-              Review simulated order <ArrowRight size={16} />
-            </Button>
-            {review && quote ? (
-              <div className="review-box">
-                <strong>SIMULATED order review</strong>
-                <p>
-                  {side.toUpperCase()} on {contract?.label} · {quote.contracts}{" "}
-                  contracts · {usd(quote.cost)} + {usd(quote.fees ?? "0")}{" "}
-                  fixture fee. No funds move.
-                </p>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    onSimulate({
-                      symbol: symbol ?? "SIMULATED",
-                      side,
-                      stake,
-                      cost: quote.cost,
-                      contracts: quote.contracts,
-                    } as Omit<PracticeOrder, "id" | "createdAt">);
-                    setReview(false);
-                  }}
-                >
-                  Confirm simulation
-                </Button>
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <Button disabled className="ticket-action">
-            Live trading requires approval
-          </Button>
-        )}
-        <div className="reward-ticket">
-          <div>
-            <Gift size={17} />
-            <strong>Collectible preview</strong>
-          </div>
-          <p>
-            {rewardsLoading
-              ? "Loading related cards…"
-              : rewardsError && !attainable.length
-                ? rewardsError
-                : attainable.length
-                  ? "Related to the selected prediction."
-                  : "No listed card matches this prediction."}
-          </p>
-          <div className="reward-mini-grid">
-            {attainable.map((c) => (
-              <div className="reward-preview-card" key={c.mint}>
-                {c.frontImage ? (
-                  <img
-                    src={c.frontImage}
-                    alt={c.name}
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <Layers3 size={20} />
-                )}
-                <strong>{c.name}</strong>
-                <span>{usd(c.ask)} USDC ask</span>
-                {quote ? (
-                  <small>
-                    {units(c.ask) <= units(quote.totalPayout)
-                      ? "Within gross payout · fees not included"
-                      : `${usd(money(units(c.ask) - units(quote.totalPayout)))} above estimated payout`}
-                  </small>
-                ) : null}
-              </div>
-            ))}
-          </div>
-          {(rewardMarket ? matchingTokens(rewardMarket, tokens) : [])
-            .slice(0, 2)
-            .map((t) => (
-              <a
-                className="related-token"
-                href={`/tokens/${t.chainId}/${t.address}`}
-                key={t.id}
-              >
-                {t.name}{" "}
-                <span>
-                  {t.symbol} · {t.chain}
-                </span>
-                <ExternalLink size={13} />
-              </a>
-            ))}
-          <small>
-            Choose rewards from a settled winning prediction. Availability and
-            fees are checked then.
-          </small>
-        </div>
-      </aside>
+        </aside>
+        <RewardTarget
+          cards={possibleMatches}
+          market={rewardMarket}
+          book={book}
+          side={side}
+          stale={stale}
+          loading={rewardsLoading}
+          error={rewardsError}
+          payout={quote?.totalPayout ?? null}
+          onStake={(value) => {
+            setStake(value.replace(/0+$/, "").replace(/\.$/, ""));
+            setReview(false);
+          }}
+        />
+      </div>
     </>
   );
 }
