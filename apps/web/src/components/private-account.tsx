@@ -48,10 +48,7 @@ export function PrivateAccount() {
   return (
     <section className="panel funding-panel">
       <h2>Your linked Gemini account</h2>
-      <p>
-        Gemini USD is separate from Solana assets. Read-only account access
-        never grants a trade or withdrawal.
-      </p>
+
       <div className="wallet-actions">
         <Button disabled={!authenticated || busy} onClick={() => void load()}>
           {busy ? "Refreshing…" : "Load Gemini balances & positions"}

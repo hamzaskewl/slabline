@@ -213,3 +213,184 @@
     display: none;
   }
 }
+.reward-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.reward-toolbar .category-tabs span {
+  margin-left: 6px;
+  opacity: 0.6;
+}
+.reward-filter-panel {
+  border: 1px solid #272c32;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  padding: 16px;
+}
+.reward-filter-panel summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.reward-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+.reward-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #a7adb8;
+  font-size: 12px;
+  min-width: 0;
+}
+.reward-filters input,
+.reward-filters select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  background: #14191f;
+  border: 1px solid #333943;
+  color: #f1f3f5;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+.filter-reset {
+  align-self: end;
+  min-height: 42px;
+  color: #87b3f7;
+  font-size: 14px;
+  cursor: pointer;
+}
+.reward-result-count {
+  font-size: 13px;
+  color: #a7adb8;
+  margin: 16px 0;
+}
+.reward-load-more {
+  display: block;
+  margin: 24px auto;
+}
+.grail-tile a.card-image-well {
+  display: flex;
+}
+.grail-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 0;
+  color: #87b3f7;
+  font-size: 13px;
+}
+.token-details {
+  border-top: 1px solid #272c32;
+  padding-top: 12px;
+  font-size: 12px;
+  color: #a7adb8;
+}
+.token-details summary {
+  cursor: pointer;
+}
+.token-details code {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 8px 0;
+}
+.token-details p {
+  line-height: 1.6;
+}
+.token-catalog-note {
+  color: #a7adb8;
+  font-size: 13px;
+  margin: 0 0 20px;
+}
+.related-token {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 12px 0;
+  font-size: 12px;
+  border-top: 1px solid #272c32;
+}
+.related-token span {
+  color: #a7adb8;
+}
+.about-page {
+  max-width: 760px;
+  margin: auto;
+  padding: 40px 24px 80px;
+}
+.about-page h1 {
+  font-size: 28px;
+  margin: 32px 0;
+}
+.about-page section {
+  margin: 28px 0;
+}
+.about-page h2 {
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+.about-page p {
+  color: #a7adb8;
+  line-height: 1.7;
+  margin: 12px 0;
+}
+.about-page a {
+  color: #87b3f7;
+}
+@media (max-width: 760px) {
+  .reward-toolbar {
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .reward-toolbar .search-field {
+    width: 100%;
+  }
+  .reward-toolbar input {
+    font-size: 16px;
+  }
+  .reward-filter-panel {
+    padding: 12px;
+  }
+  .reward-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .reward-filters input,
+  .reward-filters select {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .filter-reset {
+    min-height: 44px;
+  }
+  .about-page {
+    padding: 24px 16px 60px;
+  }
+}
+.collectible-tile .card-price {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.collectible-tile .card-price > div {
+  min-width: 0;
+  max-width: 100%;
+}
+.collectible-tile .add-card {
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .collectible-tile .card-price strong {
+    font-size: 16px;
+  }
+}

@@ -38,21 +38,15 @@ export function Discovery({
   onPractice: () => void;
 }) {
   const [limit, setLimit] = useState(24);
-  const preferredCategories = [
-    "All markets",
-    "Sports",
-    "Crypto",
-    "Economics",
-    "Politics",
-    "Tech",
-    "Culture",
-    "Business",
-    "Commodities",
-    "Weather",
-    "Other",
-  ];
   const categories = [
-    ...new Set([...preferredCategories, ...markets.map((m) => m.category)]),
+    "All markets",
+    ...new Set(
+      markets
+        .map((m) => m.category)
+        .sort((a, b) =>
+          a === "Sports" ? -1 : b === "Sports" ? 1 : a.localeCompare(b),
+        ),
+    ),
   ];
   const searchable = (m: Market): string =>
     m.searchText ??

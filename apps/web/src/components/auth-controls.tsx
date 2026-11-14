@@ -104,10 +104,7 @@ export function ConnectedWalletPanel() {
   return (
     <section className="panel funding-panel">
       <h2>Connect and verify your wallet</h2>
-      <p>
-        Google or email signs you into this app. Gemini is a separate account
-        connection. A wallet signature proves your selected destination.
-      </p>
+
       {authenticated ? (
         <>
           <div className="wallet-actions">
