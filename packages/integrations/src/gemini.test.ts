@@ -78,6 +78,29 @@ test("catalog walks past 100 and 500, retaining nested and unpriced markets", as
   expect(full.children[0]!.contracts).toHaveLength(30);
 });
 
+test("a timed out catalog page retries from the same offset with smaller pages", async () => {
+  const calls: number[][] = [];
+  const markets = await collectMarketPages(async (offset, limit) => {
+    calls.push([offset, limit]);
+    if (offset === 100 && limit === 100)
+      throw Object.assign(new Error("deadline"), {
+        name: "RequestTimeoutError",
+      });
+    const data = Array.from(
+      { length: Math.min(limit, 173 - offset) },
+      (_, i) => ({ id: String(offset + i), title: "Market" }),
+    );
+    return { data, pagination: { total: 173 } };
+  });
+  expect(calls).toEqual([
+    [0, 100],
+    [100, 100],
+    [100, 50],
+    [150, 50],
+  ]);
+  expect(markets).toHaveLength(173);
+});
+
 test("failed later pages never masquerade as a complete catalog", async () => {
   const first = Array.from({ length: 100 }, (_, i) => ({
     id: String(i),
