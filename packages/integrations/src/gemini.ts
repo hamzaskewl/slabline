@@ -129,13 +129,16 @@ export async function listMarkets(
       while (queue.length) {
         const next = queue.shift()!;
         groups[next.index] = await collectMarketPages((offset, limit) =>
-          client.predictions.listEvents({
-            status: ["active"],
-            limit,
-            offset,
-            ...(search ? { search } : {}),
-            ...(next.category ? { category: [next.category] } : {}),
-          }),
+          client.predictions.listEvents(
+            {
+              status: ["active"],
+              limit,
+              offset,
+              ...(search ? { search } : {}),
+              ...(next.category ? { category: [next.category] } : {}),
+            },
+            { timeoutMs: limit === 100 ? 12000 : 40000 },
+          ),
         );
       }
     }),
@@ -154,13 +157,27 @@ export async function collectMarketPages(
   });
   // A 500-event sports page can exceed the SDK's 16 MiB safety limit.
   // Use bounded pages, with no cap on the number of pages.
-  const limit = 100;
-  for (let offset = 0; ; offset += limit) {
-    const page = pageSchema.parse(await load(offset, limit));
+  let limit = 100;
+  for (let offset = 0; ;) {
+    let raw: unknown;
+    try {
+      raw = await load(offset, limit);
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        error.name !== "RequestTimeoutError" ||
+        limit <= 25
+      )
+        throw error;
+      limit = Math.floor(limit / 2);
+      continue;
+    }
+    const page = pageSchema.parse(raw);
     for (const raw of page.data) result.set(raw.id, normalizeEvent(raw));
     if (offset + page.data.length >= page.pagination.total) break;
     if (page.data.length < limit)
       throw new Error("Incomplete Gemini catalog page");
+    offset += page.data.length;
   }
   return [...result.values()];
 }

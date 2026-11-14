@@ -11,7 +11,7 @@ const t = initTRPC.create();
 export async function workerRead<T>(path: string): Promise<T> {
   const origin = process.env.WORKER_URL ?? "http://localhost:4001";
   const response = await fetch(`${origin}${path}`, {
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(path.startsWith("/markets?") ? 75000 : 20000),
     cache: "no-store",
   });
   if (!response.ok) throw new Error("Data worker unavailable");
