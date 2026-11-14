@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { evmChainId, evmAddress } from "@collectible/domain";
-import { findGrailToken, grailReleaseBlocker } from "@collectible/integrations";
+import {
+  findGrailToken,
+  grailReleaseBlocker,
+  grailMarket,
+} from "@collectible/integrations";
 import { GrailTrading } from "@/components/grail-trading";
 
 export default async function TokenPage({
@@ -25,6 +29,7 @@ export default async function TokenPage({
       </main>
     );
   }
+  const market = await grailMarket(chain.data, address.data).catch(() => null);
   return (
     <main className="token-page">
       <nav>
@@ -34,7 +39,7 @@ export default async function TokenPage({
       <GrailTrading
         token={token}
         configured={!!process.env.NEXT_PUBLIC_PRIVY_APP_ID}
-        quoteConfigured={!!process.env.ZEROX_API_KEY}
+        market={market}
         blocker={grailReleaseBlocker()}
       />
       <footer>
