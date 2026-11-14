@@ -1,0 +1,212 @@
+.phone-tabs,
+.phone-categories,
+.mobile-wallet-actions {
+  display: none;
+}
+@media (max-width: 760px),
+  (pointer: coarse) and (max-height: 540px) and (max-width: 1000px) {
+  .app-shell {
+    min-height: 100dvh;
+    padding-bottom: calc(65px + env(safe-area-inset-bottom));
+  }
+  .exchange-header {
+    padding-top: env(safe-area-inset-top);
+    background: #010304;
+  }
+  .app-shell .exchange-header-main {
+    min-height: 52px;
+    padding-inline: max(14px, env(safe-area-inset-left))
+      max(14px, env(safe-area-inset-right));
+  }
+  .app-shell .exchange-header .exchange-navigation,
+  .exchange-header .mobile-menu,
+  .exchange-header .global-search,
+  .exchange-header .board-navigation,
+  .exchange-header .header-account,
+  .exchange-header .predict-link,
+  .exchange-header .brand-divider {
+    display: none;
+  }
+  .app-shell .exchange-brand {
+    font-size: 17px;
+  }
+  .app-shell .topbar-actions {
+    gap: 10px;
+  }
+  .app-shell .cart-link {
+    min-height: 44px;
+    min-width: 40px;
+    justify-content: center;
+  }
+  .app-shell main {
+    width: 100%;
+    padding: 12px max(14px, env(safe-area-inset-right)) 0
+      max(14px, env(safe-area-inset-left));
+  }
+  .phone-tabs {
+    position: fixed;
+    z-index: 32;
+    inset: auto 0 0;
+    display: flex;
+    align-items: center;
+    background: #080b0e;
+    border-top: 1px solid #242a30;
+    padding: 3px max(4px, env(safe-area-inset-right))
+      calc(3px + env(safe-area-inset-bottom))
+      max(4px, env(safe-area-inset-left));
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .phone-tabs button {
+    border: 0;
+    background: transparent;
+    flex: 1;
+    min-width: 0;
+    min-height: 49px;
+    color: #a3acb5;
+    font-weight: 600;
+    line-height: 1.2;
+    font-size: 10px;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 3px;
+    touch-action: manipulation;
+  }
+  .phone-tabs button[aria-current="page"] {
+    color: #6acbff;
+  }
+  .phone-categories {
+    display: flex;
+    overflow-x: auto;
+    gap: 5px;
+    scrollbar-width: none;
+    padding: 0 0 6px;
+  }
+  .phone-categories button {
+    border-radius: 18px;
+    flex: none;
+    background: transparent;
+    color: #aab3bc;
+    padding: 6px 12px;
+    min-height: 38px;
+    font-size: 13px;
+  }
+  .phone-categories button[aria-pressed="true"] {
+    background: #202830;
+    color: white;
+  }
+  .app-shell .discovery-layout {
+    display: block;
+  }
+  .app-shell .discovery-rail,
+  .app-shell .discovery-filters {
+    display: none;
+  }
+  .app-shell .discovery-heading {
+    margin: 4px 0 7px;
+    gap: 8px;
+  }
+  .app-shell .discovery-search {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    max-width: 200px;
+    min-width: 0;
+    background: #14191e;
+    border-radius: 9px;
+    padding: 5px 8px;
+  }
+  .app-shell .discovery-search input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    font-size: 16px;
+  }
+  .app-shell .prediction-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .app-shell .prediction-card {
+    min-height: 0;
+    border: 0;
+    border-bottom: 1px solid #262c31;
+    border-radius: 0;
+    background: transparent;
+    padding: 12px 0;
+  }
+  .app-shell .prediction-card-heading {
+    min-height: 34px;
+  }
+  .app-shell .prediction-card-title {
+    font-size: 15px;
+  }
+  .app-shell .prediction-outcomes {
+    gap: 5px;
+    margin-bottom: 4px;
+  }
+  .app-shell .prediction-outcome {
+    flex-wrap: nowrap;
+  }
+  .app-shell .outcome-label {
+    flex: 1;
+    font-size: 13px;
+  }
+  .app-shell .outcome-yes,
+  .app-shell .outcome-no {
+    flex: none;
+    display: grid;
+    place-items: center;
+    min-width: 70px;
+    min-height: 36px;
+    font-size: 12px;
+  }
+  .app-shell .detail-breadcrumb {
+    margin-bottom: 9px;
+  }
+  .app-shell .event-identity {
+    margin-bottom: 12px;
+  }
+  .app-shell .event-identity > img,
+  .app-shell .event-fallback {
+    width: 42px;
+    height: 42px;
+  }
+  .app-shell .event-identity h1 {
+    font-size: 22px;
+  }
+  .app-shell .order-ticket {
+    scroll-margin-top: calc(64px + env(safe-area-inset-top));
+    border-radius: 0;
+    border-width: 1px 0 0;
+    padding: 16px 0;
+  }
+  .mobile-wallet-actions {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .install-help {
+    padding: 12px;
+    background: #151a1f;
+    border-radius: 8px;
+  }
+  .install-help p {
+    margin-top: 9px;
+  }
+  .app-shell input,
+  .app-shell select {
+    font-size: max(16px, 1em);
+  }
+  .phone-tabs button:focus-visible,
+  .phone-categories button:focus-visible {
+    outline: 2px solid #7cd5ff;
+    outline-offset: -2px;
+  }
+}
+@media (display-mode: standalone) {
+  .install-help {
+    display: none;
+  }
+}

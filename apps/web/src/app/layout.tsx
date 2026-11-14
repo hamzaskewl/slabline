@@ -1,13 +1,30 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "@fontsource-variable/inter";
 import "./globals.css";
 import "./prediction-theme.css";
+import "./mobile.css";
 import { Providers } from "@/components/providers";
 export const metadata: Metadata = {
+  applicationName: "Collectible Markets",
+  appleWebApp: {
+    capable: true,
+    title: "Collectible Markets",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+    icon: "/icons/markets-192.png",
+  },
   title: "Collectible Markets — Make your call",
   description:
     "Explore Gemini prediction markets and discover real collectible rewards. Hackathon prototype; simulated trading.",
+};
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#010304",
 };
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
