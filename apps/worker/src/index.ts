@@ -15,10 +15,8 @@ import {
 } from "@collectible/integrations";
 import {
   marketPreview,
-  eligibleMarkets,
-  eligibleCards,
-  eligibleTokens,
   rewardCategories,
+  sportsForMarket,
   type Book,
   type Market,
   type PricePoint,
@@ -331,44 +329,34 @@ const server = Bun.serve({
           ),
         [],
       );
-      if (result.error) return Response.json(result);
-      const inventory = await rewardInventory(result.data);
       return Response.json({
         ...result,
-        data: eligibleMarkets(
-          result.data,
-          inventory.cards,
-          inventory.tokens,
-        ).map(marketPreview),
-        error: inventory.error,
+        // Prediction discovery must not wait on a separate collectible provider.
+        // A sports event may have no matching reward; never invent a related player.
+        data: result.data
+          .filter(
+            (m) => m.category === "Sports" || sportsForMarket(m).length > 0,
+          )
+          .map(marketPreview),
       });
     }
     if (url.pathname === "/rewards" || url.pathname === "/cards") {
-      const marketResult = await providerRead(() => markets(), []);
-      const inventory = await rewardInventory(marketResult.data);
-      const cards = eligibleCards(inventory.cards, marketResult.data);
+      const inventory = await rewardInventory(knownMarkets);
+      const cards = inventory.cards;
       return Response.json({
         data:
           url.pathname === "/cards"
             ? cards
             : {
                 cards,
-                tokens: eligibleTokens(inventory.tokens, marketResult.data),
+                tokens: inventory.tokens,
               },
         source:
           inventory.error && !cards.length && !inventory.tokens.length
             ? "unavailable"
             : "live",
         observedAt: new Date().toISOString(),
-        error:
-          [
-            inventory.error,
-            marketResult.error
-              ? "Market matching is unavailable. Showing sports rewards only."
-              : null,
-          ]
-            .filter(Boolean)
-            .join(" ") || null,
+        error: inventory.error,
       });
     }
     if (url.pathname === "/packs")

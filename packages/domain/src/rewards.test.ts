@@ -6,6 +6,7 @@ import {
   filterCards,
   relatedCards,
   matchingTokens,
+  outcomeRewardMarket,
   type Market,
   type Listing,
   type GrailToken,
@@ -73,7 +74,7 @@ const tokens = [
 ];
 
 test("only active markets with a real inventory relationship qualify", () => {
-  const nba = market("Bulls vs Lakers", "NBA");
+  const nba = market("Michael Jordan award", "NBA");
   const tesla = market("Will Tesla launch a new model?");
   expect(
     eligibleMarkets(
@@ -94,7 +95,46 @@ test("only active markets with a real inventory relationship qualify", () => {
     relatedCards(market("Premier League winner", "Soccer"), cards).map(
       (c) => c.name,
     ),
-  ).toEqual(["Lionel Messi"]);
+  ).toEqual([]);
+});
+
+test("a selected player outcome never inherits unrelated players from the event", () => {
+  const inventory = [
+    card("2017 Patrick Mahomes II PSA 10 Donruss Optic", "Football", "4100"),
+    card("2023 Jahmyr Gibbs ROOKIE CGC 10", "Football", "21"),
+    card("2020 Justin Herbert PSA 9", "Football", "15"),
+  ];
+  const contract = (label: string) => ({
+    symbol: label,
+    label,
+    status: "active",
+    lastPrice: null,
+    quantityIncrement: "1",
+    priceIncrement: "0.01",
+  });
+  const m = {
+    ...market("NFL MVP Winner", "NFL"),
+    contracts: [contract("Patrick Mahomes"), contract("Justin Herbert")],
+  };
+  expect(
+    relatedCards(outcomeRewardMarket(m, m.contracts[0]!), inventory).map(
+      (c) => c.ask,
+    ),
+  ).toEqual(["4100"]);
+  expect(
+    relatedCards(
+      outcomeRewardMarket(m, contract("Jahmyr Gibbs 1+ Touchdowns scored")),
+      inventory,
+    ).map((c) => c.ask),
+  ).toEqual(["21"]);
+  expect(
+    relatedCards(market("Texas A&M vs Texas", "Football"), inventory),
+  ).toEqual([]);
+  expect(
+    matchingTokens(market("Texas A&M vs Texas", "Football"), [
+      token("gBRADY", ["American Football"]),
+    ]),
+  ).toEqual([]);
 });
 test("non-sports rewards need an active market; nested outcomes participate", () => {
   expect(

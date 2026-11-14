@@ -72,7 +72,11 @@ export async function providerRead<T>(
       observedAt: new Date().toISOString(),
       error: null,
     };
-  } catch {
+  } catch (error) {
+    console.warn(
+      "Public provider read failed",
+      error instanceof Error ? error.name : "UnknownError",
+    );
     return {
       data: empty,
       source: "unavailable",
@@ -85,7 +89,10 @@ export async function providerRead<T>(
 async function json(url: string) {
   const response = await fetch(url, {
     signal: AbortSignal.timeout(12000),
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "CollectibleMarkets/1.0",
+    },
   });
   if (!response.ok) throw new Error(`Provider HTTP ${response.status}`);
   return response.json() as Promise<unknown>;

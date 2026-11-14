@@ -1,4 +1,4 @@
-import type { Listing, Market } from "./index";
+import type { Contract, Listing, Market } from "./index";
 
 export type GrailToken = {
   id: string;
@@ -128,36 +128,59 @@ export function tokenSport(token: GrailToken) {
   return token.tags.find((tag) => sportCategories.includes(tag));
 }
 export function matchingTokens(market: Market, tokens: GrailToken[]) {
-  const text = marketText(market),
-    sports = sportsForMarket(market);
+  const text = marketText(market);
   return tokens.filter((token) => {
-    const sport = tokenSport(token);
     return (
-      (sport && sports.includes(sport)) ||
-      (grailSubjects[token.symbol.toLowerCase()]?.aliases ?? [token.name]).some(
-        (a) => includes(text, a),
-      )
-    );
+      grailSubjects[token.symbol.toLowerCase()]?.aliases ?? [token.name]
+    ).some((a) => includes(text, a));
   });
 }
 export function relatedCards(market: Market, cards: Listing[]) {
-  const text = marketText(market),
-    sports = sportsForMarket(market);
+  const text = marketText(market);
   const subjects = [
     ...Object.values(grailSubjects),
     { name: "Donald Trump", aliases: ["trump"] },
     { name: "Barack Obama", aliases: ["obama"] },
   ].filter((subject) => subject.aliases.some((a) => includes(text, a)));
+  // A player prop supplies an explicit subject, e.g. "Patrick Mahomes 2+ Passing
+  // Touchdowns". Match the whole name, never just the sport or a surname.
+  const outcomeSubjects = market.contracts.flatMap((c) => {
+    const name = c.label.split(/\s+(?:\d|over\b|under\b)/i)[0]?.trim() ?? "";
+    return /^[A-Za-zÀ-ž.'’ -]+$/.test(name) &&
+      name.split(/\s+/).length >= 2 &&
+      name.split(/\s+/).length <= 4 &&
+      !/\b(yes|no|winner|total|points|touchdowns|rebounds|assists|vs|over|under|above|below|tie|co-winners)\b/i.test(
+        name,
+      )
+      ? [name]
+      : [];
+  });
   return cards.filter((card) => {
-    if (sports.includes(card.category)) return true;
     if (card.player && includes(text, card.player)) return true;
     if (
       ["Pokemon", "One Piece", "Riftbound"].includes(card.category) &&
       includes(text, card.category)
     )
       return true;
-    return subjects.some((subject) => includes(card.name, subject.name));
+    return (
+      subjects.some((subject) => includes(card.name, subject.name)) ||
+      outcomeSubjects.some((subject) => includes(card.name, subject))
+    );
   });
+}
+export function outcomeRewardMarket(
+  market: Market,
+  contract: Contract,
+): Market {
+  // Parent events contain many players. The selected outcome is the reward subject.
+  return {
+    ...market,
+    title: contract.label,
+    searchText: "",
+    description: "",
+    contracts: [contract],
+    children: [],
+  };
 }
 export function rewardCategories(markets: Market[]) {
   const text = markets.filter(activeMarket).map(marketText).join(" ");

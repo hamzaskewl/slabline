@@ -1,5 +1,5 @@
 "use client";
-import dynamic from "next/dynamic";
+import Link from "next/link";
 import { formatUnits } from "viem";
 import {
   evmChains,
@@ -8,12 +8,7 @@ import {
   type GrailOrderView,
   type GrailMarket,
 } from "@collectible/domain";
-import { Button } from "./ui/button";
 
-const WalletTrade = dynamic(() => import("./grail-wallet-trade"), {
-  ssr: false,
-  loading: () => <p role="status">Loading wallet…</p>,
-});
 export type TradeProps = {
   token: GrailToken;
   configured: boolean;
@@ -42,21 +37,14 @@ export function GrailTrading(props: TradeProps) {
       </header>
       <div className="token-trade-layout">
         <section className="token-purchase panel">
-          <h2>Buy {token.symbol}</h2>
-          {props.configured ? (
-            <WalletTrade {...props} />
-          ) : (
-            <>
-              <label className="token-amount-label">
-                Spend · {props.market?.paymentSymbol ?? "Unavailable"}
-                <input inputMode="decimal" placeholder="0.00" disabled />
-              </label>
-              <Button disabled>Wallet connection unavailable</Button>
-              <p role="status">
-                Sign-in setup is required before connecting an EVM wallet.
-              </p>
-            </>
-          )}
+          <h2>Prediction reward</h2>
+          <p>
+            Open a settled winning prediction in your portfolio to choose its
+            reward.
+          </p>
+          <Link href="/portfolio" className="button button-outline">
+            View predictions
+          </Link>
         </section>
         <section className="token-information">
           <h2>Token details</h2>
@@ -105,8 +93,8 @@ export function GrailTrading(props: TradeProps) {
             </ol>
             <p>
               Gemini withdrawals and bridge quotes are not connected yet. No
-              funds will move here. You can use an already funded wallet; keep
-              ETH for gas.
+              funds will move here. Reward purchases require a verified,
+              unredeemed winning prediction.
             </p>
           </details>
           <p>
