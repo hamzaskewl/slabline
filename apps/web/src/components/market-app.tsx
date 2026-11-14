@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   ArrowRight,
@@ -96,6 +97,14 @@ export function MarketApp({
   initialOutcome?: number;
   initialSymbol?: string;
 }) {
+  const router = useRouter();
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+      void navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .catch(() => {});
+    }
+  }, []);
   const [search, setSearch] = useState(""),
     [category, setCategory] = useState("All markets"),
     [practice, setPractice] = useState(false),
@@ -234,7 +243,9 @@ export function MarketApp({
                 <ShoppingBag size={19} />
                 {cart.length ? <b>{cart.length}</b> : null}
               </Link>
-              <WalletEntry configured={!!status.data?.privyConfigured} />
+              <div className="header-account">
+                <WalletEntry configured={!!status.data?.privyConfigured} />
+              </div>
               <button
                 className="icon-button mobile-menu"
                 onClick={() => setMenuOpen(!menuOpen)}
@@ -361,6 +372,7 @@ export function MarketApp({
             <>
               {!selectedId && !practice ? (
                 <Discovery
+                  onPractice={() => setPractice(true)}
                   search={search}
                   setSearch={setSearch}
                   markets={markets}
@@ -569,6 +581,18 @@ export function MarketApp({
             </>
           ) : section === "wallet" ? (
             <>
+              <div className="mobile-wallet-actions">
+                {status.data?.privyConfigured && <AuthButton />}
+                <details className="install-help">
+                  <summary>Add to Home Screen</summary>
+                  <p>
+                    On iPhone, open this site in Safari, tap Share, then Add to
+                    Home Screen. Turn on Open as Web App if shown and tap Add.
+                    In Chrome on Android, open the browser menu and select
+                    Install app or Add to Home screen.
+                  </p>
+                </details>
+              </div>
               <WalletView network={status.data?.solanaNetwork ?? "devnet"} />
               {status.data?.privyConfigured ? <ConnectedWalletPanel /> : null}
               <ChainInspector
@@ -636,6 +660,32 @@ export function MarketApp({
             <span>Independent project. No provider endorsement.</span>
           </footer>
         </main>
+        <nav
+          className="phone-tabs"
+          aria-label="App navigation"
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {navigation.map(({ label, href, icon: Icon }) => (
+            <button
+              key={href}
+              type="button"
+              aria-current={
+                section === label.toLowerCase() ? "page" : undefined
+              }
+              onClick={() => {
+                if (href === "/" && !selectedId && section === "markets") {
+                  setPractice(false);
+                  setSearch("");
+                  setCategory("All markets");
+                  window.scrollTo({ top: 0 });
+                } else router.push(href);
+              }}
+            >
+              <Icon size={20} aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
       </div>
     </div>
   );
@@ -879,7 +929,13 @@ function MarketDetail({
                     buyPercent(s === "yes" ? c.buyYes : c.buyNo)
                   }
                   aria-pressed={c.symbol === symbol && side === s}
-                  onClick={() => selectOutcome(c.symbol, s)}
+                  onClick={() => {
+                    selectOutcome(c.symbol, s);
+                    if (window.matchMedia("(max-width: 840px)").matches)
+                      document
+                        .getElementById("prediction-ticket")
+                        ?.scrollIntoView({ block: "start" });
+                  }}
                 >
                   {s === "yes" ? "Yes" : "No"}{" "}
                   <b>{buyPercent(s === "yes" ? c.buyYes : c.buyNo)}</b>
@@ -966,7 +1022,7 @@ function MarketDetail({
           </a>
         </details>
       </section>
-      <aside className="order-ticket panel">
+      <aside className="order-ticket panel" id="prediction-ticket">
         <h2 className="prediction-title">The prediction</h2>
         <p className="ticket-event">{market.title}</p>
         <label className="ticket-outcome">

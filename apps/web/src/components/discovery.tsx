@@ -25,6 +25,7 @@ export function Discovery({
   retry,
   search,
   setSearch,
+  onPractice,
 }: {
   markets: Market[];
   category: string;
@@ -34,6 +35,7 @@ export function Discovery({
   retry: () => void;
   search: string;
   setSearch: (value: string) => void;
+  onPractice: () => void;
 }) {
   const [limit, setLimit] = useState(24);
   const preferredCategories = [
@@ -100,6 +102,21 @@ export function Discovery({
         </div>
       </aside>
       <section className="discovery-content">
+        <nav className="phone-categories" aria-label="Market categories">
+          {categories.map((c) => (
+            <button
+              key={c}
+              aria-pressed={category === c}
+              onClick={() => {
+                setCategory(c);
+                setLimit(24);
+              }}
+            >
+              {c === "All markets" ? "All" : c}
+            </button>
+          ))}
+          <button onClick={onPractice}>Practice</button>
+        </nav>
         <div className="discovery-heading">
           <h1>{category === "All markets" ? "Markets" : category}</h1>
           <div className="discovery-filters">
