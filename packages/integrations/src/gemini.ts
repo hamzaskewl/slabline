@@ -304,6 +304,8 @@ export function safeImage(raw: string | null | undefined): string | null {
       "images.phygitals.com",
       "cdn.phygitals.com",
       "api.phygitals.com",
+      "grailxyz-public.s3.us-east-2.amazonaws.com",
+      "wildcard-public.s3.us-east-2.amazonaws.com",
     ];
     return url.protocol === "https:" && allowed.some((h) => url.hostname === h)
       ? url.toString()

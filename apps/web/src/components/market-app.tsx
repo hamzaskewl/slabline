@@ -33,6 +33,10 @@ import {
   validateCart,
   storedListingSchema,
   matchingCards,
+  matchingTokens,
+  filterCards,
+  type GrailToken,
+  type RewardFilters,
   marketOutcomes,
   buyPercent,
   type ChartRange,
@@ -48,8 +52,8 @@ import {
 import { api } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { usd } from "@/lib/utils";
+import { GrailCatalog } from "./grail-catalog";
 import { Discovery } from "./discovery";
-import { ChainInspector } from "./chain-inspector";
 const PriceChart = dynamic(() => import("./price-chart"), {
   ssr: false,
   loading: () => <div className="chart-loading">Loading chart…</div>,
@@ -119,9 +123,9 @@ export function MarketApp({
       enabled: section === "markets" && !selectedId && !practice,
     },
   );
-  const cardQuery = api.cards.useQuery({ search: "" }, { staleTime: 60000 });
-  const packQuery = api.packs.useQuery(undefined, {
-    enabled: section === "rewards",
+  const rewardQuery = api.rewards.useQuery(undefined, {
+    staleTime: 60000,
+    enabled: ["markets", "rewards"].includes(section),
   });
   const status = api.status.useQuery();
   const selectedQuery = api.market.useQuery(
@@ -177,7 +181,8 @@ export function MarketApp({
           (m) => m.id === selectedId || m.ticker === selectedId,
         ))
       : visible[0];
-  const cards = cardQuery.data?.data ?? [];
+  const cards = rewardQuery.data?.data.cards ?? [];
+  const tokens = rewardQuery.data?.data.tokens ?? [];
   const simulate = (order: Omit<PracticeOrder, "id" | "createdAt">) => {
     const updated = [
       {
@@ -269,29 +274,24 @@ export function MarketApp({
             >
               <Zap size={14} /> Trending
             </Link>
-            {[
-              "Sports",
-              "Crypto",
-              "Commodities",
-              "Weather",
-              "Economics",
-              "Politics",
-              "Tech",
-              "Culture",
-            ].map((c) => (
-              <button
-                key={c}
-                className={
-                  section === "markets" && category === c ? "active" : ""
-                }
-                onClick={() => {
-                  setCategory(c);
-                  if (section !== "markets") window.location.href = "/";
-                }}
-              >
-                {c}
-              </button>
-            ))}
+            {[...new Set(markets.map((m) => m.category))]
+              .sort((a, b) =>
+                a === "Sports" ? -1 : b === "Sports" ? 1 : a.localeCompare(b),
+              )
+              .map((c) => (
+                <button
+                  key={c}
+                  className={
+                    section === "markets" && category === c ? "active" : ""
+                  }
+                  onClick={() => {
+                    setCategory(c);
+                    if (section !== "markets") window.location.href = "/";
+                  }}
+                >
+                  {c}
+                </button>
+              ))}
             <span className="navigation-divider" />
             {navigation.slice(1).map((n) => (
               <Link
@@ -331,11 +331,6 @@ export function MarketApp({
                             ? "Collection"
                             : "Physical redemption"}
                 </h1>
-                <p>
-                  {section === "rewards"
-                    ? "Exact graded listings from Collector Crypt. Packs from Phygitals."
-                    : "Separate accounts. Explicit approvals. Verified ownership."}
-                </p>
               </div>
               <Link href="/" className="text-link">
                 Markets <ArrowUpRight size={16} />
@@ -355,7 +350,7 @@ export function MarketApp({
               </button>
             </div>
           ) : null}
-          {practice || section !== "markets" ? (
+          {practice ? (
             <div className="mode-strip">
               <ShieldCheck size={16} />
               <span>
@@ -412,6 +407,7 @@ export function MarketApp({
                         market={selected}
                         practice={practice}
                         cards={cards}
+                        tokens={tokens}
                         onAdd={add}
                         onSimulate={simulate}
                         initialSide={initialSide}
@@ -446,80 +442,32 @@ export function MarketApp({
               <div className="section-heading">
                 <div>
                   <h2>Collectible rewards</h2>
-                  <p>
-                    Actual graded listings. Preview only; cards are not
-                    reserved.
-                  </p>
                 </div>
                 <Link href="/rewards">
                   View all <ArrowUpRight size={16} />
                 </Link>
               </div>
               <CatalogGrid
-                cards={cards.slice(0, 5)}
-                loading={cardQuery.isLoading}
-                error={cardQuery.data?.error}
+                cards={(selectedId && selected
+                  ? matchingCards(selected, cards)
+                  : cards
+                ).slice(0, 5)}
+                loading={rewardQuery.isLoading}
+                error={rewardQuery.data?.error}
                 onAdd={add}
-                retry={() => void cardQuery.refetch()}
+                retry={() => void rewardQuery.refetch()}
               />
             </>
           ) : section === "rewards" ? (
             <>
               <RewardCatalog
                 cards={cards}
-                loading={cardQuery.isLoading}
-                error={cardQuery.data?.error}
+                tokens={tokens}
+                loading={rewardQuery.isLoading}
+                error={rewardQuery.data?.error}
                 onAdd={add}
-                retry={() => void cardQuery.refetch()}
+                retry={() => void rewardQuery.refetch()}
               />
-              <div className="section-heading">
-                <div>
-                  <h2>A different kind of surprise.</h2>
-                  <p>
-                    Phygitals packs are random pulls, separate from exact-card
-                    listings.
-                  </p>
-                </div>
-                <span className="subtle">
-                  MAINNET CATALOG · PURCHASES DISABLED
-                </span>
-              </div>
-              {packQuery.data?.data.length ? (
-                <div className="pack-grid">
-                  {packQuery.data.data.slice(0, 8).map((p) => (
-                    <article className="pack-tile" key={p.id}>
-                      <Gift size={25} />
-                      <div>
-                        <h3>{p.name}</h3>
-                        <p>
-                          {p.inStock
-                            ? "Provider reports in stock"
-                            : "Out of stock"}{" "}
-                          · {usd(p.price)}
-                        </p>
-                      </div>
-                      <a
-                        href={`https://www.phygitals.com`}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`View ${p.name} at Phygitals`}
-                      >
-                        <ExternalLink size={17} />
-                      </a>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <Empty
-                  title={
-                    packQuery.isLoading
-                      ? "Loading Phygitals packs…"
-                      : "Pack catalog unavailable"
-                  }
-                  detail={packQuery.data?.error ?? "No packs returned."}
-                  retry={() => void packQuery.refetch()}
-                />
-              )}
             </>
           ) : section === "cart" ? (
             <CartView cart={cart} saveCart={saveCart} />
@@ -528,12 +476,8 @@ export function MarketApp({
               {status.data?.privyConfigured ? <PrivateAccount /> : null}
               <div className="account-empty panel">
                 <BarChart3 size={35} />
-                <h2>Your Gemini account is a separate connection.</h2>
-                <p>
-                  Private balances, positions and settlements require an
-                  approved Gemini OAuth application. Social or wallet login
-                  alone does not authorize trading.
-                </p>
+                <h2>Connect Gemini</h2>
+                <p>Gemini account connection is awaiting approval.</p>
                 <Button disabled>Gemini OAuth approval required</Button>
               </div>
               <div className="section-heading">
@@ -595,26 +539,19 @@ export function MarketApp({
               </div>
               <WalletView network={status.data?.solanaNetwork ?? "devnet"} />
               {status.data?.privyConfigured ? <ConnectedWalletPanel /> : null}
-              <ChainInspector
-                network={status.data?.solanaNetwork ?? "devnet"}
-              />
             </>
           ) : section === "collection" ? (
             <div className="account-empty panel">
               <Layers3 size={36} />
-              <h2>Your cards will live in your wallet.</h2>
-              <p>
-                No ownership has been verified yet. Purchases remain disabled
-                pending wallet setup, transaction inspection, confirmation
-                testing and provider permissions.
-              </p>
+              <h2>No collectibles yet</h2>
+
               <Link href="/rewards" className="text-link">
                 Browse the catalog <ArrowRight size={16} />
               </Link>
             </div>
           ) : (
             <div className="redeem-flow panel">
-              <h2>A card you can hold.</h2>
+              <h2>Physical redemption</h2>
               <p>
                 Physical redemption is separate from owning a Solana asset.
                 Collector Crypt manages its vault, shipping eligibility and
@@ -639,25 +576,11 @@ export function MarketApp({
                   Open Collector Crypt <ExternalLink size={16} />
                 </a>
               </Button>
-              <p className="subtle">
-                Integrated shipping requires partner onboarding. No shipping has
-                been booked.
-              </p>
             </div>
           )}
           <footer className="page-footer">
-            <span>
-              <Layers3 size={14} /> Collectible Markets · UBC 2026 prototype
-            </span>
-            <a
-              href="https://www.tradingview.com/"
-              target="_blank"
-              rel="noreferrer"
-            >
-              TradingView Lightweight Charts™ · Copyright © 2025 TradingView,
-              Inc.
-            </a>
-            <span>Independent project. No provider endorsement.</span>
+            <span>Collectible Markets</span>
+            <Link href="/about">About &amp; credits</Link>
           </footer>
         </main>
         <nav
@@ -740,6 +663,7 @@ function MarketDetail({
   market,
   practice,
   cards,
+  tokens,
   onAdd,
   onSimulate,
   initialSide,
@@ -750,6 +674,7 @@ function MarketDetail({
   practice: boolean;
   cards: Listing[];
   onAdd: (c: Listing) => void;
+  tokens: GrailToken[];
   onSimulate: (o: Omit<PracticeOrder, "id" | "createdAt">) => void;
   initialSide: "yes" | "no";
   initialOutcome: number;
@@ -861,7 +786,7 @@ function MarketDetail({
   }, [stake, book, side, stale, practice]);
   const possibleMatches = matchingCards(market, cards);
   const attainable = quote
-    ? (possibleMatches.length ? possibleMatches : cards)
+    ? possibleMatches
         .filter((c) => units(c.ask) <= units(quote.totalPayout))
         .slice(0, 3)
     : [];
@@ -1202,7 +1127,7 @@ function MarketDetail({
           <p>
             {attainable.length
               ? "Actual asks within the estimated payout."
-              : "Change your stake to explore what a payout could buy."}
+              : "No related cards within this payout."}
           </p>
           <div className="reward-mini-grid">
             {attainable.map((c) => (
@@ -1225,10 +1150,24 @@ function MarketDetail({
               </button>
             ))}
           </div>
-          <small>
-            General inventory · player/team match unverified. Cards are not
-            reserved.
-          </small>
+          {matchingTokens(market, tokens)
+            .slice(0, 2)
+            .map((t) => (
+              <a
+                className="related-token"
+                href={t.url}
+                key={t.id}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t.name}{" "}
+                <span>
+                  {t.symbol} · {t.chain}
+                </span>
+                <ExternalLink size={13} />
+              </a>
+            ))}
+          <small>Related by subject or sport. Cards are not reserved.</small>
         </div>
       </aside>
     </>
@@ -1283,7 +1222,7 @@ function CardTile({
           {card.year} {card.category} · {card.network}
         </span>
         <h3>{card.name}</h3>
-        <p>{card.set ?? "Set unverified"}</p>
+        {card.set ? <p>{card.set}</p> : null}
         <div className="card-price">
           <div>
             <small>Listing ask · USDC</small>
@@ -1297,41 +1236,6 @@ function CardTile({
             <Plus size={18} />
           </button>
         </div>
-        {card.valuation ? (
-          <details className="valuation-details">
-            <summary>
-              Card Hedge FMV {usd(card.valuation.fmv)} ·{" "}
-              {card.valuation.confidence === "exact"
-                ? "Certificate match"
-                : "Low-confidence match"}
-            </summary>
-            <p>
-              Updated{" "}
-              {new Date(card.valuation.observedAt).toLocaleDateString("en-US")}{" "}
-              · {card.valuation.methodology}
-            </p>
-            {card.valuation.comps.length ? (
-              <ol>
-                {card.valuation.comps.slice(0, 5).map((comp, i) => (
-                  <li key={i}>
-                    <a href={comp.url} target="_blank" rel="noreferrer">
-                      {usd(comp.amount)} · Sold{" "}
-                      {new Date(comp.soldAt).toLocaleDateString("en-US")}{" "}
-                      <ExternalLink size={11} />
-                    </a>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p>No verified dated sold comps available.</p>
-            )}
-          </details>
-        ) : (
-          <div className="valuation-line">
-            <ShieldCheck size={12} /> FMV unavailable · credentials/rights
-            required
-          </div>
-        )}
       </div>
     </article>
   );
@@ -1359,85 +1263,232 @@ function CatalogGrid({
     </div>
   ) : (
     <Empty
-      title={
-        error
-          ? "Collector Crypt is unavailable"
-          : "No graded USDC listings returned"
-      }
-      detail={
-        error ??
-        "Provider results may be empty or ungraded. Try a specific card search."
-      }
+      title={error ? "Collector Crypt is unavailable" : "No matching cards"}
+      detail={error ?? "Try a different search or reset your filters."}
       retry={retry}
     />
   );
 }
 function RewardCatalog({
   cards,
+  tokens,
   loading,
   error,
   onAdd,
   retry,
 }: {
   cards: Listing[];
+  tokens: GrailToken[];
   loading: boolean;
   error?: string | null;
   onAdd: (c: Listing) => void;
   retry: () => void;
 }) {
-  const [search, setSearch] = useState(""),
-    [filter, setFilter] = useState("All"),
-    [providerSearch, setProviderSearch] = useState("");
-  const query = api.cards.useQuery(
-    { search: providerSearch },
-    { enabled: !!providerSearch },
+  const defaults: RewardFilters = {
+    search: "",
+    category: "",
+    grader: "",
+    grade: "",
+    min: "",
+    max: "",
+    feature: "",
+    sort: "high",
+  };
+  const [filters, setFilters] = useState<RewardFilters>(defaults);
+  const [source, setSource] = useState<"cards" | "tokens">("cards");
+  const [limit, setLimit] = useState(24);
+  const update = (key: keyof RewardFilters, value: string) => {
+    setFilters((f) => ({ ...f, [key]: value }));
+    setLimit(24);
+  };
+  const visible = filterCards(cards, filters);
+  const visibleTokens = tokens.filter((t) =>
+    `${t.name} ${t.symbol} ${t.tags.join(" ")}`
+      .toLowerCase()
+      .includes(filters.search.toLowerCase()),
   );
-  const source = providerSearch ? (query.data?.data ?? []) : cards;
-  const categories = ["All", ...new Set(source.map((c) => c.category))];
-  const visible = source.filter(
-    (c) =>
-      (filter === "All" || filter === c.category) &&
-      c.name.toLowerCase().includes(search.toLowerCase()),
+  const select = (
+    key: keyof RewardFilters,
+    label: string,
+    values: string[],
+  ) => (
+    <label>
+      {label}
+      <select
+        aria-label={label}
+        value={filters[key]}
+        onChange={(e) => update(key, e.target.value)}
+      >
+        <option value="">All</option>
+        {values.map((v) => (
+          <option key={v} value={v}>
+            {v}
+          </option>
+        ))}
+      </select>
+    </label>
   );
   return (
     <>
-      <form
-        className="market-toolbar"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setProviderSearch(search);
-          setFilter("All");
-        }}
-      >
-        <div className="category-tabs">
-          {categories.slice(0, 6).map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setFilter(c)}
-              className={filter === c ? "selected" : ""}
-            >
-              {c}
-            </button>
-          ))}
+      <div className="reward-toolbar">
+        <div className="category-tabs" aria-label="Reward type">
+          <button
+            className={source === "cards" ? "selected" : ""}
+            onClick={() => {
+              setSource("cards");
+              setLimit(24);
+            }}
+          >
+            Cards <span>{cards.length}</span>
+          </button>
+          <button
+            className={source === "tokens" ? "selected" : ""}
+            onClick={() => {
+              setSource("tokens");
+              setLimit(24);
+            }}
+          >
+            Grail tokens <span>{tokens.length}</span>
+          </button>
         </div>
         <label className="search-field">
           <Search size={16} />
           <input
-            aria-label="Search card inventory"
-            placeholder="Search cards, press Enter"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search rewards"
+            placeholder={
+              source === "cards"
+                ? "Search cards, players, sets"
+                : "Search Grail tokens"
+            }
+            value={filters.search}
+            onChange={(e) => update("search", e.target.value)}
           />
         </label>
-      </form>
-      <CatalogGrid
-        cards={visible}
-        loading={providerSearch ? query.isLoading : loading}
-        error={providerSearch ? query.data?.error : error}
-        onAdd={onAdd}
-        retry={providerSearch ? () => void query.refetch() : retry}
-      />
+      </div>
+      {source === "cards" && (
+        <details className="reward-filter-panel">
+          <summary>Filters</summary>
+          <div className="reward-filters">
+            {select(
+              "category",
+              "Sport / category",
+              [...new Set(cards.map((c) => c.category))].sort(),
+            )}
+            {select(
+              "grader",
+              "Grader",
+              [
+                ...new Set(
+                  cards.map((c) => c.grader).filter((g): g is string => !!g),
+                ),
+              ].sort(),
+            )}
+            {select(
+              "grade",
+              "Grade",
+              [
+                ...new Set(
+                  cards.flatMap(
+                    (c) => c.grade?.match(/\d+(?:\.\d+)?/)?.[0] ?? [],
+                  ),
+                ),
+              ].sort((a, b) => Number(b) - Number(a)),
+            )}
+            <label>
+              Card type
+              <select
+                value={filters.feature}
+                onChange={(e) => update("feature", e.target.value)}
+              >
+                <option value="">All cards</option>
+                <option value="autograph">Autographed</option>
+                <option value="rookie">Rookie</option>
+              </select>
+            </label>
+            <label>
+              Min price · USDC
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                placeholder="Any"
+                value={filters.min}
+                onChange={(e) => update("min", e.target.value)}
+              />
+            </label>
+            <label>
+              Max price · USDC
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                placeholder="Any"
+                value={filters.max}
+                onChange={(e) => update("max", e.target.value)}
+              />
+            </label>
+            <label>
+              Sort by
+              <select
+                value={filters.sort}
+                onChange={(e) => update("sort", e.target.value)}
+              >
+                <option value="high">Highest price</option>
+                <option value="low">Lowest price</option>
+                <option value="name">Name A–Z</option>
+              </select>
+            </label>
+            <button
+              className="filter-reset"
+              onClick={() => {
+                setFilters(defaults);
+                setLimit(24);
+              }}
+            >
+              Reset filters
+            </button>
+          </div>
+        </details>
+      )}
+      <div className="reward-result-count" role="status">
+        {loading
+          ? "Loading rewards…"
+          : `${source === "cards" ? visible.length : visibleTokens.length} ${source === "cards" ? "cards" : "tokens"}`}
+      </div>
+      {source === "cards" ? (
+        <CatalogGrid
+          cards={visible.slice(0, limit)}
+          loading={loading}
+          error={error}
+          onAdd={onAdd}
+          retry={retry}
+        />
+      ) : loading ? (
+        <LoadingRows />
+      ) : visibleTokens.length ? (
+        <>
+          <p className="token-catalog-note">
+            Fractional collectible tokens. View prices and redemption options on
+            Grail.
+          </p>
+          <GrailCatalog tokens={visibleTokens.slice(0, limit)} />
+        </>
+      ) : (
+        <Empty
+          title="No matching tokens"
+          detail={error ?? "Try a different search."}
+          retry={retry}
+        />
+      )}
+      {(source === "cards" ? visible.length : visibleTokens.length) > limit && (
+        <Button
+          className="reward-load-more"
+          variant="outline"
+          onClick={() => setLimit((l) => l + 24)}
+        >
+          Show more
+        </Button>
+      )}
     </>
   );
 }
@@ -1487,14 +1538,14 @@ function CartView({
           ))
         ) : (
           <Empty
-            title="A collection starts with one card."
+            title="Your cart is empty"
             detail="Add an exact listing from Rewards. Your selections stay on this device."
           />
         )}
       </section>
       <aside className="panel cart-summary">
         <h2>Budget preview</h2>
-        <p>This is a planning amount, not a verified wallet balance.</p>
+
         <label className="stake-label" htmlFor="budget">
           Planned budget · USDC
         </label>
@@ -1528,12 +1579,7 @@ function CartView({
             {error}
           </p>
         ) : null}
-        <Button disabled>Checkout awaiting integration tests</Button>
-        <p className="quote-note">
-          Each card will require an approved transaction. Completed purchases
-          remain completed if another item fails. Unspent funds stay in your
-          wallet.
-        </p>
+        <Button disabled>Checkout unavailable</Button>
       </aside>
     </div>
   );
@@ -1546,10 +1592,7 @@ function WalletView({ network }: { network: string }) {
           <span>Gemini account</span>
           <h2>USD</h2>
           <strong>Not connected</strong>
-          <p>
-            Available cash and withdrawal eligibility require your own linked
-            Gemini account.
-          </p>
+
           <Button disabled variant="outline">
             OAuth app approval required
           </Button>
@@ -1558,21 +1601,15 @@ function WalletView({ network }: { network: string }) {
           <span>Solana wallet · {network.toUpperCase()}</span>
           <h2>SOL / USDC</h2>
           <strong>No verified wallet</strong>
-          <p>
-            Balances remain separate from Gemini. No pooled balance or automatic
-            transfer.
-          </p>
+
           <Button disabled variant="outline">
             Privy application setup required
           </Button>
         </section>
       </div>
       <section className="panel funding-panel">
-        <h2>Fund your own wallet, one approval at a time.</h2>
-        <p>
-          Conversion, withdrawal and collectible purchases are separate actions.
-          Your account must permit the network, destination and amount.
-        </p>
+        <h2>Transfers</h2>
+
         <div className="funding-stages">
           <span>Choose amount</span>
           <ArrowRight size={17} />
@@ -1582,12 +1619,8 @@ function WalletView({ network }: { network: string }) {
           <ArrowRight size={17} />
           <span>Verify receipt</span>
         </div>
-        <p className="quote-note">
-          Manual fallback: transfer eligible funds through your own verified
-          wallets. No Relay deposit address is offered without proven CEX
-          support and route safety.
-        </p>
-        <Button disabled>Funding permission blocked</Button>
+
+        <Button disabled>Transfers unavailable</Button>
       </section>
     </>
   );

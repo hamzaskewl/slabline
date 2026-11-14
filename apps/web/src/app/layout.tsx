@@ -16,9 +16,8 @@ export const metadata: Metadata = {
     apple: "/icons/apple-touch-icon.png",
     icon: "/icons/markets-192.png",
   },
-  title: "Collectible Markets — Make your call",
-  description:
-    "Explore Gemini prediction markets and discover real collectible rewards. Hackathon prototype; simulated trading.",
+  title: "Collectible Markets",
+  description: "Prediction markets, sports cards and collectible tokens.",
 };
 export const viewport: Viewport = {
   width: "device-width",

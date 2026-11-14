@@ -2,6 +2,7 @@ import { initTRPC } from "@trpc/server";
 import { z } from "zod";
 import type {
   Market,
+  GrailToken,
   Listing,
   Pack,
   ProviderResult,
@@ -11,7 +12,9 @@ const t = initTRPC.create();
 export async function workerRead<T>(path: string): Promise<T> {
   const origin = process.env.WORKER_URL ?? "http://localhost:4001";
   const response = await fetch(`${origin}${path}`, {
-    signal: AbortSignal.timeout(path.startsWith("/markets?") ? 75000 : 20000),
+    signal: AbortSignal.timeout(
+      /^(\/markets|\/rewards|\/cards)/.test(path) ? 90000 : 20000,
+    ),
     cache: "no-store",
   });
   if (!response.ok) throw new Error("Data worker unavailable");
@@ -72,6 +75,12 @@ export const appRouter = t.router({
     .query(({ input }) =>
       safe<Listing[]>(`/cards?search=${encodeURIComponent(input.search)}`, []),
     ),
+  rewards: t.procedure.query(() =>
+    safe<{ cards: Listing[]; tokens: GrailToken[] }>("/rewards", {
+      cards: [],
+      tokens: [],
+    }),
+  ),
   packs: t.procedure.query(() => safe<Pack[]>("/packs", [])),
   status: t.procedure.query(() => ({
     mode: process.env.DEMO_MODE ?? "simulated",

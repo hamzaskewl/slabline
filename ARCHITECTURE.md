@@ -9,6 +9,15 @@ Mobile is the primary web experience. The same URLs serve the desktop website, m
 
 Ship a standalone web app manifest, home-screen icons and an offline launch message. Fetch prices, accounts and transaction state from the network. Verify narrow portrait and short landscape layouts, touch navigation, and installation metadata when changing the app shell.
 
+Current product scope (2026-11-13)
+
+- Apply every UI change to mobile and desktop. Remove promotional slogans and repeated integration explanations from app flows; keep required attribution and technical status on About. Keep simulation and unavailable actions unambiguous.
+- Discover active markets only when available card inventory or Grail tokens relate to the event's subject or sport. No unrelated inventory fallback. Sports rewards are the default; non-sports rewards, including Pokemon, require a related active market.
+- Rewards default to highest listing ask, with search, price bounds, sport/category, grader, grade, autograph/rookie and sort filters. Follow Collector Crypt cursor pagination; no arbitrary $1,000 ceiling.
+- Hide Phygitals packs and absent FMV/comps from this UI scope. Their adapters remain available for later work.
+- Read Grail's public token catalog, validate chain/address metadata and persist all deployed token subjects in assets using eip155 chain/address keys. Match only available records. Grail rewards are fractional tokens, separate from exact-card checkout. Prices, trading and physical redemption open on Grail until an authorized, tested EVM integration exists. No implied gas sponsorship, whole-card ownership or automatic redemption.
+- Report blockers in chat; do not create additional user-facing Markdown reports.
+
 Locked technical choices
 
 - Bun runtime/package manager/workspaces. TypeScript strict throughout.

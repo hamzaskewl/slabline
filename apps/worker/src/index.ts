@@ -2,6 +2,7 @@ import {
   geminiClient,
   listMarkets,
   listCards,
+  listGrailTokens,
   listPacks,
   cached,
   providerRead,
@@ -14,6 +15,10 @@ import {
 } from "@collectible/integrations";
 import {
   marketPreview,
+  eligibleMarkets,
+  eligibleCards,
+  eligibleTokens,
+  rewardCategories,
   type Book,
   type Market,
   type PricePoint,
@@ -110,6 +115,23 @@ async function markets(search = "", category = "") {
       (!category || m.category === category) &&
       (!searchText || searchable(m).includes(searchText)),
   );
+}
+async function rewardInventory(data: Market[]) {
+  const [cards, tokens] = await Promise.all([
+    providerRead(() => listCards("", rewardCategories(data)), []),
+    providerRead(listGrailTokens, []),
+  ]);
+  return {
+    cards: cards.data,
+    tokens: tokens.data,
+    error:
+      [
+        cards.error ? "Collector Crypt is unavailable." : "",
+        tokens.error ? "Grail is unavailable." : "",
+      ]
+        .filter(Boolean)
+        .join(" ") || null,
+  };
 }
 async function subscribe(symbol: string) {
   const existing = books.get(symbol);
@@ -300,29 +322,55 @@ const server = Bun.serve({
         }, null),
       );
     }
-    if (url.pathname === "/markets")
-      return Response.json(
-        await providerRead(
-          () =>
-            markets(
-              url.searchParams.get("search")?.slice(0, 100) ?? "",
-              url.searchParams.get("category")?.slice(0, 50) ?? "",
-            ).then((data) => data.map(marketPreview)),
-          [],
-        ),
+    if (url.pathname === "/markets") {
+      const result = await providerRead(
+        () =>
+          markets(
+            url.searchParams.get("search")?.slice(0, 100) ?? "",
+            url.searchParams.get("category")?.slice(0, 50) ?? "",
+          ),
+        [],
       );
-    if (url.pathname === "/cards")
-      return Response.json(
-        await providerRead(
-          async () =>
-            attachCachedValuations(
-              await listCards(
-                url.searchParams.get("search")?.slice(0, 100) ?? "",
-              ),
-            ),
-          [],
-        ),
-      );
+      if (result.error) return Response.json(result);
+      const inventory = await rewardInventory(result.data);
+      return Response.json({
+        ...result,
+        data: eligibleMarkets(
+          result.data,
+          inventory.cards,
+          inventory.tokens,
+        ).map(marketPreview),
+        error: inventory.error,
+      });
+    }
+    if (url.pathname === "/rewards" || url.pathname === "/cards") {
+      const marketResult = await providerRead(() => markets(), []);
+      const inventory = await rewardInventory(marketResult.data);
+      const cards = eligibleCards(inventory.cards, marketResult.data);
+      return Response.json({
+        data:
+          url.pathname === "/cards"
+            ? cards
+            : {
+                cards,
+                tokens: eligibleTokens(inventory.tokens, marketResult.data),
+              },
+        source:
+          inventory.error && !cards.length && !inventory.tokens.length
+            ? "unavailable"
+            : "live",
+        observedAt: new Date().toISOString(),
+        error:
+          [
+            inventory.error,
+            marketResult.error
+              ? "Market matching is unavailable. Showing sports rewards only."
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" ") || null,
+      });
+    }
     if (url.pathname === "/packs")
       return Response.json(await providerRead(listPacks, []));
     if (url.pathname === "/book") {
