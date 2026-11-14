@@ -86,7 +86,7 @@ export function normalizeEvent(raw: RawEvent): Market {
       buyYes: c.prices?.buy?.yes ?? null,
       buyNo: c.prices?.buy?.no ?? null,
       status: c.status ?? "unknown",
-      lastPrice: c.prices?.lastTradePrice ?? c.prices?.bestAsk ?? null,
+      lastPrice: c.prices?.lastTradePrice ?? null,
       quantityIncrement: c.quantityIncrement ?? null,
       priceIncrement: c.priceIncrement ?? null,
       quantityMinimum: c.quantityMinimum ?? undefined,
