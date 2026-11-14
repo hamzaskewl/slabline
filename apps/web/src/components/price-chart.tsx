@@ -38,6 +38,7 @@ export default function PriceChart({
   range,
   onRangeChange,
   latestTrade,
+  compact = false,
 }: {
   outcomes: Outcome[];
   volume?: string | null;
@@ -45,6 +46,7 @@ export default function PriceChart({
   range: ChartRange;
   onRangeChange: (r: ChartRange) => void;
   latestTrade: (PricePoint & { symbol: string }) | null;
+  compact?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null),
     chartRef = useRef<IChartApi | null>(null),
@@ -260,20 +262,22 @@ export default function PriceChart({
         )}
       </div>
       <div className="chart-controls">
-        <div className="chart-meta">
-          {eventTime && (
-            <time dateTime={eventTime}>
-              {new Date(eventTime).toLocaleString("en-US", {
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-                timeZoneName: "short",
-              })}
-            </time>
-          )}
-          <strong className="chart-volume">{eventVolume(volume)}</strong>
-        </div>
+        {!compact && (
+          <div className="chart-meta">
+            {eventTime && (
+              <time dateTime={eventTime}>
+                {new Date(eventTime).toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                  timeZoneName: "short",
+                })}
+              </time>
+            )}
+            <strong className="chart-volume">{eventVolume(volume)}</strong>
+          </div>
+        )}
         <div className="chart-ranges" aria-label="Chart time range">
           {(["1D", "1W", "1M", "ALL"] as const).map((r) => (
             <button

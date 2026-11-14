@@ -42,7 +42,6 @@ export function OrderBook({
   error: string | null;
   practice: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const [group, setGroup] = useState<string | null>(null);
   const [totalMode, setTotalMode] = useState("usd");
   const asksRef = useRef<HTMLDivElement>(null);
@@ -78,7 +77,7 @@ export function OrderBook({
   }
   useEffect(() => {
     recenter();
-  }, [open, book?.symbol, side, increment, hasDepth]);
+  }, [book?.symbol, side, increment, hasDepth]);
   const last = sidePrice(lastPrice, side);
   function rows(levels: DepthRow[], kind: "asks" | "bids") {
     const max = Number(levels.at(-1)?.totalShares ?? 1);
@@ -109,25 +108,9 @@ export function OrderBook({
     ));
   }
   return (
-    <details
-      className="ob-disclosure"
-      onToggle={(e) => setOpen(e.currentTarget.open)}
-    >
-      <summary>
-        Order book{" "}
-        <span className={book && !stale ? "ob-live" : ""}>
-          {practice
-            ? "Simulated"
-            : book && !stale
-              ? "Live"
-              : book || error
-                ? "Reconnecting"
-                : "Loading"}
-        </span>
-      </summary>
+    <div className="ob-disclosure ob-inline">
       <div className="ob-controls">
         <div className="ob-selection">
-          <span>{label}</span>
           <div className="ob-sides" aria-label="Order book side">
             {(["yes", "no"] as const).map((s) => (
               <button
@@ -139,6 +122,15 @@ export function OrderBook({
               </button>
             ))}
           </div>
+          <span className={`ob-feed-status${book && !stale ? " ob-live" : ""}`}>
+            {practice
+              ? "Simulated"
+              : book && !stale
+                ? "Live"
+                : book || error
+                  ? "Reconnecting"
+                  : "Loading"}
+          </span>
         </div>
         <div className="ob-tools">
           <label>
@@ -237,6 +229,6 @@ export function OrderBook({
         Totals accumulate from the best price. Scroll each side to see more
         depth.
       </p>
-    </details>
+    </div>
   );
 }

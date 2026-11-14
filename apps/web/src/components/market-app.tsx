@@ -39,21 +39,17 @@ import {
   marketOutcomes,
   buyPercent,
   type ChartRange,
-  type PricePoint,
-  type Book,
   type Listing,
   type Market,
 } from "@collectible/domain";
-import {
-  PRACTICE_MARKET,
-  practiceBook,
-} from "@collectible/integrations/fixtures";
+import { PRACTICE_MARKET } from "@collectible/integrations/fixtures";
 import { api } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { usd } from "@/lib/utils";
 import { GrailCatalog } from "./grail-catalog";
 import { Discovery } from "./discovery";
-import { OrderBook } from "./order-book";
+import { OutcomeDetail } from "./outcome-detail";
+import { useLiveBook } from "@/lib/use-live-book";
 const PriceChart = dynamic(() => import("./price-chart"), {
   ssr: false,
   loading: () => <div className="chart-loading">Loading chart…</div>,
@@ -645,20 +641,15 @@ function MarketDetail({
       initialSymbol ?? contracts[initialOutcome]?.symbol,
     ),
     [expanded, setExpanded] = useState(false),
+    [expandedSymbol, setExpandedSymbol] = useState<string | null>(null),
     [side, setSide] = useState<"yes" | "no">(initialSide),
     [stake, setStake] = useState(initialStake),
-    [receivedBook, setBook] = useState<Book | null>(null),
-    [streamError, setStreamError] = useState<string | null>(null),
-    [now, setNow] = useState(0),
-    [lastHeartbeat, setLastHeartbeat] = useState(0),
-    [latestTrade, setLatestTrade] = useState<
-      (PricePoint & { symbol: string }) | null
-    >(null),
     [range, setRange] = useState<ChartRange>("ALL"),
     [review, setReview] = useState(false);
   const contract = contracts.find((c) => c.symbol === selectedSymbol);
   const symbol = contract?.symbol;
-  const book = receivedBook?.symbol === symbol ? receivedBook : null;
+  const live = useLiveBook(symbol, practice);
+  const { book, latestTrade, stale } = live;
   const charted = contracts.slice(0, 3);
   if (contract && !charted.some((c) => c.symbol === symbol))
     charted.splice(2, 1, contract);
@@ -674,54 +665,6 @@ function MarketDetail({
       window.history.replaceState(window.history.state, "", url);
     }
   }
-  useEffect(() => {
-    setBook(null);
-    setLatestTrade(null);
-    setStreamError(null);
-    if (practice) {
-      setBook(practiceBook());
-      return;
-    }
-    if (!symbol) return;
-    const stream = new EventSource(
-      `/api/events?symbol=${encodeURIComponent(symbol)}`,
-    );
-    stream.onmessage = (e) => {
-      try {
-        const update = JSON.parse(e.data) as {
-          book: Book | null;
-          error: string | null;
-          latestTrade?: PricePoint | null;
-        };
-        setBook(update.book);
-        setLastHeartbeat(Date.now());
-        setStreamError(update.error);
-        if (update.latestTrade)
-          setLatestTrade((previous) =>
-            previous?.symbol === symbol &&
-            previous?.time === update.latestTrade?.time &&
-            previous?.value === update.latestTrade?.value
-              ? previous
-              : { ...update.latestTrade!, symbol },
-          );
-      } catch {
-        setStreamError("Unsupported book update");
-      }
-    };
-    stream.onerror = () => {
-      setStreamError("Connection interrupted. Reconnecting…");
-      setBook((b) => (b ? { ...b, stale: true } : null));
-    };
-    return () => stream.close();
-  }, [symbol, practice]);
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const stale =
-    book?.stale ||
-    (!!book && book.symbol !== symbol) ||
-    (!practice && book && now - lastHeartbeat > 15000);
   const quote = useMemo(() => {
     if (
       !book ||
@@ -789,47 +732,68 @@ function MarketDetail({
             <span>Markets</span>
             <small>{contracts.length}</small>
           </h2>
-          {(expanded ? contracts : charted).map((c) => (
-            <div className="outcome-row" key={c.symbol}>
-              <div className="outcome-name">
-                <i style={{ background: c.color }} />
-                {c.imageUrl && (
-                  <img
-                    src={c.imageUrl}
-                    alt=""
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                )}
-                <strong>{c.label}</strong>
-              </div>
-              {(["yes", "no"] as const).map((s) => (
+          {(expanded ? contracts : contracts.slice(0, 10)).map((c) => (
+            <div className="outcome-item" key={c.symbol}>
+              <div className="outcome-row">
                 <button
-                  key={s}
-                  className={"board-side " + s}
-                  aria-label={
-                    s.toUpperCase() +
-                    " " +
-                    c.label +
-                    " " +
-                    buyPercent(s === "yes" ? c.buyYes : c.buyNo)
+                  className="outcome-name outcome-expand"
+                  aria-label={`${c.label} details`}
+                  aria-expanded={expandedSymbol === c.symbol}
+                  aria-controls={`outcome-${c.symbol}`}
+                  onClick={() =>
+                    setExpandedSymbol((current) =>
+                      current === c.symbol ? null : c.symbol,
+                    )
                   }
-                  aria-pressed={c.symbol === symbol && side === s}
-                  onClick={() => {
-                    selectOutcome(c.symbol, s);
-                    if (window.matchMedia("(max-width: 840px)").matches)
-                      document
-                        .getElementById("prediction-ticket")
-                        ?.scrollIntoView({ block: "start" });
-                  }}
                 >
-                  {s === "yes" ? "Yes" : "No"}{" "}
-                  <b>{buyPercent(s === "yes" ? c.buyYes : c.buyNo)}</b>
+                  <i style={{ background: c.color }} />
+                  {c.imageUrl && (
+                    <img
+                      src={c.imageUrl}
+                      alt=""
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  )}
+                  <strong>{c.label}</strong>
+                  <ChevronDown size={16} />
                 </button>
-              ))}
+                {(["yes", "no"] as const).map((s) => (
+                  <button
+                    key={s}
+                    className={"board-side " + s}
+                    aria-label={
+                      s.toUpperCase() +
+                      " " +
+                      c.label +
+                      " " +
+                      buyPercent(s === "yes" ? c.buyYes : c.buyNo)
+                    }
+                    aria-pressed={c.symbol === symbol && side === s}
+                    onClick={() => {
+                      selectOutcome(c.symbol, s);
+                      if (window.matchMedia("(max-width: 840px)").matches)
+                        document
+                          .getElementById("prediction-ticket")
+                          ?.scrollIntoView({ block: "start" });
+                    }}
+                  >
+                    {s === "yes" ? "Yes" : "No"}{" "}
+                    <b>{buyPercent(s === "yes" ? c.buyYes : c.buyNo)}</b>
+                  </button>
+                ))}
+              </div>
+              {expandedSymbol === c.symbol && (
+                <OutcomeDetail
+                  id={`outcome-${c.symbol}`}
+                  outcome={c}
+                  practice={practice}
+                  shared={live}
+                />
+              )}
             </div>
           ))}
-          {contracts.length > 3 && (
+          {contracts.length > 10 && (
             <button
               className="more-outcomes"
               aria-expanded={expanded}
@@ -837,26 +801,11 @@ function MarketDetail({
             >
               {expanded
                 ? "Show less"
-                : "Show " + (contracts.length - 3) + " more"}{" "}
+                : "Show all " + contracts.length + " markets"}{" "}
               <ChevronDown size={15} />
             </button>
           )}
         </section>
-        <OrderBook
-          key={symbol}
-          book={book}
-          label={contract?.label ?? "Choose an outcome"}
-          side={side}
-          onSide={(next) => contract && selectOutcome(contract.symbol, next)}
-          lastPrice={
-            latestTrade?.symbol === symbol
-              ? latestTrade!.value.toFixed(6)
-              : (contract?.lastPrice ?? null)
-          }
-          stale={!!stale}
-          error={streamError}
-          practice={practice}
-        />
         <details className="market-rules">
           <summary>Market details &amp; resolution</summary>
           <p>
