@@ -129,13 +129,16 @@ export async function listMarkets(
       while (queue.length) {
         const next = queue.shift()!;
         groups[next.index] = await collectMarketPages((offset, limit) =>
-          client.predictions.listEvents({
-            status: ["active"],
-            limit,
-            offset,
-            ...(search ? { search } : {}),
-            ...(next.category ? { category: [next.category] } : {}),
-          }),
+          client.predictions.listEvents(
+            {
+              status: ["active"],
+              limit,
+              offset,
+              ...(search ? { search } : {}),
+              ...(next.category ? { category: [next.category] } : {}),
+            },
+            { timeoutMs: limit === 100 ? 12000 : 40000 },
+          ),
         );
       }
     }),
