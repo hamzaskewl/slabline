@@ -2,6 +2,7 @@ import { z } from "zod";
 export * from "./history";
 export * from "./rewards";
 export * from "./evm";
+export * from "./orderbook";
 import { relatedCards } from "./rewards";
 
 export const decimal = z.string().regex(/^\d+(\.\d{1,6})?$/);
@@ -263,6 +264,7 @@ export function quoteDepth(input: {
   let remaining = budget,
     cost = 0n,
     fees = 0n,
+    notional = 0n,
     quantity = 0n;
   const fills: { price: string; quantity: string }[] = [];
   for (const level of levels) {
@@ -295,12 +297,14 @@ export function quoteDepth(input: {
     cost += c;
     fees += f;
     quantity += q;
+    notional += level.price * q;
     fills.push({ price: money(level.price), quantity: money(q) });
     if (q < level.quantity - (level.quantity % lot)) break;
   }
   if (quantity < quantityMinimum)
     return {
       contracts: money(0n),
+      averagePrice: null,
       cost: money(0n),
       fees: input.feeBps === null ? null : money(0n),
       totalPayout: money(0n),
@@ -311,6 +315,10 @@ export function quoteDepth(input: {
     };
   return {
     contracts: money(quantity),
+    // Weighted execution price excludes fees and per-fill cash rounding.
+    averagePrice: quantity
+      ? money((notional + quantity / 2n) / quantity)
+      : null,
     cost: money(cost),
     fees: input.feeBps === null ? null : money(fees),
     totalPayout: money(quantity),
@@ -318,7 +326,10 @@ export function quoteDepth(input: {
     feesVerified: input.feeBps !== null,
     fills,
     exhausted:
-      quantity > 0n && fills.length === levels.length && remaining > 0n,
+      quantity > 0n &&
+      quantity ===
+        levels.reduce((sum, level) => sum + (level.quantity / lot) * lot, 0n) &&
+      remaining > 0n,
   };
 }
 

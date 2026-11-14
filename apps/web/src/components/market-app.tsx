@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import {
   asksForSide,
+  cents,
   quoteDepth,
   units,
   money,
@@ -52,6 +53,7 @@ import { Button } from "@/components/ui/button";
 import { usd } from "@/lib/utils";
 import { GrailCatalog } from "./grail-catalog";
 import { Discovery } from "./discovery";
+import { OrderBook } from "./order-book";
 const PriceChart = dynamic(() => import("./price-chart"), {
   ssr: false,
   loading: () => <div className="chart-loading">Loading chart…</div>,
@@ -840,53 +842,21 @@ function MarketDetail({
             </button>
           )}
         </section>
-        <details className="depth-section book-disclosure">
-          <summary>
-            Order book{" "}
-            <small>
-              {practice
-                ? "Simulated"
-                : book && !stale
-                  ? "Live"
-                  : "Waiting for fresh depth"}
-            </small>
-          </summary>
-          <p className="book-context">
-            {contract?.label ?? "Choose an outcome"} · Top four YES bid and ask
-            levels
-          </p>
-          {streamError ? (
-            <p className="connection-message" role="status">
-              {streamError}
-            </p>
-          ) : null}
-          <div className="depth-columns">
-            <div>
-              <div className="depth-label">
-                <span>Bid price</span>
-                <span>Contracts</span>
-              </div>
-              {book?.bids.slice(0, 4).map((l, i) => (
-                <div className="depth-row bid" key={i}>
-                  <span>{(Number(l.price) * 100).toFixed(1)}¢</span>
-                  <span>{Number(l.quantity).toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-            <div>
-              <div className="depth-label">
-                <span>Ask price</span>
-                <span>Contracts</span>
-              </div>
-              {book?.asks.slice(0, 4).map((l, i) => (
-                <div className="depth-row ask" key={i}>
-                  <span>{(Number(l.price) * 100).toFixed(1)}¢</span>
-                  <span>{Number(l.quantity).toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </details>
+        <OrderBook
+          key={symbol}
+          book={book}
+          label={contract?.label ?? "Choose an outcome"}
+          side={side}
+          onSide={(next) => contract && selectOutcome(contract.symbol, next)}
+          lastPrice={
+            latestTrade?.symbol === symbol
+              ? latestTrade!.value.toFixed(6)
+              : (contract?.lastPrice ?? null)
+          }
+          stale={!!stale}
+          error={streamError}
+          practice={practice}
+        />
         <details className="market-rules">
           <summary>Market details &amp; resolution</summary>
           <p>
@@ -979,6 +949,30 @@ function MarketDetail({
           <button disabled title="A verified spendable USD balance is required">
             Max
           </button>
+        </div>
+        <div className="execution-estimate" aria-label="Execution estimate">
+          <div>
+            <span>Average price</span>
+            <strong>
+              {cents(quote?.averagePrice ?? null, book?.priceIncrement, true)}
+            </strong>
+          </div>
+          <div>
+            <span>Shares</span>
+            <strong>
+              {quote
+                ? Number(quote.contracts).toLocaleString("en-US", {
+                    maximumFractionDigits: 6,
+                  })
+                : "—"}
+            </strong>
+          </div>
+          {quote?.exhausted && (
+            <p>
+              Not enough depth for this stake. {usd(quote.unspent)} would remain
+              unspent{practice ? "." : " before fees."}
+            </p>
+          )}
         </div>
         <details className="estimate-details">
           <summary>Estimate details</summary>

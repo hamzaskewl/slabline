@@ -4,6 +4,7 @@ import {
   normalizeCandles,
   readPriceHistory,
   CandleRequestError,
+  normalizeEvent,
 } from "./gemini";
 import {
   marketPreview,
@@ -11,6 +12,20 @@ import {
   eventVolume,
   buyPercent,
 } from "@collectible/domain";
+
+test("an ask is never presented as a last trade", () => {
+  const market = normalizeEvent({
+    id: "test",
+    title: "Test",
+    contracts: [
+      {
+        instrumentSymbol: "GEMI-TEST-YES",
+        prices: { bestAsk: "0.62", lastTradePrice: null },
+      },
+    ],
+  });
+  expect(market.contracts[0]?.lastPrice).toBeNull();
+});
 
 test("new contracts fall back to real minute candles, while outages stay errors", async () => {
   const requests: string[] = [];
