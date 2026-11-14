@@ -1,6 +1,7 @@
 import { z } from "zod";
 export * from "./history";
 export * from "./rewards";
+export * from "./evm";
 import { relatedCards } from "./rewards";
 
 export const decimal = z.string().regex(/^\d+(\.\d{1,6})?$/);

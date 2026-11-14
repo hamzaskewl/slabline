@@ -8,3 +8,4 @@ export * from "./valuations";
 export * from "./financial";
 
 export * from "./grail";
+export * from "./evm-trading";
