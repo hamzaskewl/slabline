@@ -15,11 +15,9 @@ import {
   Gift,
   Layers3,
   Menu,
-  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
-  ShoppingBag,
   Trophy,
   Wallet,
   X,
@@ -30,9 +28,8 @@ import {
   quoteDepth,
   units,
   money,
-  validateCart,
-  storedListingSchema,
   matchingCards,
+  outcomeRewardMarket,
   matchingTokens,
   filterCards,
   type GrailToken,
@@ -94,12 +91,14 @@ export function MarketApp({
   initialSide = "yes",
   initialOutcome = 0,
   initialSymbol,
+  initialStake = "25",
 }: {
   section?: string;
   selectedId?: string;
   initialSide?: "yes" | "no";
   initialOutcome?: number;
   initialSymbol?: string;
+  initialStake?: string;
 }) {
   const router = useRouter();
   useEffect(() => {
@@ -113,8 +112,7 @@ export function MarketApp({
     [category, setCategory] = useState("All markets"),
     [practice, setPractice] = useState(false),
     [menuOpen, setMenuOpen] = useState(false);
-  const [cart, setCart] = useState<Listing[]>([]),
-    [orders, setOrders] = useState<PracticeOrder[]>([]),
+  const [orders, setOrders] = useState<PracticeOrder[]>([]),
     [notice, setNotice] = useState("");
   const marketQuery = api.markets.useQuery(
     { search: "" },
@@ -125,7 +123,8 @@ export function MarketApp({
   );
   const rewardQuery = api.rewards.useQuery(undefined, {
     staleTime: 60000,
-    enabled: ["markets", "rewards"].includes(section),
+    enabled: section === "rewards" || (section === "markets" && !!selectedId),
+    refetchInterval: 60000,
   });
   const status = api.status.useQuery();
   const selectedQuery = api.market.useQuery(
@@ -134,38 +133,12 @@ export function MarketApp({
   );
   useEffect(() => {
     try {
-      const c = JSON.parse(localStorage.getItem("cm-cart-v1") ?? "[]");
-      if (Array.isArray(c))
-        setCart(
-          c.slice(0, 20).flatMap((value) => {
-            const result = storedListingSchema.safeParse(value);
-            return result.success ? [result.data] : [];
-          }),
-        );
       const o = JSON.parse(localStorage.getItem("cm-practice-v1") ?? "[]");
       if (Array.isArray(o)) setOrders(o.slice(0, 50));
     } catch {
-      localStorage.removeItem("cm-cart-v1");
+      localStorage.removeItem("cm-practice-v1");
     }
   }, []);
-  const saveCart = (items: Listing[]) => {
-    setCart(items);
-    localStorage.setItem("cm-cart-v1", JSON.stringify(items));
-  };
-  const add = (item: Listing) => {
-    if (cart.some((c) => c.mint === item.mint)) {
-      setNotice("This card is already in your cart.");
-      return;
-    }
-    if (cart.length >= 20) {
-      setNotice("Your cart can hold up to 20 cards.");
-      return;
-    }
-    saveCart([...cart, item]);
-    setNotice(
-      "Added to cart. Listing availability will need to be checked again.",
-    );
-  };
   const detailView = section === "markets" && (!!selectedId || practice);
   const markets = practice ? [PRACTICE_MARKET] : (marketQuery.data?.data ?? []);
   const visible = markets.filter(
@@ -240,14 +213,6 @@ export function MarketApp({
             )}
             <div className="topbar-actions">
               <span className="mode-badge">SIMULATED</span>
-              <Link
-                className="cart-link"
-                href="/cart"
-                aria-label={`Cart, ${cart.length} items`}
-              >
-                <ShoppingBag size={19} />
-                {cart.length ? <b>{cart.length}</b> : null}
-              </Link>
               <div className="header-account">
                 <WalletEntry configured={!!status.data?.privyConfigured} />
               </div>
@@ -408,8 +373,15 @@ export function MarketApp({
                         practice={practice}
                         cards={cards}
                         tokens={tokens}
-                        onAdd={add}
+                        rewardsLoading={rewardQuery.isLoading}
+                        rewardsError={
+                          rewardQuery.data?.error ??
+                          (rewardQuery.isError
+                            ? "Rewards are unavailable. Retrying shortly."
+                            : null)
+                        }
                         onSimulate={simulate}
+                        initialStake={initialStake}
                         initialSide={initialSide}
                         initialOutcome={initialOutcome}
                         initialSymbol={practice ? undefined : initialSymbol}
@@ -439,24 +411,6 @@ export function MarketApp({
                   </div>
                 </>
               )}
-              <div className="section-heading">
-                <div>
-                  <h2>Collectible rewards</h2>
-                </div>
-                <Link href="/rewards">
-                  View all <ArrowUpRight size={16} />
-                </Link>
-              </div>
-              <CatalogGrid
-                cards={(selectedId && selected
-                  ? matchingCards(selected, cards)
-                  : cards
-                ).slice(0, 5)}
-                loading={rewardQuery.isLoading}
-                error={rewardQuery.data?.error}
-                onAdd={add}
-                retry={() => void rewardQuery.refetch()}
-              />
             </>
           ) : section === "rewards" ? (
             <>
@@ -465,12 +419,9 @@ export function MarketApp({
                 tokens={tokens}
                 loading={rewardQuery.isLoading}
                 error={rewardQuery.data?.error}
-                onAdd={add}
                 retry={() => void rewardQuery.refetch()}
               />
             </>
-          ) : section === "cart" ? (
-            <CartView cart={cart} saveCart={saveCart} />
           ) : section === "portfolio" ? (
             <>
               {status.data?.privyConfigured ? <PrivateAccount /> : null}
@@ -664,21 +615,25 @@ function MarketDetail({
   practice,
   cards,
   tokens,
-  onAdd,
   onSimulate,
   initialSide,
   initialOutcome,
   initialSymbol,
+  initialStake,
+  rewardsLoading,
+  rewardsError,
 }: {
   market: Market;
   practice: boolean;
   cards: Listing[];
-  onAdd: (c: Listing) => void;
   tokens: GrailToken[];
   onSimulate: (o: Omit<PracticeOrder, "id" | "createdAt">) => void;
   initialSide: "yes" | "no";
   initialOutcome: number;
   initialSymbol?: string;
+  initialStake: string;
+  rewardsLoading: boolean;
+  rewardsError: string | null;
 }) {
   const contracts = useMemo(() => marketOutcomes(market), [market]);
   const [selectedSymbol, setSelectedSymbol] = useState(
@@ -686,10 +641,11 @@ function MarketDetail({
     ),
     [expanded, setExpanded] = useState(false),
     [side, setSide] = useState<"yes" | "no">(initialSide),
-    [stake, setStake] = useState("25"),
+    [stake, setStake] = useState(initialStake),
     [receivedBook, setBook] = useState<Book | null>(null),
     [streamError, setStreamError] = useState<string | null>(null),
     [now, setNow] = useState(0),
+    [lastHeartbeat, setLastHeartbeat] = useState(0),
     [latestTrade, setLatestTrade] = useState<
       (PricePoint & { symbol: string }) | null
     >(null),
@@ -733,6 +689,7 @@ function MarketDetail({
           latestTrade?: PricePoint | null;
         };
         setBook(update.book);
+        setLastHeartbeat(Date.now());
         setStreamError(update.error);
         if (update.latestTrade)
           setLatestTrade((previous) =>
@@ -759,7 +716,7 @@ function MarketDetail({
   const stale =
     book?.stale ||
     (!!book && book.symbol !== symbol) ||
-    (!practice && book && now - Date.parse(book.updatedAt) > 15000);
+    (!practice && book && now - lastHeartbeat > 15000);
   const quote = useMemo(() => {
     if (
       !book ||
@@ -784,12 +741,11 @@ function MarketDetail({
       return null;
     }
   }, [stake, book, side, stale, practice]);
-  const possibleMatches = matchingCards(market, cards);
-  const attainable = quote
-    ? possibleMatches
-        .filter((c) => units(c.ask) <= units(quote.totalPayout))
-        .slice(0, 3)
+  const rewardMarket = contract ? outcomeRewardMarket(market, contract) : null;
+  const possibleMatches = rewardMarket
+    ? matchingCards(rewardMarket, cards)
     : [];
+  const attainable = possibleMatches.slice(0, 3);
   return (
     <>
       <section className="market-detail panel">
@@ -828,7 +784,7 @@ function MarketDetail({
             <span>Markets</span>
             <small>{contracts.length}</small>
           </h2>
-          {(expanded ? contracts : contracts.slice(0, 3)).map((c) => (
+          {(expanded ? contracts : charted).map((c) => (
             <div className="outcome-row" key={c.symbol}>
               <div className="outcome-name">
                 <i style={{ background: c.color }} />
@@ -1125,17 +1081,17 @@ function MarketDetail({
             <strong>Collectible preview</strong>
           </div>
           <p>
-            {attainable.length
-              ? "Actual asks within the estimated payout."
-              : "No related cards within this payout."}
+            {rewardsLoading
+              ? "Loading related cards…"
+              : rewardsError && !attainable.length
+                ? rewardsError
+                : attainable.length
+                  ? "Related to the selected prediction."
+                  : "No listed card matches this prediction."}
           </p>
           <div className="reward-mini-grid">
             {attainable.map((c) => (
-              <button
-                key={c.mint}
-                onClick={() => onAdd(c)}
-                title={`Add ${c.name} to cart`}
-              >
+              <div className="reward-preview-card" key={c.mint}>
                 {c.frontImage ? (
                   <img
                     src={c.frontImage}
@@ -1146,11 +1102,19 @@ function MarketDetail({
                 ) : (
                   <Layers3 size={20} />
                 )}
-                <span>{usd(c.ask)}</span>
-              </button>
+                <strong>{c.name}</strong>
+                <span>{usd(c.ask)} USDC ask</span>
+                {quote ? (
+                  <small>
+                    {units(c.ask) <= units(quote.totalPayout)
+                      ? "Within gross payout · fees not included"
+                      : `${usd(money(units(c.ask) - units(quote.totalPayout)))} above estimated payout`}
+                  </small>
+                ) : null}
+              </div>
             ))}
           </div>
-          {matchingTokens(market, tokens)
+          {(rewardMarket ? matchingTokens(rewardMarket, tokens) : [])
             .slice(0, 2)
             .map((t) => (
               <a
@@ -1165,20 +1129,17 @@ function MarketDetail({
                 <ExternalLink size={13} />
               </a>
             ))}
-          <small>Related by subject or sport. Cards are not reserved.</small>
+          <small>
+            Choose rewards from a settled winning prediction. Availability and
+            fees are checked then.
+          </small>
         </div>
       </aside>
     </>
   );
 }
 
-function CardTile({
-  card,
-  onAdd,
-}: {
-  card: Listing;
-  onAdd: (c: Listing) => void;
-}) {
+function CardTile({ card }: { card: Listing }) {
   const [back, setBack] = useState(false),
     [failed, setFailed] = useState(false);
   const image = back ? card.backImage : card.frontImage;
@@ -1226,13 +1187,6 @@ function CardTile({
             <small>Listing ask · USDC</small>
             <strong>{usd(card.ask)}</strong>
           </div>
-          <button
-            className="add-card"
-            aria-label={`Add ${card.name} to cart`}
-            onClick={() => onAdd(card)}
-          >
-            <Plus size={18} />
-          </button>
         </div>
       </div>
     </article>
@@ -1242,13 +1196,11 @@ function CatalogGrid({
   cards,
   loading,
   error,
-  onAdd,
   retry,
 }: {
   cards: Listing[];
   loading: boolean;
   error?: string | null;
-  onAdd: (c: Listing) => void;
   retry?: () => void;
 }) {
   return loading ? (
@@ -1256,7 +1208,7 @@ function CatalogGrid({
   ) : cards.length ? (
     <div className="collectible-grid">
       {cards.map((c) => (
-        <CardTile card={c} key={c.mint} onAdd={onAdd} />
+        <CardTile card={c} key={c.mint} />
       ))}
     </div>
   ) : (
@@ -1272,14 +1224,12 @@ function RewardCatalog({
   tokens,
   loading,
   error,
-  onAdd,
   retry,
 }: {
   cards: Listing[];
   tokens: GrailToken[];
   loading: boolean;
   error?: string | null;
-  onAdd: (c: Listing) => void;
   retry: () => void;
 }) {
   const defaults: RewardFilters = {
@@ -1458,7 +1408,7 @@ function RewardCatalog({
           cards={visible.slice(0, limit)}
           loading={loading}
           error={error}
-          onAdd={onAdd}
+
           retry={retry}
         />
       ) : loading ? (
@@ -1488,98 +1438,6 @@ function RewardCatalog({
         </Button>
       )}
     </>
-  );
-}
-function CartView({
-  cart,
-  saveCart,
-}: {
-  cart: Listing[];
-  saveCart: (items: Listing[]) => void;
-}) {
-  const [budget, setBudget] = useState("100");
-  let result: ReturnType<typeof validateCart> | undefined,
-    error = "";
-  try {
-    result = validateCart(cart, budget);
-  } catch (e) {
-    error = e instanceof Error ? e.message : "Invalid budget";
-  }
-  return (
-    <div className="cart-layout">
-      <section className="panel cart-items">
-        <h2>Your selected cards</h2>
-        {cart.length ? (
-          cart.map((c) => (
-            <div className="cart-item" key={c.mint}>
-              {c.frontImage ? (
-                <img src={c.frontImage} alt={c.name} />
-              ) : (
-                <Layers3 size={25} />
-              )}
-              <div>
-                <strong>{c.name}</strong>
-                <p>
-                  {c.grader} {c.grade} · {c.network}
-                </p>
-                <span className="subtle">Saved ask; must be rechecked</span>
-              </div>
-              <strong>{usd(c.ask)}</strong>
-              <button
-                className="icon-button"
-                onClick={() => saveCart(cart.filter((i) => i.mint !== c.mint))}
-                aria-label={`Remove ${c.name}`}
-              >
-                <X size={17} />
-              </button>
-            </div>
-          ))
-        ) : (
-          <Empty
-            title="Your cart is empty"
-            detail="Add an exact listing from Rewards. Your selections stay on this device."
-          />
-        )}
-      </section>
-      <aside className="panel cart-summary">
-        <h2>Budget preview</h2>
-
-        <label className="stake-label" htmlFor="budget">
-          Planned budget · USDC
-        </label>
-        <div className="stake-input">
-          <span>$</span>
-          <input
-            id="budget"
-            inputMode="decimal"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-          />
-        </div>
-        <div className="quote-lines">
-          <div>
-            <span>Saved listing asks</span>
-            <strong>
-              {usd(money(cart.reduce((s, c) => s + units(c.ask), 0n)))}
-            </strong>
-          </div>
-          <div>
-            <span>Remainder before fees</span>
-            <strong>{result ? usd(result.remaining) : "—"}</strong>
-          </div>
-          <div>
-            <span>Network &amp; purchase fees</span>
-            <strong>Unverified</strong>
-          </div>
-        </div>
-        {error ? (
-          <p role="alert" className="error-text">
-            {error}
-          </p>
-        ) : null}
-        <Button disabled>Checkout unavailable</Button>
-      </aside>
-    </div>
   );
 }
 function WalletView({ network }: { network: string }) {

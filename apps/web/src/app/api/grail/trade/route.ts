@@ -94,6 +94,13 @@ export async function POST(request: Request) {
       const parsed = inputSchema.safeParse(await boundedJson(request));
       if (!parsed.success) throw new ApiError(400, "Invalid trade request.");
       const input = parsed.data;
+      // Standalone purchase entry points are closed. Reconciliation of an already
+      // submitted transaction stays available; new signing awaits settlement linkage.
+      if (input.action === "prepare")
+        throw new ApiError(
+          403,
+          "Reward purchases require a verified, unredeemed winning prediction. Settlement redemption is not enabled yet.",
+        );
       if (
         input.action === "quote" ||
         input.action === "balances" ||

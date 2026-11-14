@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { MarketApp } from "@/components/market-app";
 const sections = [
   "rewards",
@@ -14,6 +14,7 @@ export default async function Page({
   params: Promise<{ section: string }>;
 }) {
   const { section } = await params;
+  if (section === "cart") redirect("/portfolio");
   if (!sections.includes(section)) notFound();
   return <MarketApp section={section} />;
 }

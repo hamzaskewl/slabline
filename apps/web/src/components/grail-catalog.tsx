@@ -43,7 +43,7 @@ function GrailTile({ token }: { token: GrailToken }) {
           className="grail-action"
           href={`/tokens/${token.chainId}/${token.address}`}
         >
-          Buy token <ArrowRight size={14} />
+          View token <ArrowRight size={14} />
         </Link>
         <details className="token-details">
           <summary>Token details</summary>
