@@ -25,48 +25,54 @@ export const evmChains = {
 export type EvmChainId = keyof typeof evmChains;
 export const evmChainId = z.union([z.literal(8453), z.literal(4663)]);
 export const PERMIT2 = "0x000000000022d473030f116ddee9f6b43ac78ba3" as const;
-export const typedDataSchema = z
-  .object({
-    domain: z
-      .object({
-        name: z.string(),
-        version: z.string().optional(),
-        chainId: z.coerce.number().int(),
-        verifyingContract: evmAddress,
-      })
-      .strict(),
-    types: z.record(
-      z.string(),
-      z.array(z.object({ name: z.string(), type: z.string() }).strict()),
-    ),
-    primaryType: z.string(),
-    message: z.record(z.string(), z.unknown()),
-  })
-  .strict();
-export type EvmTypedData = z.infer<typeof typedDataSchema>;
-export type GrailQuote = {
+export type PoolKey = {
+  currency0: `0x${string}`;
+  currency1: `0x${string}`;
+  fee: number;
+  tickSpacing: number;
+  hooks: `0x${string}`;
+};
+export type GrailMarket = {
   chainId: EvmChainId;
-  wallet: `0x${string}`;
   buyToken: `0x${string}`;
+  sellToken: `0x${string}`;
   symbol: string;
   decimals: number;
   paymentSymbol: string;
+  paymentDecimals: number;
+  protocol: "v3" | "v4";
+  router: `0x${string}`;
+  spender: `0x${string}`;
+  pool: `0x${string}`;
+  feePips: number;
+  poolKey?: PoolKey;
+};
+export type GrailQuote = GrailMarket & {
+  wallet: `0x${string}`;
   sellAmount: string;
   buyAmount: string;
   minBuyAmount: string;
-  fees: { label: string; amount: string; symbol: string; decimals: number }[];
   expiresAt: string;
-  approvalRequired: boolean;
-  approvalTransaction: {
-    to: `0x${string}`;
-    data: `0x${string}`;
-    value: "0x0";
-  } | null;
-  trade: {
-    type: "settler_metatransaction";
-    hash: string;
-    eip712: EvmTypedData;
-  };
+  blockNumber: string;
+  slippageBps: number;
+  nextAction: "approve_token" | "approve_router" | "swap";
+  paymentBalance: string;
+  nativeBalance: string;
+};
+export type GrailTransaction = {
+  from: `0x${string}`;
+  to: `0x${string}`;
+  data: `0x${string}`;
+  value: "0x0";
+  chainId: `0x${string}`;
+  nonce: `0x${string}`;
+};
+export type PreparedGrailAction = {
+  action: GrailQuote["nextAction"];
+  transaction: GrailTransaction;
+  estimatedGasWei: string;
+  preparedAt: string;
+  startBlock: string;
 };
 export type GrailOrderView = {
   id: string;
@@ -74,6 +80,7 @@ export type GrailOrderView = {
   quote: GrailQuote;
   canSubmit: boolean;
   blocker: string | null;
+  prepared?: PreparedGrailAction;
   transactionHash?: string;
   received?: string;
 };

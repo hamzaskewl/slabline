@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseUnits } from "viem";
+
 import {
   getDb,
   orders,
@@ -9,24 +9,27 @@ import {
   and,
   gt,
   inArray,
+  sql,
 } from "@collectible/db";
 import {
   evmAddress,
   evmChainId,
   evmHash,
   type GrailQuote,
+  type PreparedGrailAction,
   type GrailOrderView,
 } from "@collectible/domain";
 import {
   quoteGrail,
   grailReleaseBlocker,
-  submitGrail,
   checkGrailTrade,
-  verifyEvmTrade,
-  assertSettler,
-  evmClient,
+  assertGrailTransaction,
+  checkedClient,
   evmBalances,
   findGrailToken,
+  grailMarket,
+  grailSpend,
+  prepareGrail,
   EvmTradingError,
 } from "@collectible/integrations";
 import {
@@ -38,10 +41,9 @@ import {
 } from "@/server/auth";
 
 type OrderData = {
-  kind: "grail";
+  kind: "grail-direct";
   quote: GrailQuote;
-  tradeHash: string;
-  approvalHash?: string;
+  prepared?: PreparedGrailAction;
   transactionHash?: string;
   received?: string;
 };
@@ -54,21 +56,18 @@ const inputSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("quote"),
     ...selection,
-    amount: z.string().regex(/^\d+(\.\d{1,6})?$/),
+    amount: z.string().regex(/^\d+(\.\d{1,18})?$/),
     slippageBps: z.number().int().min(30).max(100),
     idempotencyKey: z.string().uuid(),
   }),
   z.object({ action: z.literal("balances"), ...selection }),
   z.object({ action: z.literal("resume"), ...selection }),
-  z.object({
-    action: z.literal("submit"),
-    id: z.string().uuid(),
-    signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/),
-  }),
+  z.object({ action: z.literal("prepare"), id: z.string().uuid() }),
+  z.object({ action: z.literal("signing"), id: z.string().uuid() }),
+  z.object({ action: z.literal("rejected"), id: z.string().uuid() }),
   z.object({ action: z.literal("status"), id: z.string().uuid() }),
-  z.object({ action: z.literal("approval"), id: z.string().uuid() }),
   z.object({
-    action: z.literal("approval_sent"),
+    action: z.literal("broadcasted"),
     id: z.string().uuid(),
     hash: evmHash,
   }),
@@ -83,6 +82,7 @@ function view(row: typeof orders.$inferSelect): GrailOrderView {
     canSubmit: !grailReleaseBlocker(data.quote.wallet, data.quote.chainId),
     transactionHash: data.transactionHash,
     received: data.received,
+    prepared: data.prepared,
   };
 }
 export async function POST(request: Request) {
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
             .where(
               and(
                 eq(orders.userId, user.id),
-                gt(orders.createdAt, new Date(Date.now() - 7 * 86400000)),
+                sql`(${orders.createdAt} > ${new Date(Date.now() - 7 * 86400000)} OR ${orders.state} IN ('awaiting_signature','pending','reconciliation_required'))`,
               ),
             );
           return Response.json({
@@ -131,24 +131,30 @@ export async function POST(request: Request) {
               .filter((row) => {
                 const d = row.data as OrderData;
                 return (
-                  d.kind === "grail" &&
+                  d.kind === "grail-direct" &&
                   d.quote.wallet === input.wallet &&
                   d.quote.buyToken === input.buyToken &&
                   d.quote.chainId === input.chainId
                 );
               })
-              .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+              .sort((a, b) => {
+                const pending = [
+                  "awaiting_signature",
+                  "pending",
+                  "reconciliation_required",
+                ];
+                return (
+                  Number(pending.includes(b.state)) -
+                    Number(pending.includes(a.state)) ||
+                  b.createdAt.getTime() - a.createdAt.getTime()
+                );
+              })
               .slice(0, 10)
               .map(view),
           });
         }
-        const spend = parseUnits(input.amount, 6),
-          max = parseUnits(process.env.GRAIL_MAX_TRADE_AMOUNT ?? "25", 6);
-        if (spend <= 0n || spend > max)
-          throw new ApiError(
-            400,
-            `Amount must be greater than zero and no more than ${process.env.GRAIL_MAX_TRADE_AMOUNT ?? "25"}.`,
-          );
+        const market = await grailMarket(input.chainId, input.buyToken),
+          spend = grailSpend(input.amount, market);
         const key = `grail:${user.id}:${input.idempotencyKey}`;
         const [prior] = await db
           .select()
@@ -160,11 +166,12 @@ export async function POST(request: Request) {
         if (prior) {
           const d = prior.data as OrderData;
           if (
-            d.kind !== "grail" ||
+            d.kind !== "grail-direct" ||
             d.quote.wallet !== input.wallet ||
             d.quote.buyToken !== input.buyToken ||
             d.quote.chainId !== input.chainId ||
-            d.quote.sellAmount !== spend.toString()
+            d.quote.sellAmount !== spend.toString() ||
+            d.quote.slippageBps !== input.slippageBps
           )
             throw new ApiError(
               409,
@@ -180,9 +187,9 @@ export async function POST(request: Request) {
               eq(orders.userId, user.id),
               inArray(orders.state, [
                 "pending",
-                "submitting",
+                "awaiting_signature",
                 "reconciliation_required",
-                "approval_pending",
+                "prepared",
               ]),
             ),
           )
@@ -191,10 +198,11 @@ export async function POST(request: Request) {
           unresolved.some((r) => {
             const d = r.data as OrderData;
             return (
-              d.kind === "grail" &&
+              d.kind === "grail-direct" &&
+              (r.state !== "prepared" ||
+                Date.parse(d.quote.expiresAt) > Date.now()) &&
               d.quote.wallet === input.wallet &&
-              d.quote.chainId === input.chainId &&
-              d.quote.buyToken === input.buyToken
+              d.quote.chainId === input.chainId
             );
           })
         )
@@ -225,9 +233,8 @@ export async function POST(request: Request) {
             idempotencyKey: key,
             state: "quoted",
             data: {
-              kind: "grail",
+              kind: "grail-direct",
               quote,
-              tradeHash: quote.trade.hash,
             } satisfies OrderData,
           })
           .onConflictDoNothing()
@@ -254,39 +261,68 @@ export async function POST(request: Request) {
         eq(orders.userId, user.id),
       );
       const [row] = await db.select().from(orders).where(conditions).limit(1);
-      if (!row || (row.data as OrderData).kind !== "grail")
+      if (!row || (row.data as OrderData).kind !== "grail-direct")
         throw new ApiError(404, "Trade not found.");
       const data = row.data as OrderData,
         q = data.quote;
-      if (input.action === "status") {
-        if (
-          ["confirmed", "failed", "quoted", "approval_confirmed"].includes(
-            row.state,
+      if (input.action === "status" || input.action === "broadcasted") {
+        if (input.action === "broadcasted") {
+          if (
+            !data.prepared ||
+            ![
+              "awaiting_signature",
+              "pending",
+              "reconciliation_required",
+            ].includes(row.state)
           )
-        )
-          return Response.json(view(row));
-        if (data.approvalHash && row.state === "approval_pending") {
-          const receipt = await evmClient(q.chainId).getTransactionReceipt({
-            hash: data.approvalHash as `0x${string}`,
-          });
-          const state =
-            receipt.status === "success" ? "approval_confirmed" : "failed";
+            throw new ApiError(
+              409,
+              "This order is not awaiting a transaction.",
+            );
+          if (data.transactionHash && data.transactionHash !== input.hash)
+            throw new ApiError(
+              409,
+              "An existing transaction is already tracked.",
+            );
+          const client = await checkedClient(q.chainId);
+          assertGrailTransaction(
+            data.prepared,
+            await client.getTransaction({ hash: input.hash as `0x${string}` }),
+          );
           const [updated] = await db
             .update(orders)
-            .set({ state })
-            .where(and(conditions, eq(orders.state, "approval_pending")))
+            .set({
+              state: "pending",
+              data: { ...data, transactionHash: input.hash },
+            })
+            .where(and(conditions, eq(orders.state, row.state)))
             .returning();
+          if (updated)
+            await db.insert(auditEvents).values({
+              userId: user.id,
+              action: "grail.broadcasted",
+              data: { orderId: row.id, hash: input.hash },
+            });
           return Response.json(view(updated ?? row));
         }
+        if (
+          !data.transactionHash ||
+          !data.prepared ||
+          !["pending", "reconciliation_required"].includes(row.state)
+        )
+          return Response.json(view(row));
         try {
-          const result = await checkGrailTrade(q, data.tradeHash);
-          if (result.state === "pending") return Response.json(view(row));
+          const result = await checkGrailTrade(
+            q,
+            data.prepared,
+            data.transactionHash as `0x${string}`,
+          );
           const [updated] = await db
             .update(orders)
             .set({ state: result.state, data: { ...data, ...result } })
             .where(and(conditions, eq(orders.state, row.state)))
             .returning();
-          if (updated)
+          if (updated && result.state !== row.state)
             await db.insert(auditEvents).values({
               userId: user.id,
               action: `grail.${result.state}`,
@@ -297,119 +333,103 @@ export async function POST(request: Request) {
           return Response.json({
             ...view(row),
             blocker:
-              "Confirmation is unavailable. This order remains pending; do not submit another purchase.",
+              "Confirmation is unavailable. Keep this order pending and check again; do not send another transaction.",
           });
         }
       }
-      if (input.action === "approval_sent") {
-        if (row.state !== "quoted" || !q.approvalTransaction)
+      if (input.action === "rejected") {
+        // Only called for an explicit EIP-1193 user rejection, never a timeout.
+        if (row.state !== "awaiting_signature" || data.transactionHash)
           return Response.json(view(row));
-        const client = evmClient(q.chainId),
-          tx = await client.getTransaction({
-            hash: input.hash as `0x${string}`,
-          });
-        if (
-          (await client.getChainId()) !== q.chainId ||
-          tx.from.toLowerCase() !== q.wallet ||
-          tx.to?.toLowerCase() !== q.approvalTransaction.to ||
-          tx.input.toLowerCase() !== q.approvalTransaction.data.toLowerCase() ||
-          tx.value !== 0n
-        )
-          throw new ApiError(
-            400,
-            "Approval transaction does not match this order.",
-          );
         const [updated] = await db
           .update(orders)
-          .set({
-            state: "approval_pending",
-            data: { ...data, approvalHash: input.hash },
-          })
-          .where(and(conditions, eq(orders.state, "quoted")))
+          .set({ state: "cancelled" })
+          .where(and(conditions, eq(orders.state, "awaiting_signature")))
           .returning();
+        await db.insert(auditEvents).values({
+          userId: user.id,
+          action: "grail.wallet_rejected",
+          data: { orderId: row.id },
+        });
         return Response.json(view(updated ?? row));
       }
       const blocked = grailReleaseBlocker(q.wallet, q.chainId);
       if (blocked) throw new ApiError(403, blocked);
-      if (row.state !== "quoted") return Response.json(view(row));
-      if (Date.parse(q.expiresAt) <= Date.now())
-        throw new ApiError(409, "Quote expired. Request a new quote.");
-      if (input.action === "approval") {
-        if (!q.approvalTransaction)
-          throw new ApiError(409, "No approval required.");
-        const client = evmClient(q.chainId);
-        if ((await client.getChainId()) !== q.chainId)
-          throw new ApiError(503, "Wrong RPC chain.");
-        const gas = await client.estimateGas({
-          account: q.wallet,
-          to: q.approvalTransaction.to,
-          data: q.approvalTransaction.data,
-          value: 0n,
-        });
-        const price = await client.getGasPrice();
+      if (Date.parse(q.expiresAt) < Date.now() + 15000)
+        throw new ApiError(409, "Quote expired. Request a fresh quote.");
+      if (input.action === "signing") {
+        const [claimed] = await db
+          .update(orders)
+          .set({ state: "awaiting_signature" })
+          .where(and(conditions, eq(orders.state, "prepared")))
+          .returning();
+        if (!claimed)
+          throw new ApiError(
+            409,
+            "This transaction is already awaiting a wallet result. Check its status.",
+          );
         await db.insert(auditEvents).values({
           userId: user.id,
-          action: "grail.approval.review",
-          data: { orderId: row.id, amount: q.sellAmount },
+          action: "grail.wallet_prompt",
+          data: { orderId: row.id },
         });
-        return Response.json({
-          transaction: q.approvalTransaction,
-          estimatedGasWei: (gas * price).toString(),
-          sponsored: false,
-        });
+        return Response.json(view(claimed));
       }
-      if (q.approvalRequired)
-        throw new ApiError(
-          409,
-          "Approve the exact amount and request a new quote first.",
+      if (row.state !== "quoted") return Response.json(view(row));
+      const prepared = await prepareGrail(q);
+      const updated = await db.transaction(async (tx) => {
+        // All assets on the same wallet/chain share one nonce sequence.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`${q.chainId}:${q.wallet}`}))`,
         );
-      if (!(await verifyEvmTrade(q, input.signature as `0x${string}`)))
-        throw new ApiError(
-          403,
-          "Invalid trade signature for the selected wallet.",
-        );
-      await assertSettler(
-        q.chainId,
-        evmAddress.parse(q.trade.eip712.message.spender),
-      );
-      const [claimed] = await db
-        .update(orders)
-        .set({ state: "submitting" })
-        .where(and(conditions, eq(orders.state, "quoted")))
-        .returning();
-      if (!claimed)
-        throw new ApiError(409, "Trade is already being submitted.");
-      await db.insert(auditEvents).values({
-        userId: user.id,
-        action: "grail.submit",
-        data: { orderId: row.id, tradeHash: data.tradeHash },
-      });
-      try {
-        const submitted = await submitGrail(
-          q,
-          input.signature as `0x${string}`,
-        );
-        const [updated] = await db
-          .update(orders)
-          .set({
-            state: "pending",
-            data: { ...data, tradeHash: submitted.tradeHash },
+        const pending = await tx
+          .select()
+          .from(orders)
+          .where(
+            and(
+              eq(orders.userId, user.id),
+              inArray(orders.state, [
+                "prepared",
+                "awaiting_signature",
+                "pending",
+                "reconciliation_required",
+              ]),
+            ),
+          );
+        if (
+          pending.some((r) => {
+            const d = r.data as OrderData;
+            return (
+              d.kind === "grail-direct" &&
+              d.quote.chainId === q.chainId &&
+              d.quote.wallet === q.wallet &&
+              (r.state !== "prepared" ||
+                Date.parse(d.quote.expiresAt) > Date.now())
+            );
           })
-          .where(and(conditions, eq(orders.state, "submitting")))
-          .returning();
-        return Response.json(view(updated ?? claimed));
-      } catch {
-        const [updated] = await db
+        )
+          throw new ApiError(
+            409,
+            "An action for this wallet is still pending. Open recent orders and check its status.",
+          );
+        const [saved] = await tx
           .update(orders)
-          .set({ state: "reconciliation_required" })
-          .where(and(conditions, eq(orders.state, "submitting")))
+          .set({ state: "prepared", data: { ...data, prepared } })
+          .where(and(conditions, eq(orders.state, "quoted")))
           .returning();
-        return Response.json({
-          ...view(updated ?? claimed),
-          blocker:
-            "Submission result is unknown. Check this order’s status before making another purchase.",
+        if (!saved) throw new ApiError(409, "Order was already prepared.");
+        await tx.insert(auditEvents).values({
+          userId: user.id,
+          action: "grail.prepared",
+          data: {
+            orderId: row.id,
+            action: prepared.action,
+            nonce: prepared.transaction.nonce,
+          },
         });
-      }
+        return saved;
+      });
+      return Response.json(view(updated));
     } catch (error) {
       if (error instanceof EvmTradingError)
         throw new ApiError(422, error.message);

@@ -25,10 +25,11 @@ export default function About() {
           Practice orders are simulated and saved on this device.
         </p>
         <p>
-          Grail purchases use the connected EVM wallet and require a live 0x
-          quote. Purchases remain disabled pending setup and a verified test.
-          Gas sponsorship is off; physical redemption remains on Grail. Owning a
-          fraction of a token does not by itself qualify for a physical card.
+          Grail purchases use your connected EVM wallet and direct Uniswap
+          pools. Each approval and purchase requires a wallet signature and ETH
+          for gas. Gas sponsorship is off; physical redemption remains on Grail.
+          Owning a fraction of a token does not by itself qualify for a physical
+          card.
         </p>
       </section>
       <section>

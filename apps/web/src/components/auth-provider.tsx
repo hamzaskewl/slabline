@@ -1,6 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
-import { base } from "viem/chains";
+import { base, baseSepolia } from "viem/chains";
 import { defineChain } from "viem";
 import { evmChains } from "@collectible/domain";
 import { PrivyProvider } from "@privy-io/react-auth";
@@ -35,6 +35,16 @@ export default function AuthProvider({
         defaultChain: base,
         supportedChains: [
           base,
+          baseSepolia,
+          defineChain({
+            id: 46630,
+            name: "Robinhood Testnet",
+            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+            rpcUrls: {
+              default: { http: ["https://rpc.testnet.chain.robinhood.com"] },
+            },
+            testnet: true,
+          }),
           defineChain({
             id: 4663,
             name: "Robinhood",

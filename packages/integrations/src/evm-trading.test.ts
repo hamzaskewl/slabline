@@ -1,22 +1,37 @@
 import { expect, test } from "bun:test";
 import {
-  hashTypedData,
   encodeAbiParameters,
   encodeEventTopics,
   erc20Abi,
+  decodeFunctionData,
+  decodeAbiParameters,
+  zeroAddress,
   type TransactionReceipt,
   type Address,
 } from "viem";
-import { PERMIT2, evmChains, type EvmTypedData } from "@collectible/domain";
 import {
-  validateGaslessQuote,
-  assertSettler,
+  PERMIT2,
+  evmChains,
+  type GrailQuote,
+  type PreparedGrailAction,
+} from "@collectible/domain";
+import {
   confirmedGrailReceipt,
   grailReleaseBlocker,
+  assertGrailTransaction,
+  grailSpend,
 } from "./evm-trading";
-
-// Named offline fixture, shaped after 0x's documented Gasless response. Never
-// served to the UI and never submitted to a provider.
+import {
+  encodeGrailAction,
+  uniswap,
+  v3Abi,
+  v4Abi,
+  permit2Abi,
+  poolId,
+  validatePoolKey,
+  minimumOutput,
+  effectiveV4Fee,
+} from "./uniswap";
 const fixtureInput = {
   chainId: 8453 as const,
   wallet: "0x1111111111111111111111111111111111111111" as const,
@@ -24,154 +39,157 @@ const fixtureInput = {
   sellAmount: "10000000",
   slippageBps: 50,
 };
-function simulatedGaslessQuote() {
-  const td = {
-    domain: { name: "Permit2", chainId: 8453, verifyingContract: PERMIT2 },
-    primaryType: "PermitWitnessTransferFrom",
-    types: {
-      EIP712Domain: [
-        { name: "name", type: "string" },
-        { name: "chainId", type: "uint256" },
-        { name: "verifyingContract", type: "address" },
-      ],
-      PermitWitnessTransferFrom: [
-        { name: "permitted", type: "TokenPermissions" },
-        { name: "spender", type: "address" },
-        { name: "nonce", type: "uint256" },
-        { name: "deadline", type: "uint256" },
-        { name: "slippageAndActions", type: "SlippageAndActions" },
-      ],
-      TokenPermissions: [
-        { name: "token", type: "address" },
-        { name: "amount", type: "uint256" },
-      ],
-      SlippageAndActions: [
-        { name: "recipient", type: "address" },
-        { name: "buyToken", type: "address" },
-        { name: "minAmountOut", type: "uint256" },
-        { name: "actions", type: "bytes[]" },
-      ],
-    },
-    message: {
-      permitted: { token: evmChains[8453].paymentToken, amount: "10000000" },
-      spender: "0x3333333333333333333333333333333333333333",
-      nonce: "123",
-      deadline: String(Math.floor(Date.now() / 1000) + 120),
-      slippageAndActions: {
-        recipient: fixtureInput.wallet,
-        buyToken: fixtureInput.buyToken,
-        minAmountOut: "995000000000000000",
-        actions: ["0x12345678"],
-      },
-    },
-  };
+function simulatedDirectQuote(): GrailQuote {
   return {
-    liquidityAvailable: true,
-    buyToken: fixtureInput.buyToken,
+    ...fixtureInput,
     sellToken: evmChains[8453].paymentToken,
+    symbol: "Fixture",
+    decimals: 18,
+    paymentSymbol: "USDC",
+    paymentDecimals: 6,
+    protocol: "v3",
+    router: uniswap[8453].routerV3,
+    spender: uniswap[8453].routerV3,
+    pool: "0x3333333333333333333333333333333333333333",
+    feePips: 3000,
     buyAmount: "1000000000000000000",
     minBuyAmount: "995000000000000000",
-    sellAmount: "9900000",
-    fees: {
-      gasFee: {
-        amount: "100000",
-        token: evmChains[8453].paymentToken,
-        type: "gas",
-      },
-      zeroExFee: null,
-      integratorFee: null,
-    },
-    issues: {
-      allowance: null,
-      balance: null,
-      simulationIncomplete: false,
-      invalidSourcesPassed: [],
-    },
-    trade: {
-      type: "settler_metatransaction",
-      hash: hashTypedData(td as EvmTypedData),
-      eip712: td,
-    },
+    expiresAt: new Date(Date.now() + 90000).toISOString(),
+    blockNumber: "100",
+    nextAction: "swap",
+    paymentBalance: "10000000",
+    nativeBalance: "1000000000000000",
   };
 }
-test("gasless fixture binds chain, recipient, spend, slippage and typed-data hash", () => {
-  expect(
-    validateGaslessQuote(simulatedGaslessQuote(), fixtureInput).message
-      .permitted.amount,
-  ).toBe("10000000");
-  for (const mutate of [
-    (q: ReturnType<typeof simulatedGaslessQuote>) => {
-      q.trade.eip712.domain.chainId = 4663;
-    },
-    (q: ReturnType<typeof simulatedGaslessQuote>) => {
-      q.trade.eip712.message.permitted.amount = "10000001";
-    },
-    (q: ReturnType<typeof simulatedGaslessQuote>) => {
-      q.trade.eip712.message.slippageAndActions.recipient =
-        "0x4444444444444444444444444444444444444444" as typeof fixtureInput.wallet;
-    },
-    (q: ReturnType<typeof simulatedGaslessQuote>) => {
-      q.minBuyAmount = "1";
-      q.trade.eip712.message.slippageAndActions.minAmountOut = "1";
-    },
-    (q: ReturnType<typeof simulatedGaslessQuote>) => {
-      q.trade.eip712.message.deadline = "1";
-    },
-    (q: ReturnType<typeof simulatedGaslessQuote>) => {
-      q.trade.eip712.types.TokenPermissions.reverse();
-    },
-    (q: ReturnType<typeof simulatedGaslessQuote>) => {
-      q.issues.simulationIncomplete = true;
-    },
-    (q: ReturnType<typeof simulatedGaslessQuote>) => {
-      q.trade.hash = ("0x" + "0".repeat(64)) as `0x${string}`;
-    },
-  ]) {
-    const q = simulatedGaslessQuote();
-    mutate(q);
-    expect(() => validateGaslessQuote(q, fixtureInput)).toThrow();
-  }
+test("v3 swap pins recipient, input, minimum and deadline; approval is exact", () => {
+  const q = simulatedDirectQuote(),
+    tx = encodeGrailAction(q),
+    outer = decodeFunctionData({ abi: v3Abi, data: tx.data });
+  expect(tx.to).toBe(uniswap[8453].routerV3);
+  expect(tx.value).toBe("0x0");
+  expect(outer.functionName).toBe("multicall");
+  if (outer.functionName !== "multicall") throw Error();
+  expect(outer.args[0]).toBe(
+    BigInt(Math.floor(Date.parse(q.expiresAt) / 1000)),
+  );
+  const swap = decodeFunctionData({ abi: v3Abi, data: outer.args[1][0]! });
+  if (swap.functionName !== "exactInputSingle") throw Error();
+  expect(swap.args[0].recipient.toLowerCase()).toBe(q.wallet);
+  expect(swap.args[0].amountIn).toBe(10000000n);
+  expect(swap.args[0].amountOutMinimum).toBe(BigInt(q.minBuyAmount));
+  const a = encodeGrailAction({ ...q, nextAction: "approve_token" }),
+    decoded = decodeFunctionData({ abi: erc20Abi, data: a.data });
+  if (decoded.functionName !== "approve") throw Error();
+  expect(decoded.args[0].toLowerCase()).toBe(q.router);
+  expect(decoded.args[1]).toBe(10000000n);
+  expect(() => encodeGrailAction({ ...q, router: q.buyToken })).toThrow();
+  expect(() =>
+    encodeGrailAction({ ...q, nextAction: "approve_router" }),
+  ).toThrow();
 });
-test("onchain registry check rejects counterfeit and paused gasless Settlers", async () => {
-  const original = globalThis.fetch;
-  let paused = false;
-  globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
-    const r = JSON.parse(String(init?.body));
-    return Response.json(
-      r.method === "eth_chainId"
-        ? { jsonrpc: "2.0", id: r.id, result: "0x2105" }
-        : paused
-          ? {
-              jsonrpc: "2.0",
-              id: r.id,
-              error: { code: 3, message: "execution reverted" },
-            }
-          : {
-              jsonrpc: "2.0",
-              id: r.id,
-              result: encodeAbiParameters(
-                [{ type: "address" }],
-                ["0x3333333333333333333333333333333333333333"],
-              ),
-            },
-    );
-  }) as unknown as typeof fetch;
-  try {
-    await assertSettler(8453, "0x3333333333333333333333333333333333333333");
-    await expect(
-      assertSettler(8453, "0x4444444444444444444444444444444444444444"),
-    ).rejects.toThrow();
-    paused = true;
-    await expect(
-      assertSettler(8453, "0x3333333333333333333333333333333333333333"),
-    ).rejects.toThrow();
-  } finally {
-    globalThis.fetch = original;
-  }
+test("v4 uses bounded settle/take and no custom hooks or allow-revert commands", () => {
+  const key = {
+    currency0: fixtureInput.wallet,
+    currency1: fixtureInput.buyToken,
+    fee: 10000,
+    tickSpacing: 200,
+    hooks: zeroAddress,
+  };
+  const q: GrailQuote = {
+    ...simulatedDirectQuote(),
+    chainId: 4663,
+    protocol: "v4",
+    sellToken: key.currency0,
+    router: uniswap[4663].routerV4,
+    spender: PERMIT2,
+    poolKey: key,
+    pool: poolId(key),
+  };
+  const tx = encodeGrailAction(q),
+    call = decodeFunctionData({ abi: v4Abi, data: tx.data });
+  if (call.functionName !== "execute") throw Error();
+  expect(call.args[0]).toBe("0x10");
+  const [actions, params] = decodeAbiParameters(
+    [{ type: "bytes" }, { type: "bytes[]" }],
+    call.args[1][0]!,
+  );
+  expect(actions).toBe("0x060c0f");
+  expect(
+    decodeAbiParameters(
+      [{ type: "address" }, { type: "uint256" }],
+      params[1]!,
+    )[1],
+  ).toBe(BigInt(q.sellAmount));
+  expect(
+    decodeAbiParameters(
+      [{ type: "address" }, { type: "uint256" }],
+      params[2]!,
+    )[1],
+  ).toBe(BigInt(q.minBuyAmount));
+  const approval = decodeFunctionData({
+    abi: permit2Abi,
+    data: encodeGrailAction({ ...q, nextAction: "approve_router" }).data,
+  });
+  if (approval.functionName !== "approve") throw Error();
+  expect(approval.args[2]).toBe(BigInt(q.sellAmount));
+  expect(approval.args[3]).toBeLessThan(Math.floor(Date.now() / 1000) + 600);
+  expect(() =>
+    validatePoolKey({ ...key, hooks: key.currency0 }, q.buyToken, q.pool),
+  ).toThrow();
+  expect(() =>
+    validatePoolKey({ ...key, fee: 3000 }, q.buyToken, q.pool),
+  ).toThrow();
+  expect(effectiveV4Fee(4097000, 10000, true)).toBe(10990);
+  expect(effectiveV4Fee(4097000, 10000, false)).toBe(10990);
+});
+test("quote slippage and payment precision cannot round up spend", () => {
+  expect(minimumOutput(10000n, 50)).toBe(9950n);
+  expect(() => minimumOutput(1n, 50)).toThrow();
+  expect(() => minimumOutput(100n, 101)).toThrow();
+  expect(() => grailSpend("0.0000001", simulatedDirectQuote())).toThrow();
+  expect(() => grailSpend("26", simulatedDirectQuote())).toThrow();
+  expect(() =>
+    grailSpend("1", {
+      ...simulatedDirectQuote(),
+      sellToken: fixtureInput.wallet,
+      paymentDecimals: 18,
+    }),
+  ).toThrow();
+});
+test("recovery hash must match exact calldata, sender, recipient, value and nonce", () => {
+  const q = simulatedDirectQuote(),
+    encoded = encodeGrailAction(q);
+  const p: PreparedGrailAction = {
+    action: "swap",
+    transaction: {
+      ...encoded,
+      from: q.wallet,
+      chainId: "0x2105",
+      nonce: "0x7",
+    },
+    estimatedGasWei: "1",
+    preparedAt: q.expiresAt,
+    startBlock: "100",
+  };
+  const tx = {
+    from: q.wallet,
+    to: encoded.to,
+    input: encoded.data,
+    value: 0n,
+    nonce: 7,
+  };
+  expect(() => assertGrailTransaction(p, tx)).not.toThrow();
+  for (const change of [
+    { from: q.buyToken },
+    { to: q.buyToken },
+    { input: "0x" as const },
+    { value: 1n },
+    { nonce: 8 },
+  ])
+    expect(() => assertGrailTransaction(p, { ...tx, ...change })).toThrow();
 });
 test("a feature flag alone cannot release live Grail spending", () => {
   const saved = {
-    key: process.env.ZEROX_API_KEY,
     mode: process.env.DEMO_MODE,
     enabled: process.env.ENABLE_GRAIL_TRADING,
     verified: process.env.GRAIL_TRADING_VERIFIED,
@@ -179,7 +197,6 @@ test("a feature flag alone cannot release live Grail spending", () => {
     testChain: process.env.GRAIL_TEST_CHAIN_ID,
   };
   try {
-    process.env.ZEROX_API_KEY = "fixture-not-a-credential";
     process.env.ENABLE_GRAIL_TRADING = "true";
     process.env.DEMO_MODE = "simulated";
     process.env.GRAIL_TRADING_VERIFIED = "false";
@@ -195,7 +212,6 @@ test("a feature flag alone cannot release live Grail spending", () => {
     expect(grailReleaseBlocker(fixtureInput.wallet, 8453)).not.toBeNull();
   } finally {
     for (const [key, value] of Object.entries({
-      ZEROX_API_KEY: saved.key,
       DEMO_MODE: saved.mode,
       ENABLE_GRAIL_TRADING: saved.enabled,
       GRAIL_TRADING_VERIFIED: saved.verified,
@@ -212,7 +228,11 @@ test("a feature flag alone cannot release live Grail spending", () => {
 // reverted/pending transactions: a provider status alone must never prove delivery.
 test("confirmation requires net token delivery to the wallet, bounded spend and three blocks", () => {
   const counterparty = "0x3333333333333333333333333333333333333333";
-  const q = { ...fixtureInput, minBuyAmount: "995000000000000000" };
+  const q = {
+    ...fixtureInput,
+    sellToken: evmChains[8453].paymentToken,
+    minBuyAmount: "995000000000000000",
+  };
   const log = (address: Address, from: Address, to: Address, value: bigint) =>
     ({
       address,

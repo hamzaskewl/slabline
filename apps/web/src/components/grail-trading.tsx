@@ -6,6 +6,7 @@ import {
   type EvmChainId,
   type GrailToken,
   type GrailOrderView,
+  type GrailMarket,
 } from "@collectible/domain";
 import { Button } from "./ui/button";
 
@@ -16,7 +17,7 @@ const WalletTrade = dynamic(() => import("./grail-wallet-trade"), {
 export type TradeProps = {
   token: GrailToken;
   configured: boolean;
-  quoteConfigured: boolean;
+  market: GrailMarket | null;
   blocker: string | null;
 };
 export function GrailTrading(props: TradeProps) {
@@ -47,7 +48,7 @@ export function GrailTrading(props: TradeProps) {
           ) : (
             <>
               <label className="token-amount-label">
-                Spend · {chain.paymentSymbol}
+                Spend · {props.market?.paymentSymbol ?? "Unavailable"}
                 <input inputMode="decimal" placeholder="0.00" disabled />
               </label>
               <Button disabled>Wallet connection unavailable</Button>
@@ -63,7 +64,7 @@ export function GrailTrading(props: TradeProps) {
             <dt>Network</dt>
             <dd>{chain.name}</dd>
             <dt>Payment token</dt>
-            <dd>{chain.paymentSymbol}</dd>
+            <dd>{props.market?.paymentSymbol ?? "Unavailable"}</dd>
             <dt>Gas sponsorship</dt>
             <dd>Off</dd>
             <dt>Contract</dt>
@@ -77,6 +78,37 @@ export function GrailTrading(props: TradeProps) {
               </a>
             </dd>
           </dl>
+          <details className="token-history">
+            <summary>Use Gemini winnings</summary>
+            <ol>
+              <li>Link Gemini and select an available settled USD amount.</li>
+              <li>
+                Review USD to USDC conversion and fees in your Gemini account.
+              </li>
+              <li>
+                Withdraw to your own wallet using an account-supported network.
+              </li>
+              <li>
+                Review a bridge quote to {chain.name} if needed, including gas
+                and minimum received.
+              </li>
+              {props.market?.paymentSymbol !== "USDC" && (
+                <li>
+                  Convert to{" "}
+                  {props.market?.paymentSymbol ?? "the pool’s payment token"}{" "}
+                  using an eligible, verified route.
+                </li>
+              )}
+              <li>
+                Review this token purchase and sign each required approval.
+              </li>
+            </ol>
+            <p>
+              Gemini withdrawals and bridge quotes are not connected yet. No
+              funds will move here. You can use an already funded wallet; keep
+              ETH for gas.
+            </p>
+          </details>
           <p>
             Fractional collectible token. Physical redemption depends on Grail’s
             requirements and inventory.
@@ -95,7 +127,7 @@ export function TradeQuote({ order }: { order: GrailOrderView }) {
     <dl className="token-quote">
       <dt>Pay, including quoted fees</dt>
       <dd>
-        {formatUnits(BigInt(q.sellAmount), 6)} {q.paymentSymbol}
+        {formatUnits(BigInt(q.sellAmount), q.paymentDecimals)} {q.paymentSymbol}
       </dd>
       <dt>Estimated tokens</dt>
       <dd>
@@ -105,14 +137,12 @@ export function TradeQuote({ order }: { order: GrailOrderView }) {
       <dd>
         {formatUnits(BigInt(q.minBuyAmount), q.decimals)} {q.symbol}
       </dd>
-      {q.fees.map((f, i) => (
-        <div className="token-quote-fee" key={i}>
-          <dt>{f.label}</dt>
-          <dd>
-            {formatUnits(BigInt(f.amount), f.decimals)} {f.symbol}
-          </dd>
-        </div>
-      ))}
+      <dt>Pool fee (included)</dt>
+      <dd>{q.feePips / 10000}%</dd>
+      <dt>Gas</dt>
+      <dd>Paid separately in ETH</dd>
+      <dt>Route</dt>
+      <dd>Uniswap {q.protocol}</dd>
       <dt>Expires</dt>
       <dd>{new Date(q.expiresAt).toLocaleTimeString()}</dd>
     </dl>

@@ -102,7 +102,7 @@ test.skipIf(!process.env.DATABASE_URL)(
         const claim = (userId: string) =>
           tx
             .update(orders)
-            .set({ state: "submitting" })
+            .set({ state: "prepared" })
             .where(
               and(
                 eq(orders.id, order.id),
@@ -114,6 +114,21 @@ test.skipIf(!process.env.DATABASE_URL)(
         expect(await claim(b.id)).toHaveLength(0);
         expect(await claim(a.id)).toHaveLength(1);
         expect(await claim(a.id)).toHaveLength(0);
+        const prompt = () =>
+          tx
+            .update(orders)
+            .set({ state: "awaiting_signature" })
+            .where(
+              and(
+                eq(orders.id, order.id),
+                eq(orders.userId, a.id),
+                eq(orders.state, "prepared"),
+              ),
+            )
+            .returning();
+        expect(await prompt()).toHaveLength(1);
+        expect(await prompt()).toHaveLength(0);
+
         expect(
           await tx
             .insert(orders)

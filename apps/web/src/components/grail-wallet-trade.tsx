@@ -18,7 +18,7 @@ import { TradeQuote, type TradeProps } from "./grail-trading";
 // Retain only public transaction hashes, including when browser storage is blocked.
 const pendingApprovals = new Map<string, string>();
 function pendingApproval(id: string, hash?: string | null) {
-  const key = `cm-evm-approval:${id}`;
+  const key = `cm-evm-transaction:${id}`;
   if (hash !== undefined) {
     if (hash) pendingApprovals.set(id, hash);
     else pendingApprovals.delete(id);
@@ -39,28 +39,32 @@ type Balances = {
   token: string;
   decimals: number;
   native: string;
+  paymentDecimals: number;
+  paymentSymbol: string;
 };
-export default function WalletTrade({
-  token,
-  quoteConfigured,
-  blocker,
-}: TradeProps) {
+export default function WalletTrade({ token, market, blocker }: TradeProps) {
   const { authenticated, login, getAccessToken } = usePrivy(),
     { wallets } = useWallets(),
     { connectWallet } = useConnectWallet(),
     { createWallet } = useCreateWallet();
   const [selected, setSelected] = useState(""),
-    [amount, setAmount] = useState("10"),
+    [amount, setAmount] = useState(
+      market?.paymentSymbol === "USDC" ? "10" : "0.001",
+    ),
     [slippage, setSlippage] = useState("50"),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [order, setOrder] = useState<GrailOrderView | null>(null),
     [balances, setBalances] = useState<Balances | null>(null),
     [verified, setVerified] = useState(""),
-    [approvalFee, setApprovalFee] = useState<string | null>(null),
+    [recoveryHash, setRecoveryHash] = useState(""),
+    [testNetwork, setTestNetwork] = useState("84532"),
+    [testResult, setTestResult] = useState(""),
     [history, setHistory] = useState<GrailOrderView[]>([]);
   const quoteKey = useRef(crypto.randomUUID()),
     generation = useRef(0),
+    lock = useRef(false),
+    polling = useRef(false),
     wallet = wallets.find(
       (w) =>
         w.address.toLowerCase() ===
@@ -75,7 +79,9 @@ export default function WalletTrade({
     setBalances(null);
     setVerified("");
     setHistory([]);
-    setApprovalFee(null);
+    setRecoveryHash("");
+    setTestResult("");
+
     quoteKey.current = crypto.randomUUID();
   }, [address, authenticated, token.address]);
   async function api<T>(body: object, path = "/api/grail/trade"): Promise<T> {
@@ -88,6 +94,7 @@ export default function WalletTrade({
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20000),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error ?? "Request failed. Retry shortly.");
@@ -99,6 +106,8 @@ export default function WalletTrade({
     buyToken: token.address.toLowerCase(),
   };
   async function run(action: () => Promise<void>) {
+    if (lock.current) return;
+    lock.current = true;
     setBusy(true);
     setError("");
     try {
@@ -106,6 +115,7 @@ export default function WalletTrade({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed.");
     } finally {
+      lock.current = false;
       setBusy(false);
     }
   }
@@ -145,15 +155,15 @@ export default function WalletTrade({
       (o) =>
         [
           "pending",
-          "submitting",
+          "awaiting_signature",
           "reconciliation_required",
-          "approval_pending",
+          "prepared",
         ].includes(o.state) || pendingApproval(o.id),
     );
     if (unsettled)
       setOrder(
         pendingApproval(unsettled.id)
-          ? { ...unsettled, state: "approval_pending" }
+          ? { ...unsettled, state: "awaiting_signature" }
           : unsettled,
       );
   }
@@ -173,87 +183,67 @@ export default function WalletTrade({
     });
     if (version !== generation.current) return;
     setOrder(next);
-    setApprovalFee(null);
+  }
+  async function prepare() {
+    if (!order) return;
+    setOrder(await api<GrailOrderView>({ action: "prepare", id: order.id }));
   }
   async function signAndSubmit() {
-    if (!wallet || !order || !order.canSubmit)
-      throw new Error("Purchases are not enabled.");
-    const current = order;
-    const version = generation.current;
-    if (Date.parse(current.quote.expiresAt) <= Date.now())
-      throw new Error("Quote expired. Refresh the quote.");
+    if (!wallet || !order?.prepared || !order.canSubmit)
+      throw new Error("Review the transaction first.");
+    const current = order,
+      version = generation.current;
     await wallet.switchChain(chainId);
     const provider = await wallet.getEthereumProvider();
     const accounts = (await provider.request({
       method: "eth_accounts",
     })) as string[];
-    if (!accounts.some((a) => a.toLowerCase() === current.quote.wallet))
-      throw new Error("Wallet account changed. Refresh the quote.");
-    if (Number(await provider.request({ method: "eth_chainId" })) !== chainId)
-      throw new Error("Wallet is on the wrong chain.");
-    if (version !== generation.current)
+    if (
+      !accounts.some((a) => a.toLowerCase() === current.quote.wallet) ||
+      Number(await provider.request({ method: "eth_chainId" })) !== chainId ||
+      version !== generation.current
+    )
       throw new Error("Wallet changed. Refresh the quote.");
-    const signature = (await provider.request({
-      method: "eth_signTypedData_v4",
-      params: [
-        current.quote.wallet,
-        JSON.stringify(current.quote.trade.eip712),
-      ],
-    })) as string;
-    if (version !== generation.current)
-      throw new Error("Wallet changed. Refresh the quote.");
-    setOrder({ ...current, state: "submitting" });
-    setOrder(
-      await api<GrailOrderView>({
-        action: "submit",
-        id: current.id,
-        signature,
-      }),
-    );
-  }
-  async function approve() {
-    if (!wallet || !order) return;
-    if (!approvalFee) {
-      const result = await api<{ estimatedGasWei: string }>({
-        action: "approval",
-        id: order.id,
-      });
-      setApprovalFee(result.estimatedGasWei);
+    const claimed = await api<GrailOrderView>({
+      action: "signing",
+      id: current.id,
+    });
+    setOrder(claimed);
+    let hash: string;
+    try {
+      hash = (await provider.request({
+        method: "eth_sendTransaction",
+        params: [claimed.prepared!.transaction],
+      })) as string;
+    } catch (e) {
+      if (e && typeof e === "object" && "code" in e && e.code === 4001)
+        setOrder(
+          await api<GrailOrderView>({ action: "rejected", id: current.id }),
+        );
+      else
+        throw new Error(
+          "Wallet result unknown. Check your wallet and enter its transaction hash below. Do not send again.",
+        );
       return;
     }
-    const current = order;
-    const version = generation.current;
-    const result = await api<{
-      transaction: { to: `0x${string}`; data: `0x${string}`; value: string };
-    }>({ action: "approval", id: current.id });
-    await wallet.switchChain(chainId);
-    const provider = await wallet.getEthereumProvider();
-    if (Number(await provider.request({ method: "eth_chainId" })) !== chainId)
-      throw new Error("Wallet is on the wrong chain.");
-    if (version !== generation.current)
-      throw new Error("Wallet changed. Refresh the quote.");
-    const hash = (await provider.request({
-      method: "eth_sendTransaction",
-      params: [{ ...result.transaction, from: current.quote.wallet }],
-    })) as string;
     pendingApproval(current.id, hash);
-    setOrder({ ...current, state: "approval_pending" });
-    setOrder(
-      await api<GrailOrderView>({
-        action: "approval_sent",
-        id: current.id,
-        hash,
-      }),
-    );
+    const updated = await api<GrailOrderView>({
+      action: "broadcasted",
+      id: current.id,
+      hash,
+    });
     pendingApproval(current.id, null);
+    if (version === generation.current) setOrder(updated);
   }
   async function status() {
     if (!order) return;
     const version = generation.current;
-    const pendingHash = pendingApproval(order.id);
+    const pendingHash = !order.transactionHash
+      ? pendingApproval(order.id) || recoveryHash
+      : null;
     const updated = await api<GrailOrderView>(
       pendingHash
-        ? { action: "approval_sent", id: order.id, hash: pendingHash }
+        ? { action: "broadcasted", id: order.id, hash: pendingHash }
         : { action: "status", id: order.id },
     );
     if (pendingHash && updated.state !== "quoted")
@@ -263,12 +253,9 @@ export default function WalletTrade({
   const visibleBlocker = order ? order.blocker : blocker;
   const pending =
     !!order &&
-    [
-      "pending",
-      "submitting",
-      "reconciliation_required",
-      "approval_pending",
-    ].includes(order.state);
+    ["pending", "awaiting_signature", "reconciliation_required"].includes(
+      order.state,
+    );
   useEffect(() => {
     if (!pending) return;
     let attempts = 0;
@@ -277,13 +264,41 @@ export default function WalletTrade({
         clearInterval(timer);
         return;
       }
-      void status().catch(() => {});
+      if (polling.current) return;
+      polling.current = true;
+      void status()
+        .catch(() => {})
+        .finally(() => {
+          polling.current = false;
+        });
     }, 3000);
     return () => clearInterval(timer);
-  }, [order?.id, pending, address]);
+  }, [order?.id, order?.state, order?.transactionHash, pending, address]);
+  useEffect(() => {
+    if (!authenticated || !address) return;
+    let active = true;
+    void api<{ orders: GrailOrderView[] }>({ action: "resume", ...selection })
+      .then((r) => {
+        if (!active) return;
+        setHistory(r.orders);
+        const unresolved = r.orders.find((o) =>
+          [
+            "prepared",
+            "awaiting_signature",
+            "pending",
+            "reconciliation_required",
+          ].includes(o.state),
+        );
+        if (unresolved) setOrder(unresolved);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [authenticated, address, chainId, token.address]);
   function change() {
     setOrder(null);
-    setApprovalFee(null);
+    setRecoveryHash("");
     quoteKey.current = crypto.randomUUID();
   }
   if (!authenticated)
@@ -348,9 +363,9 @@ export default function WalletTrade({
       </div>
       {balances && (
         <p className="token-balances">
-          {formatUnits(BigInt(balances.payment), 6)} {chain.paymentSymbol} ·{" "}
-          {formatUnits(BigInt(balances.native), 18)} ETH ·{" "}
-          {formatUnits(BigInt(balances.token), balances.decimals)}{" "}
+          {formatUnits(BigInt(balances.payment), balances.paymentDecimals)}{" "}
+          {balances.paymentSymbol} · {formatUnits(BigInt(balances.native), 18)}{" "}
+          ETH · {formatUnits(BigInt(balances.token), balances.decimals)}{" "}
           {token.symbol}
         </p>
       )}
@@ -383,54 +398,65 @@ export default function WalletTrade({
       </label>
       {!pending && (
         <Button
-          disabled={!wallet || busy || !quoteConfigured}
+          disabled={!wallet || busy || !market}
           onClick={() => void run(quote)}
         >
           {busy ? "Working…" : order ? "Refresh quote" : "Review quote"}
         </Button>
       )}
-      {!quoteConfigured && (
-        <p role="status">Live quotes are awaiting provider setup.</p>
+      {!market && (
+        <p role="status">
+          Pool details could not be loaded. Reload this page to retry.
+        </p>
       )}
       {order && (
         <>
           <TradeQuote order={order} />
-          {order.state === "quoted" && order.quote.approvalRequired && (
-            <>
-              <p>
-                Approve exactly {formatUnits(BigInt(order.quote.sellAmount), 6)}{" "}
-                {chain.paymentSymbol} for Permit2, then refresh the quote. This
-                separate transaction requires ETH; sponsorship is off.
-              </p>
-              {approvalFee && (
-                <p>
-                  Estimated approval gas: {formatUnits(BigInt(approvalFee), 18)}{" "}
-                  ETH. Your wallet shows the final fee.
-                </p>
-              )}
-              <Button
-                disabled={busy || !order.canSubmit}
-                onClick={() => void run(approve)}
-              >
-                {approvalFee ? "Sign token approval" : "Review token approval"}
-              </Button>
-            </>
-          )}
-          {order.state === "quoted" && !order.quote.approvalRequired && (
+          {order.state === "quoted" && (
             <Button
               disabled={busy || !order.canSubmit}
-              onClick={() => void run(signAndSubmit)}
+              onClick={() => void run(prepare)}
             >
-              Sign &amp; buy {token.symbol}
+              Review{" "}
+              {order.quote.nextAction === "swap" ? "purchase" : "approval"}
             </Button>
+          )}
+          {order.state === "prepared" && order.prepared && (
+            <>
+              <p>
+                {order.prepared.action === "swap"
+                  ? `Buy ${token.symbol}`
+                  : `Approve exactly ${formatUnits(BigInt(order.quote.sellAmount), order.quote.paymentDecimals)} ${order.quote.paymentSymbol}`}
+                . Estimated gas:{" "}
+                {formatUnits(BigInt(order.prepared.estimatedGasWei), 18)} ETH.
+                Your wallet shows the final fee.
+              </p>
+              <Button
+                disabled={busy || !order.canSubmit}
+                onClick={() => void run(signAndSubmit)}
+              >
+                Sign{" "}
+                {order.prepared.action === "swap" ? "purchase" : "approval"}
+              </Button>
+            </>
           )}
           {pending && (
             <>
               <p role="status">
-                {order.state === "approval_pending"
-                  ? "Approval pending"
-                  : "Purchase pending"}
+                {order.transactionHash
+                  ? "Waiting for onchain confirmation"
+                  : "Waiting for the wallet result"}
               </p>
+              {!order.transactionHash && (
+                <label className="token-amount-label">
+                  Transaction hash from your wallet
+                  <input
+                    value={recoveryHash}
+                    onChange={(e) => setRecoveryHash(e.target.value)}
+                    placeholder="0x�"
+                  />
+                </label>
+              )}
               <Button
                 disabled={busy}
                 variant="outline"
@@ -474,6 +500,54 @@ export default function WalletTrade({
           {error}
         </p>
       )}
+      <details className="token-history">
+        <summary>Test wallet connection</summary>
+        <label className="token-amount-label">
+          Test network
+          <select
+            value={testNetwork}
+            disabled={busy || pending}
+            onChange={(e) => {
+              setTestNetwork(e.target.value);
+              setTestResult("");
+            }}
+          >
+            <option value="84532">Base Sepolia</option>
+            <option value="46630">Robinhood Testnet</option>
+          </select>
+        </label>
+        <Button
+          variant="outline"
+          disabled={!wallet || busy || pending}
+          onClick={() =>
+            void run(async () => {
+              if (!wallet) return;
+              const version = generation.current;
+              await wallet.switchChain(Number(testNetwork));
+              const provider = await wallet.getEthereumProvider();
+              if (
+                Number(await provider.request({ method: "eth_chainId" })) !==
+                Number(testNetwork)
+              )
+                throw new Error("Wallet did not switch to the test network.");
+              const balance = (await provider.request({
+                method: "eth_getBalance",
+                params: [wallet.address, "latest"],
+              })) as string;
+              if (version === generation.current)
+                setTestResult(
+                  `Connected. ${formatUnits(BigInt(balance), 18)} test ETH. No transaction sent.`,
+                );
+            })
+          }
+        >
+          Check testnet wallet
+        </Button>
+        <p role="status">
+          {testResult ||
+            "Checks your wallet and test ETH balance. Grail’s live tokens are not deployed on these test networks."}
+        </p>
+      </details>
       {history.length > 0 && (
         <details className="token-history">
           <summary>Recent orders</summary>
@@ -483,7 +557,12 @@ export default function WalletTrade({
               disabled={busy || pending}
               onClick={() => {
                 setOrder(o);
-                setAmount(formatUnits(BigInt(o.quote.sellAmount), 6));
+                setAmount(
+                  formatUnits(
+                    BigInt(o.quote.sellAmount),
+                    o.quote.paymentDecimals,
+                  ),
+                );
               }}
             >
               {new Date(o.quote.expiresAt).toLocaleString()} ·{" "}
