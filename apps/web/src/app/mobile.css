@@ -33,6 +33,9 @@
   .app-shell .topbar-actions {
     gap: 10px;
   }
+  .app-shell .topbar-actions .mode-badge {
+    display: inline-flex;
+  }
   .app-shell .cart-link {
     min-height: 44px;
     min-width: 40px;
