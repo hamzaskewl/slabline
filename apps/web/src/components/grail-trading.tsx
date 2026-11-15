@@ -1,6 +1,6 @@
 "use client";
-import Link from "next/link";
 import { formatUnits } from "viem";
+import { GrailReward } from "./grail-reward";
 import {
   evmChains,
   type EvmChainId,
@@ -36,16 +36,7 @@ export function GrailTrading(props: TradeProps) {
         </div>
       </header>
       <div className="token-trade-layout">
-        <section className="token-purchase panel">
-          <h2>Prediction reward</h2>
-          <p>
-            Open a settled winning prediction in your portfolio to choose its
-            reward.
-          </p>
-          <Link href="/portfolio" className="button button-outline">
-            View predictions
-          </Link>
-        </section>
+        <GrailReward token={token} />
         <section className="token-information">
           <h2>Token details</h2>
           <dl>
