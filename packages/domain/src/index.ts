@@ -3,6 +3,7 @@ export * from "./history";
 export * from "./rewards";
 export * from "./evm";
 export * from "./orderbook";
+export * from "./reward-preview";
 import { relatedCards } from "./rewards";
 
 export const decimal = z.string().regex(/^\d+(\.\d{1,6})?$/);

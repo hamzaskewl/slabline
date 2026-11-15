@@ -8,6 +8,8 @@ import {
   matchingTokens,
   outcomeRewardMarket,
   teamRewardMatch,
+  rewardForPayout,
+  indicativeTokens,
   type Market,
   type Listing,
   type GrailToken,
@@ -68,6 +70,34 @@ const cards = [
   card("Pikachu", "Pokemon"),
   card("Lionel Messi", "Soccer"),
 ];
+
+test("dynamic rewards select the highest covered card and the next threshold exactly", () => {
+  const options = [
+    card("Wemby A", "Basketball", "145"),
+    card("Wemby B", "Basketball", "250"),
+    card("Wemby C", "Basketball", "299"),
+  ];
+  expect(rewardForPayout(options, "144.999999").covered).toBe(false);
+  expect(rewardForPayout(options, "145").card?.ask).toBe("145");
+  expect(rewardForPayout(options, "249.999999").card?.ask).toBe("145");
+  expect(rewardForPayout(options, "250").card?.ask).toBe("250");
+  expect(rewardForPayout(options, "300").card?.ask).toBe("299");
+  expect(rewardForPayout(options, "300").next).toBeNull();
+  expect(rewardForPayout(options, null).covered).toBe(false);
+  expect(rewardForPayout([], "500").card).toBeNull();
+  // Lowering the payout must downgrade the preview too.
+  expect(rewardForPayout(options, "146").next?.ask).toBe("250");
+});
+
+test("indicative token estimates retain precision without implying physical redemption", () => {
+  expect(indicativeTokens("100", "0.1")).toBe("1000.000000");
+  expect(indicativeTokens("100", "3")).toBe("33.333333");
+  expect(indicativeTokens("1", "0.000000000001")).toBe("1000000000000.000000");
+  expect(indicativeTokens(null, "1")).toBeNull();
+  expect(indicativeTokens("100", null)).toBeNull();
+  expect(indicativeTokens("100", "0")).toBeNull();
+  expect(indicativeTokens("100", "NaN")).toBeNull();
+});
 const tokens = [
   token("gMJ", ["Basketball"]),
   token("gELON", ["Founder"]),

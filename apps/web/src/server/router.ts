@@ -3,6 +3,7 @@ import { z } from "zod";
 import type {
   Market,
   GrailToken,
+  GrailRewardDetails,
   Listing,
   Pack,
   ProviderResult,
@@ -33,6 +34,19 @@ async function safe<T>(path: string, empty: T): Promise<ProviderResult<T>> {
   }
 }
 export const appRouter = t.router({
+  grailReward: t.procedure
+    .input(
+      z.object({
+        chain: z.number().int().positive(),
+        address: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+      }),
+    )
+    .query(({ input }) =>
+      safe<GrailRewardDetails | null>(
+        `/grail-reward?chain=${input.chain}&address=${input.address}`,
+        null,
+      ),
+    ),
   markets: t.procedure
     .input(
       z

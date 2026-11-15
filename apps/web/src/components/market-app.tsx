@@ -694,6 +694,9 @@ function MarketDetail({
   const possibleMatches = rewardMarket
     ? matchingCards(rewardMarket, cards)
     : [];
+  const possibleTokens = rewardMarket
+    ? matchingTokens(rewardMarket, tokens)
+    : [];
 
   return (
     <>
@@ -975,12 +978,11 @@ function MarketDetail({
         </aside>
         <RewardTarget
           cards={possibleMatches}
+          tokens={possibleTokens}
           market={rewardMarket}
           book={book}
           side={side}
           stale={stale}
-          loading={rewardsLoading}
-          error={rewardsError}
           payout={quote?.totalPayout ?? null}
           onStake={(value) => {
             setStake(value.replace(/0+$/, "").replace(/\.$/, ""));
