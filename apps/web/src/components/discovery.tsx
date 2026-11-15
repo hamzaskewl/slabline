@@ -14,7 +14,13 @@ import {
   Zap,
 } from "lucide-react";
 import { useState } from "react";
-import { buyPercent, eventVolume, type Market } from "@collectible/domain";
+import {
+  buyPercent,
+  eventVolume,
+  type Market,
+  type ProviderResult,
+} from "@collectible/domain";
+import { SnapshotStatus } from "./snapshot-status";
 
 export function Discovery({
   markets,
@@ -26,6 +32,7 @@ export function Discovery({
   search,
   setSearch,
   onPractice,
+  snapshot,
 }: {
   markets: Market[];
   category: string;
@@ -36,6 +43,7 @@ export function Discovery({
   search: string;
   setSearch: (value: string) => void;
   onPractice: () => void;
+  snapshot?: ProviderResult<Market[]>;
 }) {
   const [limit, setLimit] = useState(24);
   const categories = [
@@ -136,7 +144,8 @@ export function Discovery({
             <SlidersHorizontal size={18} />
           </button>
         </div>
-        {loading ? (
+        <SnapshotStatus result={snapshot} />
+        {loading && !markets.length ? (
           <div className="prediction-grid">
             {Array.from({ length: 9 }, (_, i) => (
               <div className="market-skeleton" key={i} />

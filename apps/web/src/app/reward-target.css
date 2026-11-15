@@ -3,6 +3,12 @@
   grid-template-columns: minmax(0, 1fr) minmax(540px, 1.1fr);
   gap: 24px;
 }
+.snapshot-status {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 8px 0 14px;
+}
 .prediction-panels {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
