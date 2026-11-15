@@ -172,9 +172,11 @@ export type Pack = {
 };
 export type ProviderResult<T> = {
   data: T;
-  source: "live" | "fixture" | "unavailable";
+  source: "live" | "cache" | "fixture" | "unavailable";
   observedAt: string;
   error: string | null;
+  refreshing?: boolean;
+  stale?: boolean;
 };
 const storedImage = z
   .string()
