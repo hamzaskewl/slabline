@@ -41,6 +41,7 @@ import {
   type ChartRange,
   type Listing,
   type Market,
+  type ProviderResult,
 } from "@collectible/domain";
 import { PRACTICE_MARKET } from "@collectible/integrations/fixtures";
 import { api } from "@/lib/trpc";
@@ -51,6 +52,8 @@ import { Discovery } from "./discovery";
 import { OutcomeDetail } from "./outcome-detail";
 import { RewardTarget } from "./reward-target";
 import { useLiveBook } from "@/lib/use-live-book";
+import { retainMarketSnapshot } from "@/lib/market-snapshot";
+import { SnapshotStatus } from "./snapshot-status";
 const PriceChart = dynamic(() => import("./price-chart"), {
   ssr: false,
   loading: () => <div className="chart-loading">Loading chart…</div>,
@@ -117,7 +120,12 @@ export function MarketApp({
   const marketQuery = api.markets.useQuery(
     { search: "" },
     {
-      refetchInterval: 60000,
+      refetchInterval: (q) => (q.state.data?.refreshing ? 2000 : 15000),
+      structuralSharing: (previous, incoming) =>
+        retainMarketSnapshot(
+          previous as ProviderResult<Market[]> | undefined,
+          incoming as ProviderResult<Market[]>,
+        ),
       enabled: section === "markets" && !selectedId && !practice,
     },
   );
@@ -129,7 +137,15 @@ export function MarketApp({
   const status = api.status.useQuery();
   const selectedQuery = api.market.useQuery(
     { id: selectedId ?? "" },
-    { enabled: !!selectedId && !practice, refetchInterval: 30000 },
+    {
+      enabled: !!selectedId && !practice,
+      refetchInterval: (q) => (q.state.data?.refreshing ? 2000 : 15000),
+      structuralSharing: (previous, incoming) =>
+        retainMarketSnapshot(
+          previous as ProviderResult<Market | null> | undefined,
+          incoming as ProviderResult<Market | null>,
+        ),
+    },
   );
   useEffect(() => {
     try {
@@ -338,7 +354,11 @@ export function MarketApp({
                   markets={markets}
                   category={category}
                   setCategory={setCategory}
-                  loading={marketQuery.isLoading}
+                  loading={
+                    marketQuery.isLoading ||
+                    (!!marketQuery.data?.refreshing && !markets.length)
+                  }
+                  snapshot={practice ? undefined : marketQuery.data}
                   error={marketQuery.data?.error}
                   retry={() => void marketQuery.refetch()}
                 />
@@ -362,6 +382,7 @@ export function MarketApp({
                       </Button>
                     ) : null}
                   </nav>
+                  {!practice && <SnapshotStatus result={selectedQuery.data} />}
                   <div className="exchange-grid">
                     {selected ? (
                       <MarketDetail
@@ -388,7 +409,10 @@ export function MarketApp({
                         initialOutcome={initialOutcome}
                         initialSymbol={practice ? undefined : initialSymbol}
                       />
-                    ) : selectedId && selectedQuery.isLoading && !practice ? (
+                    ) : selectedId &&
+                      (selectedQuery.isLoading ||
+                        selectedQuery.data?.refreshing) &&
+                      !practice ? (
                       <section className="panel no-market" role="status">
                         <RefreshCw className="spin" size={24} />
                         <h2>Loading market…</h2>
@@ -651,6 +675,8 @@ function MarketDetail({
   const symbol = contract?.symbol;
   const live = useLiveBook(symbol, practice);
   const { book, latestTrade, stale } = live;
+  const livePrice = (s: "yes" | "no") =>
+    !book || stale ? null : (asksForSide(book, s)[0]?.price ?? null);
   const charted = contracts.slice(0, 3);
   if (contract && !charted.some((c) => c.symbol === symbol))
     charted.splice(2, 1, contract);
@@ -771,7 +797,13 @@ function MarketDetail({
                       " " +
                       c.label +
                       " " +
-                      buyPercent(s === "yes" ? c.buyYes : c.buyNo)
+                      buyPercent(
+                        c.symbol === symbol
+                          ? livePrice(s)
+                          : s === "yes"
+                            ? c.buyYes
+                            : c.buyNo,
+                      )
                     }
                     aria-pressed={c.symbol === symbol && side === s}
                     onClick={() => {
@@ -783,7 +815,15 @@ function MarketDetail({
                     }}
                   >
                     {s === "yes" ? "Yes" : "No"}{" "}
-                    <b>{buyPercent(s === "yes" ? c.buyYes : c.buyNo)}</b>
+                    <b>
+                      {buyPercent(
+                        c.symbol === symbol
+                          ? livePrice(s)
+                          : s === "yes"
+                            ? c.buyYes
+                            : c.buyNo,
+                      )}
+                    </b>
                   </button>
                 ))}
               </div>
@@ -861,10 +901,7 @@ function MarketDetail({
                 disabled={!contract}
                 onClick={() => contract && selectOutcome(contract.symbol, s)}
               >
-                {s === "yes" ? "Yes" : "No"}{" "}
-                <b>
-                  {buyPercent(s === "yes" ? contract?.buyYes : contract?.buyNo)}
-                </b>
+                {s === "yes" ? "Yes" : "No"} <b>{buyPercent(livePrice(s))}</b>
               </button>
             ))}
           </div>
@@ -872,6 +909,13 @@ function MarketDetail({
             Estimates use available depth before fees. A losing prediction pays
             zero. Live trading is disabled.
           </p>
+          {!practice && (!book || stale) && (
+            <p className="snapshot-status" role="status">
+              {stale
+                ? "Reconnecting to live odds…"
+                : "Connecting to live odds…"}
+            </p>
+          )}
           <label className="stake-label" htmlFor="stake">
             Your stake <span>USD</span>
           </label>

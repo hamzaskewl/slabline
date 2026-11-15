@@ -1,6 +1,5 @@
 import {
   geminiClient,
-  listMarkets,
   listCards,
   listGrailTokens,
   getGrailRewardDetails,
@@ -11,7 +10,6 @@ import {
   enqueueValuations,
   processValuationJob,
   recoverValuationJobs,
-  getMarketByTicker,
   getPriceHistory,
 } from "@collectible/integrations";
 import {
@@ -23,15 +21,15 @@ import {
   type PricePoint,
   type ChartRange,
 } from "@collectible/domain";
-import {
-  getDb,
-  marketSnapshots,
-  markets as marketTable,
-  contracts as contractTable,
-  sql,
-  eq,
-} from "@collectible/db";
+import { getDb, marketSnapshots } from "@collectible/db";
 import { processWebhookDelivery } from "./reconciliation";
+import {
+  savedMarkets,
+  savedMarket,
+  savedContract,
+  knownMarkets,
+  startMarketRefresh,
+} from "./market-store";
 
 type Session = {
   book: Book | null;
@@ -41,81 +39,6 @@ type Session = {
 };
 const books = new Map<string, Session>();
 const pendingBooks = new Map<string, Promise<Session>>();
-let knownMarkets: Market[] = [];
-const allContracts = (items: Market[]): Market["contracts"] =>
-  items.flatMap((m) => [...m.contracts, ...allContracts(m.children)]);
-let metadataSavedAt = 0;
-async function markets(search = "", category = "") {
-  const data = await cached(
-    "gemini:markets:v6:all-active-categories",
-    60000,
-    () => listMarkets(),
-  );
-  knownMarkets = data;
-  if (process.env.DATABASE_URL && Date.now() - metadataSavedAt > 60000) {
-    const flatten = (items: Market[]): Market[] =>
-      items.flatMap((m) => [m, ...flatten(m.children)]);
-    const rows = [...new Map(flatten(data).map((m) => [m.id, m])).values()];
-    try {
-      if (rows.length) {
-        for (let start = 0; start < rows.length; start += 500)
-          await getDb()
-            .insert(marketTable)
-            .values(
-              rows.slice(start, start + 500).map((m) => ({
-                id: m.id,
-                provider: "gemini",
-                category: m.category,
-                status: m.status,
-                data: m,
-              })),
-            )
-            .onConflictDoUpdate({
-              target: marketTable.id,
-              set: {
-                data: sql`excluded.data`,
-                status: sql`excluded.status`,
-                updatedAt: new Date(),
-              },
-            });
-        const contracts = [
-          ...new Map(
-            rows
-              .flatMap((m) =>
-                m.contracts.map((c) => ({
-                  symbol: c.symbol,
-                  marketId: m.id,
-                  data: c,
-                })),
-              )
-              .map((c) => [c.symbol, c]),
-          ).values(),
-        ];
-        for (let start = 0; start < contracts.length; start += 500)
-          await getDb()
-            .insert(contractTable)
-            .values(contracts.slice(start, start + 500))
-            .onConflictDoUpdate({
-              target: contractTable.symbol,
-              set: { data: sql`excluded.data` },
-            });
-        metadataSavedAt = Date.now();
-      }
-    } catch {
-      console.warn("Market metadata persistence unavailable");
-    }
-  }
-  const searchText = search.trim().toLowerCase();
-  const searchable = (m: Market): string =>
-    [m.title, ...m.contracts.map((c) => c.label), ...m.children.map(searchable)]
-      .join(" ")
-      .toLowerCase();
-  return data.filter(
-    (m) =>
-      (!category || m.category === category) &&
-      (!searchText || searchable(m).includes(searchText)),
-  );
-}
 async function rewardInventory(data: Market[]) {
   const [cards, tokens] = await Promise.all([
     providerRead(() => listCards("", rewardCategories(data)), []),
@@ -151,8 +74,7 @@ async function openBook(symbol: string) {
     return existing;
   }
   if (books.size >= 40) throw new Error("Maximum active books reached");
-  if (!knownMarkets.length) await markets();
-  const contract = allContracts(knownMarkets).find((c) => c.symbol === symbol);
+  const contract = await savedContract(symbol);
   if (!contract) throw new Error("Symbol is not in the public active catalog");
   if (!contract.quantityIncrement || !contract.priceIncrement)
     throw new Error("Instrument increments unavailable");
@@ -290,6 +212,7 @@ setInterval(async () => {
   }
 }, 5000);
 
+startMarketRefresh();
 const server = Bun.serve({
   port: Number(process.env.PORT ?? 4001),
   hostname: "0.0.0.0",
@@ -303,38 +226,12 @@ const server = Bun.serve({
         activeBooks: books.size,
         mode: process.env.DEMO_MODE ?? "simulated",
       });
-    if (url.pathname === "/market")
-      return Response.json(
-        await providerRead(async () => {
-          const id = url.searchParams.get("id") ?? "";
-          if (!/^[A-Za-z0-9_-]{1,150}$/.test(id))
-            throw new Error("Invalid market identifier");
-          const existing = knownMarkets.find(
-            (m) => m.id === id || m.ticker === id,
-          );
-          if (existing && /^\d+$/.test(id)) return existing;
-          let market: Market | null = null;
-          if (/^\d+$/.test(id) && process.env.DATABASE_URL) {
-            const [row] = await getDb()
-              .select()
-              .from(marketTable)
-              .where(eq(marketTable.id, id))
-              .limit(1);
-            market = (row?.data as Market | undefined) ?? null;
-          } else if (!/^\d+$/.test(id)) {
-            market = await cached(`gemini:event:v2:${id}`, 30000, () =>
-              getMarketByTicker(id),
-            );
-          }
-          if (market)
-            knownMarkets = [
-              ...new Map(
-                [...knownMarkets, market].map((m) => [m.id, m]),
-              ).values(),
-            ];
-          return market;
-        }, null),
-      );
+    if (url.pathname === "/market") {
+      const id = url.searchParams.get("id") ?? "";
+      if (!/^[A-Za-z0-9_-]{1,150}$/.test(id))
+        return new Response("Invalid market identifier", { status: 400 });
+      return Response.json(await savedMarket(id));
+    }
     if (url.pathname === "/grail-reward") {
       const chain = Number(url.searchParams.get("chain")),
         address = url.searchParams.get("address") ?? "";
@@ -367,14 +264,12 @@ const server = Bun.serve({
       );
     }
     if (url.pathname === "/markets") {
-      const result = await providerRead(
-        () =>
-          markets(
-            url.searchParams.get("search")?.slice(0, 100) ?? "",
-            url.searchParams.get("category")?.slice(0, 50) ?? "",
-          ),
-        [],
-      );
+      const result = await savedMarkets();
+      const search = (url.searchParams.get("search") ?? "")
+        .slice(0, 100)
+        .trim()
+        .toLowerCase();
+      const category = (url.searchParams.get("category") ?? "").slice(0, 50);
       return Response.json({
         ...result,
         // Prediction discovery must not wait on a separate collectible provider.
@@ -383,11 +278,17 @@ const server = Bun.serve({
           .filter(
             (m) => m.category === "Sports" || sportsForMarket(m).length > 0,
           )
-          .map(marketPreview),
+          .map(marketPreview)
+          .filter(
+            (m) =>
+              (!category || m.category === category) &&
+              (!search ||
+                (m.searchText ?? m.title).toLowerCase().includes(search)),
+          ),
       });
     }
     if (url.pathname === "/rewards" || url.pathname === "/cards") {
-      const inventory = await rewardInventory(knownMarkets);
+      const inventory = await rewardInventory(knownMarkets());
       const cards = inventory.cards;
       return Response.json({
         data:
