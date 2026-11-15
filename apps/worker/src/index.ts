@@ -3,6 +3,7 @@ import {
   listMarkets,
   listCards,
   listGrailTokens,
+  getGrailRewardDetails,
   listPacks,
   cached,
   providerRead,
@@ -334,6 +335,19 @@ const server = Bun.serve({
           return market;
         }, null),
       );
+    if (url.pathname === "/grail-reward") {
+      const chain = Number(url.searchParams.get("chain")),
+        address = url.searchParams.get("address") ?? "";
+      if (
+        !Number.isSafeInteger(chain) ||
+        chain <= 0 ||
+        !/^0x[a-fA-F0-9]{40}$/.test(address)
+      )
+        return new Response("Invalid token", { status: 400 });
+      return Response.json(
+        await providerRead(() => getGrailRewardDetails(chain, address), null),
+      );
+    }
     if (url.pathname === "/history") {
       const symbol = url.searchParams.get("symbol") ?? "",
         range = url.searchParams.get("range") ?? "ALL";
