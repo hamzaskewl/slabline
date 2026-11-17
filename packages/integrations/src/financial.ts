@@ -4,9 +4,11 @@ import {
   type FundingState,
 } from "@collectible/domain";
 import {
-  buildCollectorCryptDevnetDraft,
-  type CollectorCryptDraft,
-} from "./collector-crypt";
+  inspectAndPrepareCcPurchase,
+  submitCcTest,
+  CcPurchaseError,
+} from "./collector-crypt-purchases";
+import { getDb, orders, eq, and } from "@collectible/db";
 export type FinancialApproval = {
   userId: string;
   wallet: string;
@@ -80,19 +82,36 @@ export interface CollectorCryptTransactionAdapter {
   buildBuyTransaction(
     card: Listing,
     buyer: string,
-  ): Promise<CollectorCryptDraft>;
+  ): ReturnType<typeof inspectAndPrepareCcPurchase>;
   broadcastSignedTransaction(
     signedBase64: string,
     approval: FinancialApproval,
   ): Promise<{ signature: string }>;
 }
 export const collectorCryptTransactions: CollectorCryptTransactionAdapter = {
-  buildBuyTransaction: buildCollectorCryptDevnetDraft,
-  async broadcastSignedTransaction() {
-    throw new IntegrationBlocked(
-      "Collector Crypt",
-      "Transaction program/recipient/amount inspection and a signed devnet purchase test are required before broadcast is released",
-    );
+  buildBuyTransaction: inspectAndPrepareCcPurchase,
+  async broadcastSignedTransaction(signedBase64, approval) {
+    if (approval.network !== "devnet")
+      throw new CcPurchaseError("Mainnet card purchases remain disabled.", 403);
+    const [row] = await getDb()
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.userId, approval.userId),
+          eq(
+            orders.idempotencyKey,
+            `cc-devnet:${approval.userId}:${approval.idempotencyKey}`,
+          ),
+        ),
+      )
+      .limit(1);
+    if (!row || (row.data as { wallet?: string }).wallet !== approval.wallet)
+      throw new CcPurchaseError("A matching saved card test is required.", 403);
+    const result = await submitCcTest(approval.userId, row.id, signedBase64);
+    if (!result.signature)
+      throw new CcPurchaseError("No card transaction was submitted.", 409);
+    return { signature: result.signature };
   },
 };
 // Compatibility name for existing callers. Quotes are real; execution stays blocked.

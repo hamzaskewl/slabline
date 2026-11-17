@@ -3,6 +3,7 @@ export * from "./history";
 export * from "./rewards";
 export * from "./evm";
 export * from "./relay";
+export * from "./collector-crypt";
 export * from "./orderbook";
 export * from "./reward-preview";
 import { relatedCards } from "./rewards";

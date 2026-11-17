@@ -64,6 +64,7 @@ Locked technical choices
   Collector Crypt (primary exact-card inventory)
 - Public marketplace API https://api.collectorcrypt.com, devnet https://dev-api.collectorcrypt.com. Search cards and filter by price; map mint, category, card name, player, set/year, grade, cert, actual front/back images, ask, seller, availability.
 - POST /marketplace/buy returns unsigned base64 transaction; buyer wallet signs; broadcast via documented endpoint; independently confirm on Solana before marking purchased.
+- Devnet Core testing uses a separate buyer-funded transaction built from the program-owned published IDL, because the REST builder currently returns a platform rent/fee payer even for a funded test address. Inspect every program/account/price, simulate the exact payment and ownership effects, persist per-card signing/submission/recovery state, and require the configured test-wallet allowlist before signing or broadcasting. Keep mainnet purchases disabled. Devnet tools live under About, separate from settlement-funded rewards checkout; test NFTs do not redeem physical cards.
 - Multi-item cart is not one atomic transaction. Per-item order states and idempotency. If a later card fails, earlier completed buys stay bought; remaining USDC stays user-controlled.
 - Physical redemption via /partner/v1 shipping API requires partner onboarding, key and scopes, and onchain burn/payment signatures. First MVP can link to Collector Crypt's site.
   Phygitals (packs first)
