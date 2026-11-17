@@ -20,6 +20,14 @@ bun run build
 
 Web: http://localhost:3000. Worker: http://localhost:4001. Credentials belong in local ignored environment files or Railway service secrets; never paste them into chat or commit them.
 
+## QuickNode credit cutoff
+
+Web and worker share a PostgreSQL credit ledger. Configure the same `QUICKNODE_BUDGET_*`, `QUICKNODE_INCLUDED_CREDITS`, `QUICKNODE_CREDIT_CUTOFF` and `QUICKNODE_BASELINE_CREDITS` on both services for a verified billing period. The cutoff cannot exceed 75% of included credits. Reserve prior account usage in the baseline; budget IDs must never be rotated to replenish an existing period. Run migrations before enabling the provider endpoints.
+
+Every allowed RPC call reserves 1,000 credits before contacting QuickNode, including each batch member, retry and failed request. This deliberately exceeds the published costs of the read-only methods used here. Unknown methods never reach QuickNode. Concurrent reservations are atomic and survive service restarts. Exhausted, missing, expired or unavailable budgets use public Solana/EVM RPC fallbacks; DAS ownership checks stop instead of claiming verification. New billing periods require verified settings; there is no automatic reset.
+
+This controls this app's RPC usage, not other applications using the account. Keep provider-side request caps and leave headroom for dashboard tests and other consumers. Streams are independently metered per block and remain off until a bounded block allowance is reserved; these RPC settings do not cap an independently running Stream. See [QuickNode RPC costs](https://www.quicknode.com/api-credits/sol) and [Streams billing](https://www.quicknode.com/docs/streams/billing).
+
 ## Checkpoints
 
 Every major implementation step is a branch and pull request, checked before merge. GitHub Actions runs type checking, tests and a production build.

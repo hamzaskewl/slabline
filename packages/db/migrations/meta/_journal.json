@@ -22,6 +22,13 @@
       "when": 1794545507559,
       "tag": "0002_messy_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794879032906,
+      "tag": "0003_exotic_shockwave",
+      "breakpoints": true
     }
   ]
 }

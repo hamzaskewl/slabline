@@ -1,16 +1,45 @@
-import { createSolanaRpc, address, signature } from "@solana/kit";
+import {
+  createSolanaRpcFromTransport,
+  createDefaultRpcTransport,
+  address,
+  signature,
+  type RpcTransport,
+} from "@solana/kit";
 import { IntegrationBlocked } from "@collectible/domain";
+import {
+  isQuickNodeUrl,
+  reserveQuickNodeRpc,
+  quickNodeFetch,
+} from "./quicknode-budget";
 export function solanaNetwork() {
   return process.env.SOLANA_NETWORK === "mainnet" ? "mainnet" : "devnet";
 }
 function rpc() {
-  return createSolanaRpc(
-    process.env.QUICKNODE_RPC_URL ??
-      process.env.SOLANA_RPC_URL ??
-      (solanaNetwork() === "devnet"
-        ? "https://api.devnet.solana.com"
-        : "https://api.mainnet-beta.solana.com"),
-  );
+  const fallback =
+    process.env.SOLANA_RPC_URL ||
+    (solanaNetwork() === "devnet"
+      ? "https://api.devnet.solana.com"
+      : "https://api.mainnet-beta.solana.com");
+  const url = process.env.QUICKNODE_RPC_URL || fallback;
+  const primary = createDefaultRpcTransport({ url });
+  const publicTransport = createDefaultRpcTransport({ url: fallback });
+  const transport: RpcTransport = async (request) => {
+    if (isQuickNodeUrl(url)) {
+      try {
+        await reserveQuickNodeRpc(request.payload);
+      } catch {
+        if (isQuickNodeUrl(fallback))
+          throw new Error("Public Solana RPC fallback is unavailable");
+        return publicTransport(request);
+      }
+    }
+    try {
+      return await primary(request);
+    } catch {
+      throw new Error("Solana RPC request failed");
+    }
+  };
+  return createSolanaRpcFromTransport(transport);
 }
 const timeout = () => ({ abortSignal: AbortSignal.timeout(15000) });
 export async function getSolanaBalances(wallet: string) {
@@ -86,7 +115,7 @@ export async function reconcileAssetOwner(mint: string, expectedOwner: string) {
     );
   address(mint);
   address(expectedOwner);
-  const response = await fetch(endpoint, {
+  const response = await quickNodeFetch()(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
