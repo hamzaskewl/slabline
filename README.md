@@ -36,6 +36,12 @@ Relay quote previews are available on `/wallet` after login and wallet verificat
 
 Collector Crypt devnet tools are under About → Transaction tools. Listings use the devnet API; unsigned buyer-paid Core purchases use the program-owned Anchor IDL and are independently inspected and simulated. Core ownership confirmation reads the asset account on the checked devnet RPC. Signing/broadcast requires both `ENABLE_CC_DEVNET_TESTS=true` and an exact `CC_DEVNET_TEST_WALLET` allowlist match; leave these off until a funded wallet test is approved. Gas sponsorship and mainnet purchases remain off. The test-USDC mint is `Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr`, not Circle's devnet USDC. Simulation success does not mean a card was bought. Submissions retain the exact signed transaction and signature for reconciliation and at most one explicit retry of those same bytes; a new purchase is blocked while an earlier submission is unresolved.
 
+## Account reads
+
+Wallet and Portfolio use authenticated Gemini connection readiness. Approval and granted read scopes are checked before private SDK calls; no fabricated balances or orders appear while approval is pending. Open orders, positions and settlements are read-only.
+
+Verified Solana wallets show separate SOL/native USDC balances. USDC defaults to Circle's native mint for the active network; mismatched overrides are rejected. Collection uses budgeted DAS reads, 24 assets per page, a 60-second server cache and an observed timestamp. Indexer failures remain errors rather than empty-wallet claims. Collection metadata is wallet inventory, not evidence of physical redemption eligibility. Private client queries are scoped to the signed-in user and cleared when unused.
+
 ## Checkpoints
 
 Every major implementation step is a branch and pull request, checked before merge. GitHub Actions runs type checking, tests and a production build.

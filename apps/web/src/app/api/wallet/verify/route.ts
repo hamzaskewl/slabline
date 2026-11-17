@@ -9,7 +9,7 @@ import {
   gt,
   isNull,
 } from "@collectible/db";
-import { verifyWalletProof } from "@collectible/integrations";
+import { verifyWalletProof, solanaNetwork } from "@collectible/integrations";
 import {
   apiRoute,
   authenticate,
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
       .limit(1);
     if (
       !challenge ||
+      !challenge.message.includes(`\nNetwork: ${solanaNetwork()}\n`) ||
       !verifyWalletProof(
         challenge.address,
         challenge.message,
@@ -60,15 +61,22 @@ export async function POST(request: Request) {
         .limit(1);
       if (existing && existing.userId !== user.id)
         throw new ApiError(409, "Wallet is linked to another app account");
-      await tx
+      const linked = await tx
         .insert(walletLinks)
         .values({
           userId: user.id,
           address: challenge.address,
-          network: process.env.SOLANA_NETWORK ?? "devnet",
+          network: solanaNetwork(),
           verifiedAt: new Date(),
         })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: walletLinks.address,
+          set: { network: solanaNetwork(), verifiedAt: new Date() },
+          where: eq(walletLinks.userId, user.id),
+        })
+        .returning({ address: walletLinks.address });
+      if (!linked.length)
+        throw new ApiError(409, "Wallet is linked to another app account");
       await tx.insert(auditEvents).values({
         userId: user.id,
         action: "wallet.link.verified",

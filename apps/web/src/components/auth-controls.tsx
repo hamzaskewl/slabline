@@ -1,5 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { usePrivateRead } from "@/lib/use-private-read";
+import { relayFormat } from "@collectible/domain";
 import { usePrivy, useConnectWallet } from "@privy-io/react-auth";
 import { useWallets, useSignMessage } from "@privy-io/react-auth/solana";
 import { Button } from "./ui/button";
@@ -18,37 +21,28 @@ export function AuthButton() {
   );
 }
 export function ConnectedWalletPanel() {
-  const { authenticated, login, getAccessToken } = usePrivy();
+  const { authenticated, login, getAccessToken, user } = usePrivy();
   const { wallets } = useWallets();
   const { connectWallet } = useConnectWallet();
   const { signMessage } = useSignMessage();
   const [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
-  const [balances, setBalances] = useState<
-    Record<
-      string,
-      { solLamports: string; usdc: string | null; network: string }
-    >
-  >({});
-  async function readBalances(wallet: string) {
-    try {
-      const token = await getAccessToken();
-      const response = await fetch(
-        `/api/wallet/balances?address=${encodeURIComponent(wallet)}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Balance lookup failed");
-      setBalances((previous) => ({ ...previous, [wallet]: data }));
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Balances unavailable");
-    }
-  }
+  const links = usePrivateRead<{
+    network: string;
+    wallets: { address: string }[];
+  }>("/api/wallet/links");
+  const queryClient = useQueryClient(),
+    generation = useRef(0);
+  useEffect(() => {
+    generation.current++;
+    setMessage("");
+  }, [user?.id, authenticated]);
   async function prove(index: number) {
     const wallet = wallets[index];
     if (!wallet) return;
     setBusy(true);
     setMessage("");
+    const current = generation.current;
     try {
       const token = await getAccessToken();
       if (!token) throw new Error("Sign in first");
@@ -68,6 +62,7 @@ export function ConnectedWalletPanel() {
         wallet,
         message: new TextEncoder().encode(challenge.message),
       });
+      if (current !== generation.current) return;
       const signature = btoa(String.fromCharCode(...signed.signature));
       const response = await fetch("/api/wallet/verify", {
         method: "POST",
@@ -75,35 +70,27 @@ export function ConnectedWalletPanel() {
         body: JSON.stringify({ nonce: challenge.nonce, signature }),
       });
       const result = await response.json();
+      if (current !== generation.current) return;
       if (!response.ok) throw new Error(result.error ?? "Wallet proof failed");
-      setMessage("Wallet signature verified and link saved. No funds moved.");
-      await readBalances(wallet.address);
+      setMessage("Wallet verified.");
+      await links.refetch();
+      await queryClient.invalidateQueries({
+        queryKey: ["private-read", user?.id],
+      });
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Wallet verification failed");
+      if (current === generation.current)
+        setMessage(
+          e instanceof Error ? e.message : "Wallet verification failed",
+        );
     } finally {
       setBusy(false);
     }
   }
-  async function linkGemini() {
-    setBusy(true);
-    try {
-      const token = await getAccessToken();
-      const response = await fetch("/api/gemini/connect", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error ?? "Gemini connection unavailable");
-      window.location.assign(result.url);
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Gemini connection failed");
-      setBusy(false);
-    }
-  }
   return (
-    <section className="panel funding-panel">
-      <h2>Connect and verify your wallet</h2>
+    <section className="panel funding-panel account-panel">
+      <h2>
+        Solana wallets{links.data?.network === "devnet" ? " · Devnet" : ""}
+      </h2>
 
       {authenticated ? (
         <>
@@ -113,42 +100,85 @@ export function ConnectedWalletPanel() {
             >
               Connect Phantom / external wallet
             </Button>
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => void linkGemini()}
-            >
-              Link Gemini account
-            </Button>
           </div>
           {wallets.map((w, i) => (
             <div className="connected-wallet" key={w.address}>
               <Wallet size={18} />
               <code>{w.address}</code>
               <Button size="sm" disabled={busy} onClick={() => void prove(i)}>
-                <ShieldCheck size={14} /> Verify wallet
+                <ShieldCheck size={14} />{" "}
+                {links.data?.wallets.some((l) => l.address === w.address)
+                  ? "Verify again"
+                  : "Verify wallet"}
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void readBalances(w.address)}
-              >
-                Refresh balances
-              </Button>
-              {balances[w.address] ? (
-                <p>
-                  {balances[w.address]!.network.toUpperCase()} ·{" "}
-                  {Number(balances[w.address]!.solLamports) / 1e9} SOL ·{" "}
-                  {balances[w.address]!.usdc ?? "USDC mint not configured"}
-                </p>
-              ) : null}
+              <WalletBalances
+                wallet={w.address}
+                verified={
+                  !!links.data?.wallets.some((l) => l.address === w.address)
+                }
+              />
             </div>
           ))}
         </>
       ) : (
         <Button onClick={login}>Continue with Google or email</Button>
       )}
+      {authenticated && links.error ? (
+        <>
+          <p role="alert">{links.error.message}</p>
+          <Button variant="outline" onClick={() => void links.refetch()}>
+            Retry wallet links
+          </Button>
+        </>
+      ) : null}
       {message ? <p role="status">{message}</p> : null}
     </section>
+  );
+}
+function WalletBalances({
+  wallet,
+  verified,
+}: {
+  wallet: string;
+  verified: boolean;
+}) {
+  const query = usePrivateRead<{
+    network: string;
+    solLamports: string;
+    usdc: string | null;
+    observedAt: string;
+  }>(`/api/wallet/balances?address=${encodeURIComponent(wallet)}`, verified);
+  if (!verified) return null;
+  return (
+    <div className="wallet-balance-read">
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={query.isFetching}
+        onClick={() => void query.refetch()}
+      >
+        {query.isFetching ? "Reading balances…" : "Refresh balances"}
+      </Button>
+      {query.error ? (
+        <p role="alert">
+          Balances unavailable.{" "}
+          {query.data
+            ? "The saved balances below may be outdated."
+            : "Try again shortly."}
+        </p>
+      ) : null}
+      {query.data ? (
+        <>
+          <p>
+            {relayFormat(query.data.solLamports, 9)} SOL ·{" "}
+            {query.data.usdc ?? "Unavailable"}{" "}
+            {query.data.network === "devnet" ? "test USDC" : "USDC"}
+          </p>
+          <p className="account-observed">
+            Updated {new Date(query.data.observedAt).toLocaleString()}
+          </p>
+        </>
+      ) : null}
+    </div>
   );
 }

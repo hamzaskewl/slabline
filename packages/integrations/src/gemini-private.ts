@@ -5,13 +5,64 @@ import {
 } from "@gemini-markets/sdk/server";
 import { getDb, linkedGeminiAccounts, eq, sql, and } from "@collectible/db";
 import { encryptSecret, decryptSecret } from "./security";
-import { IntegrationBlocked } from "@collectible/domain";
+import {
+  IntegrationBlocked,
+  type GeminiConnection,
+  type GeminiSnapshot,
+} from "@collectible/domain";
 import { AsyncLocalStorage } from "node:async_hooks";
 type TokenDatabase = Pick<
   ReturnType<typeof getDb>,
   "select" | "insert" | "delete"
 >;
 const tokenTransaction = new AsyncLocalStorage<TokenDatabase>();
+
+export function geminiReadiness(
+  linked: boolean,
+  rawScopes: unknown,
+): GeminiConnection {
+  const environment =
+    process.env.GEMINI_ENVIRONMENT === "sandbox" ? "sandbox" : "production";
+  const scopes = Array.isArray(rawScopes)
+    ? rawScopes.filter((s): s is string => typeof s === "string")
+    : [];
+  const configured = !!(
+    process.env.GEMINI_OAUTH_CLIENT_ID &&
+    process.env.GEMINI_OAUTH_CLIENT_SECRET &&
+    process.env.TOKEN_ENCRYPTION_KEY
+  );
+  const approved =
+    environment === "sandbox" ||
+    process.env.GEMINI_OAUTH_PRODUCTION_APPROVED === "true";
+  const canConnect = configured && approved;
+  const missingScope =
+    linked &&
+    !["balances:read", "orders:read"].every((s) => scopes.includes(s));
+  return {
+    environment,
+    linked,
+    scopes,
+    canConnect,
+    canRead: canConnect && linked && !missingScope,
+    blocker: !configured
+      ? "Gemini connection is not configured."
+      : !approved
+        ? "Gemini app approval is pending."
+        : missingScope
+          ? "Reconnect Gemini to grant balances and orders read access."
+          : !linked
+            ? "Connect your Gemini account to see balances and positions."
+            : null,
+  };
+}
+export async function getGeminiConnection(userId: string) {
+  const [row] = await getDb()
+    .select({ scopes: linkedGeminiAccounts.scopes })
+    .from(linkedGeminiAccounts)
+    .where(eq(linkedGeminiAccounts.userId, userId))
+    .limit(1);
+  return geminiReadiness(!!row, row?.scopes);
+}
 
 function encryptionKey() {
   if (!process.env.TOKEN_ENCRYPTION_KEY)
@@ -129,7 +180,15 @@ export function geminiOAuth(userId?: string) {
       : {}),
   });
 }
-export async function getGeminiAccountSnapshot(userId: string) {
+export async function getGeminiAccountSnapshot(
+  userId: string,
+): Promise<GeminiSnapshot> {
+  const connection = await getGeminiConnection(userId);
+  if (!connection.canRead)
+    throw new IntegrationBlocked(
+      "Gemini",
+      connection.blocker ?? "Account is unavailable",
+    );
   const auth = geminiOAuth(userId);
   const client = await createClient({
     env:
@@ -165,11 +224,15 @@ export async function getGeminiAccountSnapshot(userId: string) {
         payout: p.payout ?? null,
         settledAt: p.settledAt ?? null,
       })),
-      activeOrders: JSON.parse(
-        JSON.stringify(activeOrders, (_key, value) =>
-          typeof value === "bigint" ? value.toString() : value,
-        ),
-      ) as unknown,
+      activeOrders: (activeOrders.orders ?? []).map((o) => ({
+        id: o.orderId == null ? null : String(o.orderId),
+        symbol: o.symbol ?? "Unknown",
+        side: o.side ?? null,
+        outcome: o.outcome ?? null,
+        price: o.price ?? null,
+        remainingQuantity: o.remainingQuantity ?? null,
+        status: o.status ?? null,
+      })),
       observedAt: new Date().toISOString(),
     };
   } finally {

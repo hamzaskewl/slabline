@@ -111,11 +111,23 @@ export function solanaRpc(
   return client;
 }
 const timeout = () => ({ abortSignal: AbortSignal.timeout(15000) });
+export const SOLANA_USDC_MINTS = {
+  devnet: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  mainnet: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+} as const;
+export function solanaUsdcMint() {
+  const expected = SOLANA_USDC_MINTS[solanaNetwork()];
+  if (process.env.SOLANA_USDC_MINT && process.env.SOLANA_USDC_MINT !== expected)
+    throw new Error(
+      "Configured USDC mint does not match native USDC on the active network",
+    );
+  return expected;
+}
 export async function getSolanaBalances(wallet: string) {
   const balance = await solanaRpc()
     .getBalance(address(wallet), { commitment: "confirmed" })
     .send(timeout());
-  const mint = process.env.SOLANA_USDC_MINT;
+  const mint = solanaUsdcMint();
   let usdc: string | null = null;
   if (mint) {
     const tokens = await solanaRpc()

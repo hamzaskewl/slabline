@@ -297,6 +297,8 @@ export function safeImage(raw: string | null | undefined): string | null {
     const url = new URL(raw);
     const allowed = [
       "assets.gemini.com",
+      "nft.collectorcrypt.com",
+      "nft-dev.collectorcrypt.com",
       "arweave.net",
       "d1xpxki1g4htqu.cloudfront.net",
       "ipfs.io",
