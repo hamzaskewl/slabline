@@ -13,6 +13,16 @@ const id = () => uuid("id").defaultRandom().primaryKey();
 const created = () =>
   timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
 const amount = (name: string) => numeric(name, { precision: 24, scale: 6 });
+export const providerBudgets = pgTable("provider_budgets", {
+  id: text("id").primaryKey(),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  limitCredits: integer("limit_credits").notNull(),
+  reservedCredits: integer("reserved_credits").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
 export const users = pgTable("users", {
   id: id(),
   privyId: text("privy_id").notNull().unique(),

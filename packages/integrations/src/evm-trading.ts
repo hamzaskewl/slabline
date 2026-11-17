@@ -22,6 +22,7 @@ import {
 } from "@collectible/domain";
 import { listGrailTokens } from "./grail";
 import { cached } from "./catalog";
+import { quickNodeFetch } from "./quicknode-budget";
 import {
   uniswap,
   v3Abi,
@@ -38,7 +39,11 @@ export function evmClient(chainId: EvmChainId) {
     transport: http(
       process.env[chainId === 8453 ? "BASE_RPC_URL" : "ROBINHOOD_RPC_URL"] ||
         evmChains[chainId].rpc,
-      { timeout: 10000, retryCount: 1 },
+      {
+        timeout: 10000,
+        retryCount: 1,
+        fetchFn: quickNodeFetch(evmChains[chainId].rpc),
+      },
     ),
   });
 }
