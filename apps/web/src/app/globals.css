@@ -1190,6 +1190,13 @@ main {
 .balance-panel strong {
   font-size: 20px;
 }
+.balance-panel > .button {
+  display: flex;
+  margin-top: 12px;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
 .balance-panel p {
   margin: 14px 0 20px;
   line-height: 1.8;
@@ -1202,6 +1209,115 @@ main {
 .funding-panel p {
   margin-top: 12px;
   max-width: 700px;
+}
+.relay-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.relay-panel {
+  font-size: 15px;
+}
+.relay-panel p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+.relay-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 18px;
+  margin: 24px 0 16px;
+}
+.relay-form label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 8px;
+  font-weight: 600;
+}
+.relay-form input,
+.relay-form select,
+.relay-destination {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 16px;
+}
+.relay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+.relay-actions button {
+  min-height: 44px;
+}
+.relay-review {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule);
+}
+.relay-review dl {
+  margin: 18px 0;
+}
+.relay-review dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 20px;
+  padding: 10px 0;
+}
+.relay-review dt {
+  color: var(--muted);
+}
+.relay-review dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.relay-review summary,
+.relay-history summary {
+  padding: 14px 0;
+  cursor: pointer;
+}
+.relay-error {
+  color: var(--red) !important;
+}
+.relay-history {
+  margin-top: 16px;
+}
+.relay-history button {
+  display: block;
+  text-align: left;
+  padding: 12px 0;
+  background: none;
+  border: 0;
+  color: var(--ink);
+}
+@media (max-width: 600px) {
+  .relay-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .relay-review dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .relay-review dd {
+    text-align: left;
+  }
+  .relay-actions {
+    flex-direction: column;
+  }
+  .relay-actions button {
+    width: 100%;
+  }
 }
 .funding-stages {
   display: flex;

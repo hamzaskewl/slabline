@@ -70,6 +70,7 @@ const ConnectedWalletPanel = dynamic(
   () => import("./auth-controls").then((m) => m.ConnectedWalletPanel),
   { ssr: false },
 );
+const RelayFunding = dynamic(() => import("./relay-funding"), { ssr: false });
 const navigation = [
   { label: "Markets", href: "/", icon: Compass },
   { label: "Rewards", href: "/rewards", icon: Gift },
@@ -516,6 +517,7 @@ export function MarketApp({
               </div>
               <WalletView network={status.data?.solanaNetwork ?? "devnet"} />
               {status.data?.privyConfigured ? <ConnectedWalletPanel /> : null}
+              {status.data?.privyConfigured ? <RelayFunding /> : null}
             </>
           ) : section === "collection" ? (
             <div className="account-empty panel">
@@ -1355,28 +1357,9 @@ function WalletView({ network }: { network: string }) {
         <section className="panel balance-panel">
           <span>Solana wallet · {network.toUpperCase()}</span>
           <h2>SOL / USDC</h2>
-          <strong>No verified wallet</strong>
-
-          <Button disabled variant="outline">
-            Privy application setup required
-          </Button>
+          <p>Balances appear with your connected wallet below.</p>
         </section>
       </div>
-      <section className="panel funding-panel">
-        <h2>Transfers</h2>
-
-        <div className="funding-stages">
-          <span>Choose amount</span>
-          <ArrowRight size={17} />
-          <span>Review conversion</span>
-          <ArrowRight size={17} />
-          <span>Approve withdrawal</span>
-          <ArrowRight size={17} />
-          <span>Verify receipt</span>
-        </div>
-
-        <Button disabled>Transfers unavailable</Button>
-      </section>
     </>
   );
 }

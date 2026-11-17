@@ -6,6 +6,8 @@ export * from "./gemini-private";
 export * from "./solana";
 export * from "./valuations";
 export * from "./financial";
+export * from "./relay";
+export * from "./relay-store";
 
 export * from "./grail";
 export * from "./evm-trading";
