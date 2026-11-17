@@ -28,6 +28,10 @@ Every allowed RPC call reserves 1,000 credits before contacting QuickNode, inclu
 
 This controls this app's RPC usage, not other applications using the account. Keep provider-side request caps and leave headroom for dashboard tests and other consumers. Streams are independently metered per block and remain off until a bounded block allowance is reserved; these RPC settings do not cap an independently running Stream. See [QuickNode RPC costs](https://www.quicknode.com/api-credits/sol) and [Streams billing](https://www.quicknode.com/docs/streams/billing).
 
+## Relay quote previews
+
+Relay quote previews are available on `/wallet` after login and wallet verification. `RELAY_API_KEY` belongs in server secrets. The server calls `/quote/v2` and `/intents/status/v3`, saves account-owned previews in Postgres, and expires reviews after 30 seconds. Supported routes are Ethereum/Base native USDC to Solana mainnet native USDC, and test ETH between Sepolia and Base Sepolia. Solana devnet is not currently listed by Relay's testnet API. Provider-reported status is never confirmation of received funds. `ENABLE_RELAY` cannot release execution: no signing/broadcast endpoint or client transaction payload is exposed. Gas sponsorship, permits and deposit-address flows remain off. Quotes do not withdraw Gemini funds. See [Relay API keys](https://docs.relay.link/references/api/api-keys) and [testnet support](https://docs.relay.link/references/api/api_guides/testnet).
+
 ## Checkpoints
 
 Every major implementation step is a branch and pull request, checked before merge. GitHub Actions runs type checking, tests and a production build.

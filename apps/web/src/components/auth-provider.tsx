@@ -1,6 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
-import { base, baseSepolia } from "viem/chains";
+import { base, baseSepolia, mainnet, sepolia } from "viem/chains";
 import { defineChain } from "viem";
 import { evmChains } from "@collectible/domain";
 import { PrivyProvider } from "@privy-io/react-auth";
@@ -36,6 +36,8 @@ export default function AuthProvider({
         supportedChains: [
           base,
           baseSepolia,
+          mainnet,
+          sepolia,
           defineChain({
             id: 46630,
             name: "Robinhood Testnet",

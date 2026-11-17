@@ -95,33 +95,8 @@ export const collectorCryptTransactions: CollectorCryptTransactionAdapter = {
     );
   },
 };
-export interface RelayAdapter {
-  quote(input: {
-    amount: string;
-    ownedEvmWallet: string;
-    solanaWallet: string;
-  }): Promise<{
-    requestId: string;
-    expiresAt: string;
-    expectedOutput: string;
-    fees: string;
-  }>;
-  execute(approval: FinancialApproval): Promise<{ requestId: string }>;
-}
-export const blockedRelay: RelayAdapter = {
-  async quote() {
-    throw new IntegrationBlocked(
-      "Relay",
-      "No verified live chain/token route, gas quote or user-owned EVM source. Direct Gemini-to-Relay deposit addresses are not supported by this app.",
-    );
-  },
-  async execute() {
-    throw new IntegrationBlocked(
-      "Relay",
-      "A fresh permitted quote and explicit user-signed source transaction are required",
-    );
-  },
-};
+// Compatibility name for existing callers. Quotes are real; execution stays blocked.
+export { relayAdapter as blockedRelay } from "./relay";
 export const blockedPhygitals = {
   async buyPack(_input: {
     slug: string;
