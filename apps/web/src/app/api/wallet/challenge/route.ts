@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { address } from "@solana/kit";
 import { getDb, walletChallenges } from "@collectible/db";
+import { solanaNetwork } from "@collectible/integrations";
 import {
   apiRoute,
   authenticate,
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     }
     const nonce = randomBytes(24).toString("hex"),
       expiresAt = new Date(Date.now() + 300000);
-    const message = `Collectible Markets wallet verification\nOrigin: ${new URL(process.env.APP_URL ?? "http://localhost:3000").origin}\nUser: ${user.id}\nWallet: ${parsed.data.address}\nNonce: ${nonce}\nExpires: ${expiresAt.toISOString()}\nThis signature links a wallet. It does not authorize any transaction.`;
+    const message = `Collectible Markets wallet verification\nOrigin: ${new URL(process.env.APP_URL ?? "http://localhost:3000").origin}\nUser: ${user.id}\nWallet: ${parsed.data.address}\nNetwork: ${solanaNetwork()}\nNonce: ${nonce}\nExpires: ${expiresAt.toISOString()}\nThis signature links a wallet. It does not authorize any transaction.`;
     await getDb().insert(walletChallenges).values({
       nonce,
       userId: user.id,

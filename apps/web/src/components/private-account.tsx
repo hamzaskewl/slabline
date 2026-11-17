@@ -1,124 +1,236 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
+import type { GeminiConnection, GeminiSnapshot } from "@collectible/domain";
 import { Button } from "./ui/button";
 import { usd } from "@/lib/utils";
-type Snapshot = {
-  balances: {
-    currency: string;
-    available: string | null;
-    availableForWithdrawal: string | null;
-  }[];
-  positions: {
-    symbol: string;
-    quantity: string | null;
-    outcome: string | null;
-    marketValue: string | null;
-  }[];
-  settlements: {
-    symbol: string;
-    payout: string | null;
-    settledAt: string | null;
-  }[];
-  observedAt: string;
-};
-export function PrivateAccount() {
-  const { authenticated, getAccessToken } = usePrivy();
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  async function load() {
-    setBusy(true);
+import { usePrivateRead } from "@/lib/use-private-read";
+export function PrivateAccount({ compact = false }: { compact?: boolean }) {
+  const { ready, authenticated, login, getAccessToken, user } = usePrivy();
+  const connection = usePrivateRead<GeminiConnection>("/api/gemini/connection");
+  const snapshot = usePrivateRead<GeminiSnapshot>(
+    "/api/gemini/account",
+    connection.data?.canRead === true,
+  );
+  const generation = useRef(0);
+  useEffect(() => {
+    generation.current++;
+  }, [user?.id, authenticated]);
+  const [connecting, setConnecting] = useState(false),
+    [problem, setProblem] = useState<{ owner: string; text: string } | null>(
+      null,
+    );
+  async function connect() {
+    const owner = user?.id;
+    if (!owner || connecting) return;
+    setConnecting(true);
+    setProblem(null);
+    const current = generation.current;
     try {
       const token = await getAccessToken();
-      const response = await fetch("/api/gemini/account", {
+      if (current !== generation.current) return;
+      if (!token) throw new Error("Sign in to continue.");
+      const response = await fetch("/api/gemini/connect", {
+        method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Account unavailable");
-      setSnapshot(data);
-      setError("");
+      const result = await response.json();
+      if (current !== generation.current) return;
+      if (!response.ok)
+        throw new Error(result.error ?? "Gemini connection unavailable.");
+      window.location.assign(result.url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Account unavailable");
+      setProblem({
+        owner,
+        text: e instanceof Error ? e.message : "Gemini connection unavailable.",
+      });
     } finally {
-      setBusy(false);
+      setConnecting(false);
     }
   }
-  const dollars = snapshot?.balances.find((b) => b.currency === "USD");
+  const data =
+    authenticated && connection.data?.canRead ? snapshot.data : undefined;
+  const dollars = data?.balances.find(
+    (b) => b.currency.toUpperCase() === "USD",
+  );
   return (
-    <section className="panel funding-panel">
-      <h2>Your linked Gemini account</h2>
-
-      <div className="wallet-actions">
-        <Button disabled={!authenticated || busy} onClick={() => void load()}>
-          {busy ? "Refreshing…" : "Load Gemini balances & positions"}
-        </Button>
+    <section className="panel funding-panel account-panel">
+      <div className="section-heading">
+        <h2>Gemini account</h2>
+        {connection.data?.environment === "sandbox" ? (
+          <span className="mode-badge">SANDBOX</span>
+        ) : null}
       </div>
-      {error ? <p role="alert">{error}</p> : null}
-      {snapshot ? (
+      {!ready ? (
+        <p role="status">Loading account…</p>
+      ) : !authenticated ? (
+        <Button onClick={login}>Log in to connect Gemini</Button>
+      ) : (
         <>
-          <div className="quote-lines">
-            <div>
-              <span>Available Gemini USD</span>
-              <strong>
-                {dollars?.available ? usd(dollars.available) : "Not provided"}
-              </strong>
-            </div>
-            <div>
-              <span>Available for withdrawal</span>
-              <strong>
-                {dollars?.availableForWithdrawal
-                  ? usd(dollars.availableForWithdrawal)
-                  : "Not provided"}
-              </strong>
-            </div>
+          {connection.isPending ? (
+            <p role="status">Checking connection…</p>
+          ) : null}
+          {connection.data?.blocker ? <p>{connection.data.blocker}</p> : null}
+          {connection.error ? (
+            <p role="alert">{connection.error.message}</p>
+          ) : null}
+          {connection.data?.canConnect && !connection.data.canRead ? (
+            <Button disabled={connecting} onClick={() => void connect()}>
+              {connecting
+                ? "Connecting…"
+                : connection.data.linked
+                  ? "Reconnect Gemini"
+                  : "Connect Gemini"}
+            </Button>
+          ) : null}
+          <div className="wallet-actions">
+            <Button
+              variant="outline"
+              disabled={connection.isFetching || snapshot.isFetching}
+              onClick={() => {
+                void connection.refetch();
+                if (connection.data?.canRead) void snapshot.refetch();
+              }}
+            >
+              {connection.isFetching || snapshot.isFetching
+                ? "Refreshing…"
+                : "Refresh account"}
+            </Button>
           </div>
-          <h3>Positions</h3>
-          {snapshot.positions.length ? (
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Contract</th>
-                    <th>Outcome</th>
-                    <th>Quantity</th>
-                    <th>Market value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {snapshot.positions.map((p, i) => (
-                    <tr key={i}>
-                      <td>{p.symbol}</td>
-                      <td>{p.outcome ?? "Unknown"}</td>
-                      <td>{p.quantity ?? "Unknown"}</td>
-                      <td>
-                        {p.marketValue
-                          ? usd(p.marketValue)
-                          : "No executable liquidity"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p>No open positions returned.</p>
-          )}
-          <h3>Settlements</h3>
-          {snapshot.settlements.length ? (
-            <ul>
-              {snapshot.settlements.map((s, i) => (
-                <li key={i}>
-                  {s.symbol} · {s.payout ? usd(s.payout) : "Payout unknown"} ·{" "}
-                  {s.settledAt ?? "Date not supplied"}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No settlements returned.</p>
-          )}
+          {problem?.owner === user?.id ? (
+            <p role="alert">{problem?.text}</p>
+          ) : null}
+          {snapshot.error ? (
+            <p role="alert">
+              {snapshot.error.message} Balance and position data are
+              unavailable.
+            </p>
+          ) : null}
+          {data ? (
+            <>
+              <div className="quote-lines">
+                <div>
+                  <span>Available USD</span>
+                  <strong>
+                    {dollars?.available != null
+                      ? usd(dollars.available)
+                      : "Not provided"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Available for withdrawal</span>
+                  <strong>
+                    {dollars?.availableForWithdrawal != null
+                      ? usd(dollars.availableForWithdrawal)
+                      : "Not provided"}
+                  </strong>
+                </div>
+              </div>
+              <p className="account-observed">
+                Updated {new Date(data.observedAt).toLocaleString()}
+                {snapshot.isError ? " · Saved view; refresh failed" : ""}
+              </p>
+              {!compact ? (
+                <>
+                  <h3>Positions</h3>
+                  {data.positions.length ? (
+                    <div className="table-scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Contract</th>
+                            <th>Outcome</th>
+                            <th>Quantity</th>
+                            <th>Market value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.positions.map((p, i) => (
+                            <tr key={`${p.symbol}-${i}`}>
+                              <td>{p.symbol}</td>
+                              <td>{p.outcome ?? "Unknown"}</td>
+                              <td>{p.quantity ?? "Not supplied"}</td>
+                              <td>
+                                {p.marketValue != null
+                                  ? usd(p.marketValue)
+                                  : "Not supplied"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p>No open positions returned.</p>
+                  )}
+                  <h3>Open orders</h3>
+                  {data.activeOrders.length ? (
+                    <div className="table-scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Contract</th>
+                            <th>Side / outcome</th>
+                            <th>Limit price</th>
+                            <th>Remaining shares</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.activeOrders.map((o, i) => (
+                            <tr key={o.id ?? i}>
+                              <td>{o.symbol}</td>
+                              <td>
+                                {o.side ?? "Unknown"} / {o.outcome ?? "Unknown"}
+                              </td>
+                              <td>
+                                {o.price != null
+                                  ? usd(o.price)
+                                  : "Not supplied"}
+                              </td>
+                              <td>{o.remainingQuantity ?? "Not supplied"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p>No open orders returned.</p>
+                  )}
+                  <h3>Settlements</h3>
+                  {data.settlements.length ? (
+                    <div className="table-scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Contract</th>
+                            <th>Payout</th>
+                            <th>Settled</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.settlements.map((s, i) => (
+                            <tr key={`${s.symbol}-${i}`}>
+                              <td>{s.symbol}</td>
+                              <td>
+                                {s.payout != null
+                                  ? usd(s.payout)
+                                  : "Not supplied"}
+                              </td>
+                              <td>{s.settledAt ?? "Not supplied"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p>No settlements returned.</p>
+                  )}
+                </>
+              ) : null}
+            </>
+          ) : null}
         </>
-      ) : null}
+      )}
     </section>
   );
 }

@@ -66,6 +66,10 @@ const PrivateAccount = dynamic(
   () => import("./private-account").then((m) => m.PrivateAccount),
   { ssr: false },
 );
+const WalletCollection = dynamic(
+  () => import("./wallet-collection").then((m) => m.WalletCollection),
+  { ssr: false },
+);
 const ConnectedWalletPanel = dynamic(
   () => import("./auth-controls").then((m) => m.ConnectedWalletPanel),
   { ssr: false },
@@ -452,12 +456,6 @@ export function MarketApp({
           ) : section === "portfolio" ? (
             <>
               {status.data?.privyConfigured ? <PrivateAccount /> : null}
-              <div className="account-empty panel">
-                <BarChart3 size={35} />
-                <h2>Connect Gemini</h2>
-                <p>Gemini account connection is awaiting approval.</p>
-                <Button disabled>Gemini OAuth approval required</Button>
-              </div>
               <div className="section-heading">
                 <div>
                   <h2>Practice positions</h2>
@@ -515,19 +513,21 @@ export function MarketApp({
                   </p>
                 </details>
               </div>
-              <WalletView network={status.data?.solanaNetwork ?? "devnet"} />
+              {status.data?.privyConfigured ? <PrivateAccount compact /> : null}
               {status.data?.privyConfigured ? <ConnectedWalletPanel /> : null}
               {status.data?.privyConfigured ? <RelayFunding /> : null}
             </>
           ) : section === "collection" ? (
-            <div className="account-empty panel">
-              <Layers3 size={36} />
-              <h2>No collectibles yet</h2>
-
-              <Link href="/rewards" className="text-link">
-                Browse the catalog <ArrowRight size={16} />
-              </Link>
-            </div>
+            status.isPending ? (
+              <p role="status">Loading wallet connection…</p>
+            ) : status.data?.privyConfigured ? (
+              <WalletCollection />
+            ) : (
+              <Empty
+                title="Wallet connection unavailable"
+                detail="Account configuration is required to read your collection."
+              />
+            )
           ) : (
             <div className="redeem-flow panel">
               <h2>Physical redemption</h2>
@@ -1338,28 +1338,6 @@ function RewardCatalog({
           Show more
         </Button>
       )}
-    </>
-  );
-}
-function WalletView({ network }: { network: string }) {
-  return (
-    <>
-      <div className="balance-grid">
-        <section className="panel balance-panel">
-          <span>Gemini account</span>
-          <h2>USD</h2>
-          <strong>Not connected</strong>
-
-          <Button disabled variant="outline">
-            OAuth app approval required
-          </Button>
-        </section>
-        <section className="panel balance-panel">
-          <span>Solana wallet · {network.toUpperCase()}</span>
-          <h2>SOL / USDC</h2>
-          <p>Balances appear with your connected wallet below.</p>
-        </section>
-      </div>
     </>
   );
 }
