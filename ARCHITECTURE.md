@@ -29,7 +29,7 @@ Locked technical choices
 - Official Gemini TS SDK @gemini-markets/sdk (server entrypoint) for supported REST/WebSocket operations; use raw documented APIs only when SDK lacks a feature.
 - Railway deployment: web (Next.js), worker (Bun long-lived data + job process), postgres. Prefer no Docker. Deploy web/worker from same Bun workspace repository with separate start commands.
 - TradingView Lightweight Charts for quote/history visualization; SSE from our real-time gateway to browser for price updates (orders go over authenticated app API). Optional Postgres LISTEN/NOTIFY or Redis later; not required for single-instance MVP.
-- QuickNode Streams plus Solana RPC for filtered transaction ingestion, confirmation and owner reconciliation.
+- QuickNode RPC and DAS for confirmation and owner reconciliation, with the shared persistent credit cutoff. Streams are deferred at the user's request; do not create or activate one.
 - Relay SDK/API only as conditional EVM-to-Solana bridge fallback, with quote-based fee/route checks, not as a promised free or automatic withdrawal method.
   Repo layout
   collectible-markets/
@@ -73,8 +73,8 @@ Locked technical choices
 - Backend-only API (trial/paid), exact-match by grader + grade + cert where supported; otherwise year, publisher, set, card no, parallel, player, grader, grade.
 - Store provider card ID, raw attribution, FMV, confidence, methodology, timestamp and up to five verified comparable completed sales with URLs and dates. Price display must be feature-gated on data redistribution rights. Low-confidence or no exact match -> label appropriately, no fake estimate.
 - Use valuation job queue, persistent cache (12–24h initially), per-provider rate limits, and popular-card prioritization; do not refetch FMV per page view. Listing ask is not FMV. Markups above threshold can be flagged or excluded.
-  QuickNode (Solana bounty + ownership)
-- Configure at least one real QuickNode Stream with filter and webhook destination for relevant marketplace program/card transfers, historical backfill where available. Verify signed/origin-authenticated webhook, dedupe transaction signatures, check finalized/confirmed state and independently reconcile asset owner. Document stream config in README.
+  QuickNode (ownership)
+- Use guarded RPC and DAS reads for transaction confirmation and independent owner reconciliation. Streams are deferred; keep the existing webhook inactive. Do not claim the Streams-specific bounty. The app credit cutoff must apply to all QuickNode RPC/DAS calls and survive restarts.
   Funds: the explicit, user-authorized redemption orchestrator
   Not a pooled treasury, not an internal promise of money, not an unattended transfer. Gemini funds and Solana wallet funds remain distinct. A user selects a specific amount to redeem, reviews a detailed quote, and explicitly confirms.
 
@@ -112,7 +112,7 @@ Security and legal release gates
 - A verified listing shows actual provider slab image and correctly matched FMV/comps; misleading grade and stale listing rejected.
 - Cart rejects over-budget and duplicate asset; partial purchases and failed broadcast are recoverable.
 - Funding path checks actual permissions; inactive until allowed. Repeated submit cannot double convert/withdraw. Wrong chain/address causes hard stop. Relay quote failures fall back to manual path, never fabricated success.
-- QuickNode filtered stream -> webhook -> ownership reconciliation demonstrably works in supported environment.
+- QuickNode RPC confirmation and DAS ownership reconciliation work within the configured credit cutoff. Stream ingestion is outside the current scope.
 - Railway web + worker + Postgres deployment instructions, .env.example, tests, lint/typecheck, README, demo video checklist and hackathon bounty evidence.
   Official documentation / first source checks
 - Gemini: https://developer.gemini.com/prediction-markets-spec ; https://developer.gemini.com/authentication/oauth ; https://developer.gemini.com/tools ; https://developer.gemini.com/rest/fund-management ; https://developer.gemini.com/trading/rest-api/market-data/get-network
