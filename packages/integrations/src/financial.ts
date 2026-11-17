@@ -1,10 +1,12 @@
 import {
   IntegrationBlocked,
-  assertFreshListing,
   type Listing,
   type FundingState,
 } from "@collectible/domain";
-import { z } from "zod";
+import {
+  buildCollectorCryptDevnetDraft,
+  type CollectorCryptDraft,
+} from "./collector-crypt";
 export type FinancialApproval = {
   userId: string;
   wallet: string;
@@ -78,53 +80,14 @@ export interface CollectorCryptTransactionAdapter {
   buildBuyTransaction(
     card: Listing,
     buyer: string,
-  ): Promise<{
-    unsignedBase64: string;
-    inspection: "required";
-    network: "devnet";
-  }>;
+  ): Promise<CollectorCryptDraft>;
   broadcastSignedTransaction(
     signedBase64: string,
     approval: FinancialApproval,
   ): Promise<{ signature: string }>;
 }
 export const collectorCryptTransactions: CollectorCryptTransactionAdapter = {
-  async buildBuyTransaction(card, buyer) {
-    assertFreshListing(card);
-    if (card.network !== "devnet")
-      throw new IntegrationBlocked(
-        "Collector Crypt",
-        "Mainnet purchase builders are disabled until signed devnet tests and instruction inspection pass",
-      );
-    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(buyer))
-      throw new Error("Invalid buyer");
-    const response = await fetch(
-      "https://dev-api.collectorcrypt.com/marketplace/buy",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          wallet: buyer,
-          nftAddress: card.mint,
-          price: Number(card.ask),
-          isV2Listing: true,
-        }),
-        signal: AbortSignal.timeout(15000),
-      },
-    );
-    if (!response.ok)
-      throw new Error(`Collector Crypt builder HTTP ${response.status}`);
-    let body: unknown = await response.text();
-    if (typeof body === "string" && body.startsWith('"'))
-      body = JSON.parse(body);
-    const unsignedBase64 = z
-      .string()
-      .min(64)
-      .max(4096)
-      .regex(/^[A-Za-z0-9+/=]+$/)
-      .parse(body);
-    return { unsignedBase64, inspection: "required", network: "devnet" };
-  },
+  buildBuyTransaction: buildCollectorCryptDevnetDraft,
   async broadcastSignedTransaction() {
     throw new IntegrationBlocked(
       "Collector Crypt",
