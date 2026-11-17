@@ -1,5 +1,6 @@
 import { ChainInspector } from "@/components/chain-inspector";
 import Link from "next/link";
+import { CollectorCryptTest } from "@/components/collector-crypt-test";
 
 export default function About() {
   return (
@@ -54,6 +55,10 @@ export default function About() {
       <details>
         <summary>Transaction tools</summary>
         <ChainInspector network={process.env.SOLANA_NETWORK ?? "devnet"} />
+        {process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
+        process.env.SOLANA_NETWORK !== "mainnet" ? (
+          <CollectorCryptTest />
+        ) : null}
       </details>
       <nav>
         <Link href="/rewards">Rewards</Link> ·{" "}

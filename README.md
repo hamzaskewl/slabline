@@ -32,6 +32,10 @@ This controls this app's RPC usage, not other applications using the account. Ke
 
 Relay quote previews are available on `/wallet` after login and wallet verification. `RELAY_API_KEY` belongs in server secrets. The server calls `/quote/v2` and `/intents/status/v3`, saves account-owned previews in Postgres, and expires reviews after 30 seconds. Supported routes are Ethereum/Base native USDC to Solana mainnet native USDC, and test ETH between Sepolia and Base Sepolia. Solana devnet is not currently listed by Relay's testnet API. Provider-reported status is never confirmation of received funds. `ENABLE_RELAY` cannot release execution: no signing/broadcast endpoint or client transaction payload is exposed. Gas sponsorship, permits and deposit-address flows remain off. Quotes do not withdraw Gemini funds. See [Relay API keys](https://docs.relay.link/references/api/api-keys) and [testnet support](https://docs.relay.link/references/api/api_guides/testnet).
 
+## Collector Crypt devnet tests
+
+Collector Crypt devnet tools are under About → Transaction tools. Listings use the devnet API; unsigned buyer-paid Core purchases use the program-owned Anchor IDL and are independently inspected and simulated. Core ownership confirmation reads the asset account on the checked devnet RPC. Signing/broadcast requires both `ENABLE_CC_DEVNET_TESTS=true` and an exact `CC_DEVNET_TEST_WALLET` allowlist match; leave these off until a funded wallet test is approved. Gas sponsorship and mainnet purchases remain off. The test-USDC mint is `Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr`, not Circle's devnet USDC. Simulation success does not mean a card was bought. Submissions retain the exact signed transaction and signature for reconciliation and at most one explicit retry of those same bytes; a new purchase is blocked while an earlier submission is unresolved.
+
 ## Checkpoints
 
 Every major implementation step is a branch and pull request, checked before merge. GitHub Actions runs type checking, tests and a production build.

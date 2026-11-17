@@ -132,9 +132,11 @@ const rawCard = z.object({
 export async function listCards(
   search = "",
   categories: string[] = sportCategories,
+  networkOverride?: "mainnet" | "devnet",
 ): Promise<Listing[]> {
   const network =
-    process.env.COLLECTOR_CRYPT_NETWORK === "devnet" ? "devnet" : "mainnet";
+    networkOverride ??
+    (process.env.COLLECTOR_CRYPT_NETWORK === "devnet" ? "devnet" : "mainnet");
   return cached(
     `cards:v4:${network}:${categories.join(",")}:${search}`,
     60000,
@@ -147,7 +149,7 @@ export async function listCards(
         step: "100",
         marketplaceSource: "CC",
         orderBy: "listedPriceDesc",
-        categories: categories.join(","),
+        ...(categories.length ? { categories: categories.join(",") } : {}),
         ...(search ? { search } : {}),
       });
       const rows: z.infer<typeof rawCard>[] = [];
