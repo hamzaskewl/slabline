@@ -13,17 +13,6 @@
   object-fit: contain;
   border-radius: 0;
 }
-.market-artwork-fallback {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: #1d2831;
-  color: #c5d0d9;
-  font-size: 11px;
-  font-weight: 600;
-}
 .prediction-card-heading {
   min-height: 36px;
   align-items: center;

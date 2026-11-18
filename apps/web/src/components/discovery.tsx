@@ -1,14 +1,6 @@
 "use client";
 import Link from "next/link";
-import {
-  Bookmark,
-  ChevronDown,
-  Radio,
-  RefreshCw,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { Bookmark, ChevronDown, Radio, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   buyPercent,
@@ -23,6 +15,7 @@ import {
 import { SnapshotStatus } from "./snapshot-status";
 import { MarketArt } from "./market-art";
 import { FeaturedMarkets } from "./featured-markets";
+import { DiscoveryControls } from "./discovery-controls";
 
 export function Discovery({
   markets,
@@ -34,6 +27,7 @@ export function Discovery({
   error,
   retry,
   search,
+  query,
   setSearch,
   onPractice,
   snapshot,
@@ -47,12 +41,12 @@ export function Discovery({
   error?: string | null;
   retry: () => void;
   search: string;
+  query: string;
   setSearch: (value: string) => void;
   onPractice: () => void;
   snapshot?: ProviderResult<Market[]>;
 }) {
   const [limit, setLimit] = useState(24);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [sort, setSort] = useState<MarketSort>("volume");
   const [league, setLeague] = useState("");
   const [includeProps, setIncludeProps] = useState(false);
@@ -78,6 +72,10 @@ export function Discovery({
   );
   useEffect(() => {
     setLeague("");
+    if (category === "All markets") {
+      setFavoritesOnly(false);
+      setIncludeProps(false);
+    }
   }, [category]);
   useEffect(() => {
     setLeague("");
@@ -101,8 +99,8 @@ export function Discovery({
           (m) =>
             (category === "All markets" || m.category === category) &&
             (!league || m.subcategory === league) &&
-            marketMatches(m, search) &&
-            (includeProps || !!search.trim() || !isPlayerProp(m)) &&
+            marketMatches(m, query) &&
+            (includeProps || !!query || !isPlayerProp(m)) &&
             (!favoritesOnly || favorites.includes(m.id)),
         ),
         sort,
@@ -111,7 +109,7 @@ export function Discovery({
       markets,
       category,
       league,
-      search,
+      query,
       includeProps,
       favoritesOnly,
       favorites,
@@ -187,89 +185,29 @@ export function Discovery({
               </button>
             )}
           </label>
-          <div className="discovery-actions">
-            <select
-              aria-label="Sort markets"
-              value={sort}
-              onChange={(e) => setSort(e.target.value as MarketSort)}
-            >
-              <option value="volume">Highest volume</option>
-              <option value="closing">Closing soon</option>
-              <option value="name">Alphabetical</option>
-            </select>
-            <button
-              className="filter-toggle"
-              aria-expanded={filtersOpen}
-              aria-controls="market-filters"
-              onClick={() => setFiltersOpen((v) => !v)}
-            >
-              <SlidersHorizontal size={16} />
-              Filters
-              {league || favoritesOnly || includeProps ? (
-                <span className="filter-count">
-                  {Number(!!league) +
-                    Number(favoritesOnly) +
-                    Number(includeProps)}
-                </span>
-              ) : null}
-            </button>
-            <button
-              className="icon-button"
-              aria-label="Refresh markets"
-              disabled={searching}
-              onClick={retry}
-            >
-              <RefreshCw size={16} />
-            </button>
-          </div>
+          <DiscoveryControls
+            sort={sort}
+            setSort={setSort}
+            category={category}
+            setCategory={changeCategory}
+            categories={categories}
+            league={league}
+            setLeague={setLeague}
+            leagues={leagues}
+            includeProps={includeProps}
+            setIncludeProps={setIncludeProps}
+            favoritesOnly={favoritesOnly}
+            setFavoritesOnly={setFavoritesOnly}
+            searching={searching}
+            search={search}
+            retry={retry}
+            reset={() => {
+              setLeague("");
+              setIncludeProps(false);
+              setFavoritesOnly(false);
+            }}
+          />
         </div>
-        {filtersOpen && (
-          <div className="market-filters" id="market-filters">
-            <label>
-              Category
-              <select
-                value={category}
-                onChange={(e) => changeCategory(e.target.value)}
-              >
-                {categories.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              League or topic
-              <select
-                value={league}
-                onChange={(e) => setLeague(e.target.value)}
-              >
-                <option value="">All leagues and topics</option>
-                {leagues.map((l) => (
-                  <option key={l}>{l}</option>
-                ))}
-              </select>
-            </label>
-            <label className="check-filter">
-              <input
-                type="checkbox"
-                checked={includeProps || !!search.trim()}
-                disabled={!!search.trim()}
-                onChange={(e) => setIncludeProps(e.target.checked)}
-              />
-              Include player props
-            </label>
-            <label className="check-filter">
-              <input
-                type="checkbox"
-                checked={favoritesOnly}
-                onChange={(e) => setFavoritesOnly(e.target.checked)}
-              />
-              Favorites only
-            </label>
-            <button className="text-link" onClick={clear}>
-              Reset filters
-            </button>
-          </div>
-        )}
         <div className="discovery-summary" role="status" aria-live="polite">
           {searching ? (
             <span>Searching Gemini…</span>
@@ -279,7 +217,7 @@ export function Discovery({
             <span>
               {visible.length.toLocaleString()}{" "}
               {visible.length === 1 ? "market" : "markets"}
-              {search.trim() ? ` matching “${search.trim()}”` : ""}
+              {query ? ` matching “${query}”` : ""}
             </span>
           )}
           {(search.trim() ||

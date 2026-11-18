@@ -7,6 +7,7 @@ import {
   readPriceHistory,
   CandleRequestError,
   normalizeEvent,
+  safeImage,
 } from "./gemini";
 import {
   marketPreview,
@@ -14,6 +15,46 @@ import {
   eventVolume,
   buyPercent,
 } from "@collectible/domain";
+
+test("Gemini championship outcomes retain the provider's Contentful team artwork", () => {
+  const buffalo =
+    "https://images.ctfassets.net/jg6lo9a2ukvr/zbZpcrxpSCQKQmcRYUDA6/728742e6d361d7bdc46863d79545d911/Buffalo_BillsDark.png";
+  const jacksonville =
+    "https://images.ctfassets.net/jg6lo9a2ukvr/2bUDmtRSikBpCAMSTMxE9I/1e1f0eb88005a02e25bd903de99bcc86/Jacksonville_JaguarsDark.png";
+  const market = normalizeEvent({
+    id: "champion",
+    title: "2027 Pro Football Champion",
+    category: "Sports",
+    contracts: [
+      {
+        instrumentSymbol: "GEMI-PROFB2027-BUFFALO",
+        label: "Buffalo",
+        imageUrl: buffalo,
+      },
+      {
+        instrumentSymbol: "GEMI-PROFB2027-JACKSONVILLE",
+        label: "Jacksonville",
+        imageUrl: jacksonville,
+      },
+    ],
+  });
+  expect(marketPreview(market).contracts.map((c) => c.imageUrl)).toEqual([
+    buffalo,
+    jacksonville,
+  ]);
+  expect(safeImage(buffalo.replace("https:", "http:"))).toBeNull();
+  expect(
+    safeImage(
+      buffalo.replace(
+        "images.ctfassets.net",
+        "images.ctfassets.net.attacker.test",
+      ),
+    ),
+  ).toBeNull();
+  expect(
+    safeImage(buffalo.replace("jg6lo9a2ukvr", "unrelated-space")),
+  ).toBeNull();
+});
 
 test("league feeds recover active MVP futures omitted by the broad Sports catalog", async () => {
   const calls: string[] = [];
