@@ -6,6 +6,8 @@ export * from "./relay";
 export * from "./collector-crypt";
 export * from "./orderbook";
 export * from "./reward-preview";
+export * from "./discovery";
+import { marketSearchText, marketTeams } from "./discovery";
 import { relatedCards } from "./rewards";
 
 export const decimal = z.string().regex(/^\d+(\.\d{1,6})?$/);
@@ -47,6 +49,8 @@ export type Market = {
   volume?: string | null;
   startsAt?: string | null;
   subcategory?: string | null;
+  sportsMarket?: { type: string; subject?: string; sport?: string } | null;
+  teams?: Contract[];
   status: string;
   imageUrl: string | null;
   contracts: Contract[];
@@ -116,19 +120,15 @@ export function eventVolume(value?: string | null) {
     : "Volume unavailable";
 }
 export function marketPreview(market: Market): Market {
-  const flatten = (m: Market): Market[] => [m, ...m.children.flatMap(flatten)];
-  const events = flatten(market),
-    contracts = marketOutcomes(market);
+  const contracts = marketOutcomes(market);
   return {
     ...market,
     description: "",
     contracts: contracts.slice(0, 2),
+    teams: marketTeams(market),
     children: [],
     outcomeCount: contracts.length,
-    searchText: events
-      .flatMap((m) => [m.title, ...m.contracts.map((c) => c.label)])
-      .join(" ")
-      .toLowerCase(),
+    searchText: marketSearchText(market),
   };
 }
 export type Listing = {

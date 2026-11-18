@@ -1,0 +1,48 @@
+import { cached, listMarkets } from "@collectible/integrations";
+import {
+  discoveryMarkets,
+  marketMatches,
+  marketPreview,
+  normalizeMarketSearch,
+  type Market,
+  type ProviderResult,
+} from "@collectible/domain";
+
+export async function searchCatalog(
+  search: string,
+  category: string,
+  snapshot: ProviderResult<Market[]>,
+) {
+  const local = snapshot.data.filter((m) => marketMatches(m, search));
+  try {
+    const remote = await cached(
+      `gemini:search:v1:${search}`,
+      30000,
+      async () => ({
+        data: await listMarkets(normalizeMarketSearch(search)),
+        observedAt: new Date().toISOString(),
+      }),
+    );
+    return {
+      source: "cache" as const,
+      observedAt: remote.observedAt,
+      refreshing: false,
+      stale: false,
+      error: null,
+      data: discoveryMarkets([...local, ...remote.data])
+        .map(marketPreview)
+        .filter((m) => !category || m.category === category),
+    };
+  } catch {
+    return {
+      ...snapshot,
+      refreshing: false,
+      stale: true,
+      error:
+        "Gemini search is unavailable. Showing matches from the saved catalog; retry to search all markets.",
+      data: discoveryMarkets(local)
+        .map(marketPreview)
+        .filter((m) => !category || m.category === category),
+    };
+  }
+}
