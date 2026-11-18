@@ -82,11 +82,6 @@ export function RelayQuoteReview({
           <dd>{quote.timeEstimateSeconds}s</dd>
         </div>
       </dl>
-      <p>
-        {expired
-          ? "Refresh to see current fees and output."
-          : "Refresh within 30 seconds. Output includes route fees; origin gas is additional. Gas balance has not been checked."}
-      </p>
       <details>
         <summary>Fee breakdown and status</summary>
         <dl>

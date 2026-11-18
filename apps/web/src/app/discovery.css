@@ -657,3 +657,31 @@
     font-size: 12px;
   }
 }
+
+/* Preserve the shared provider artwork sizing after merging the artwork release. */
+.market-art > .market-artwork {
+  width: 100%;
+  height: 100%;
+}
+.market-art.team-pair > .market-artwork {
+  width: calc(50% - 1px);
+}
+.market-art .market-artwork img,
+.outcome-name .market-art .market-artwork img {
+  width: 100%;
+  height: 100%;
+}
+.app-shell .outcome-label .market-art {
+  width: 44px;
+  height: 40px;
+}
+.app-shell .outcome-label .market-art.team-pair {
+  width: 64px;
+}
+.ticket-outcome > .market-art {
+  width: 40px;
+  height: 36px;
+}
+.ticket-outcome > .market-art.team-pair {
+  width: 60px;
+}

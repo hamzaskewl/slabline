@@ -1,29 +1,13 @@
 "use client";
-import { useState } from "react";
-import { Layers3 } from "lucide-react";
 import {
   marketTeams,
   outcomeImages,
   type Contract,
   type Market,
 } from "@collectible/domain";
+import { MarketArtwork } from "./market-artwork";
 
-function ProviderImage({ src, label }: { src: string; label: string }) {
-  const [failed, setFailed] = useState(false);
-  return failed ? (
-    <span className="image-initial" title={label}>
-      {label.slice(0, 2)}
-    </span>
-  ) : (
-    <img
-      src={src}
-      alt={label}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-    />
-  );
-}
+/** Reuse the provider artwork component, including its contained images and fallback. */
 export function MarketArt({
   market,
   outcome,
@@ -45,9 +29,9 @@ export function MarketArt({
   return (
     <span className={`market-art ${images.length > 1 ? "team-pair" : ""}`}>
       {images.length ? (
-        images.map((i) => <ProviderImage key={i.src} {...i} />)
+        images.map((i) => <MarketArtwork key={i.src} {...i} />)
       ) : (
-        <Layers3 size={22} aria-hidden="true" />
+        <MarketArtwork src={null} label={market.title} />
       )}
     </span>
   );

@@ -44,8 +44,6 @@ export function GrailTrading(props: TradeProps) {
             <dd>{chain.name}</dd>
             <dt>Payment token</dt>
             <dd>{props.market?.paymentSymbol ?? "Unavailable"}</dd>
-            <dt>Gas sponsorship</dt>
-            <dd>Off</dd>
             <dt>Contract</dt>
             <dd>
               <a
@@ -57,43 +55,8 @@ export function GrailTrading(props: TradeProps) {
               </a>
             </dd>
           </dl>
-          <details className="token-history">
-            <summary>Use Gemini winnings</summary>
-            <ol>
-              <li>Link Gemini and select an available settled USD amount.</li>
-              <li>
-                Review USD to USDC conversion and fees in your Gemini account.
-              </li>
-              <li>
-                Withdraw to your own wallet using an account-supported network.
-              </li>
-              <li>
-                Review a bridge quote to {chain.name} if needed, including gas
-                and minimum received.
-              </li>
-              {props.market?.paymentSymbol !== "USDC" && (
-                <li>
-                  Convert to{" "}
-                  {props.market?.paymentSymbol ?? "the pool’s payment token"}{" "}
-                  using an eligible, verified route.
-                </li>
-              )}
-              <li>
-                Review this token purchase and sign each required approval.
-              </li>
-            </ol>
-            <p>
-              Gemini withdrawals and bridge quotes are not connected yet. No
-              funds will move here. Reward purchases require a verified,
-              unredeemed winning prediction.
-            </p>
-          </details>
-          <p>
-            Fractional collectible token. Physical redemption depends on Grail’s
-            requirements and inventory.
-          </p>
           <a href={token.url} target="_blank" rel="noreferrer">
-            Collectible and redemption details ↗
+            Redemption on Grail ↗
           </a>
         </section>
       </div>

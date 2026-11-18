@@ -12,6 +12,7 @@ Ship a standalone web app manifest, home-screen icons and an offline launch mess
 Current product scope (2026-11-13)
 
 - Apply every UI change to mobile and desktop. Remove promotional slogans and repeated integration explanations from app flows; keep required attribution and technical status on About. Keep simulation and unavailable actions unambiguous.
+- Use the provider's matching outcome artwork, including basketball sneakers and football helmets, on market cards and outcome rows. Keep full artwork visible rather than cropping it into an avatar. Hide routine snapshot, wallet-read and balance-refresh timestamps and repeated provider/status captions throughout the app; retain actionable errors, units, quote expiry, transaction status and clear practice/test labels.
 - Discover active markets only when available card inventory or Grail tokens relate to the event's subject or sport. No unrelated inventory fallback. Sports rewards are the default; non-sports rewards, including Pokemon, require a related active market.
 - Rewards default to highest listing ask, with search, price bounds, sport/category, grader, grade, autograph/rookie and sort filters. Follow Collector Crypt cursor pagination; no arbitrary $1,000 ceiling.
 - Hide Phygitals packs and absent FMV/comps from this UI scope. Their adapters remain available for later work.

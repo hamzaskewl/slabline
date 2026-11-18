@@ -3,6 +3,7 @@ import type { Listing, Pack, ProviderResult } from "@collectible/domain";
 import { sportCategories } from "@collectible/domain";
 import { safeImage } from "./gemini";
 import { getDb, providerCache, eq } from "@collectible/db";
+import { publicProviderError } from "./provider-error";
 
 const cache = new Map<string, { value: unknown; expires: number }>();
 const inFlight = new Map<string, Promise<unknown>>();
@@ -73,10 +74,7 @@ export async function providerRead<T>(
       error: null,
     };
   } catch (error) {
-    console.warn(
-      "Public provider read failed",
-      error instanceof Error ? error.name : "UnknownError",
-    );
+    console.warn("Public provider read failed", publicProviderError(error));
     return {
       data: empty,
       source: "unavailable",

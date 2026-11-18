@@ -18,8 +18,7 @@ const date = (value: string | number) =>
 
 function TokenHistory({ data }: { data: GrailRewardDetails }) {
   const points = data.history;
-  if (points.length < 2)
-    return <p className="reward-data-note">Price history unavailable</p>;
+  if (points.length < 2) return null;
   const first = points[0]!,
     last = points.at(-1)!;
   const prices = points.map((p) => p.price),
@@ -96,7 +95,7 @@ export function GrailReward({
         <div className="reward-result-heading">
           <h2>If {side.toUpperCase()} wins</h2>
           <strong>
-            {payout ? usd(payout) : "—"} <small>USD*</small>
+            {payout ? usd(payout) : "—"} <small>USD</small>
           </strong>
         </div>
       )}
@@ -117,7 +116,7 @@ export function GrailReward({
             {side ? (
               <>
                 <strong>{amount ? `≈ ${number(amount)}` : "—"}</strong>
-                <span>{token.symbol} at spot price*</span>
+                <span>{token.symbol} at spot price</span>
               </>
             ) : (
               <>
@@ -137,10 +136,6 @@ export function GrailReward({
                 : "Price unavailable"}
             </p>
           )}
-          <p className="reward-data-note">
-            Last trade{" "}
-            {data.lastTradeAt ? date(data.lastTradeAt) : "unavailable"}
-          </p>
           <details className="grail-vault-details" open={!side}>
             <summary>
               Chart & vault · {data.reserves.length}{" "}
@@ -173,18 +168,13 @@ export function GrailReward({
                 Grail has not published a reserve for this token.
               </p>
             )}
-            <p className="reward-data-note">
-              Vault checked {date(data.observedAt)}.
-            </p>
           </details>
           <details className="reward-assumptions">
-            <summary>* Estimate details</summary>
+            <summary>Fees & redemption</summary>
             <p>
-              Indicative token amount at Grail’s spot price, before fees, gas
-              and price impact. This is not a swap quote or a guaranteed card.
-              Physical redemption requires the full token threshold and
-              available inventory through Grail. A losing prediction pays $0.
-              Purchases and gas sponsorship remain off.
+              Estimates exclude fees, gas and price impact. Redeeming a
+              collectible requires its full token threshold and available
+              inventory on Grail.
             </p>
             <a href={token.url} target="_blank" rel="noreferrer">
               Grail source & redemption requirements
