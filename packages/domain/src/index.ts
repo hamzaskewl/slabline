@@ -7,6 +7,7 @@ export * from "./collector-crypt";
 export * from "./orderbook";
 export * from "./reward-preview";
 export * from "./discovery";
+export * from "./team-cards";
 import { marketSearchText, marketTeams } from "./discovery";
 import { relatedCards } from "./rewards";
 
@@ -137,6 +138,8 @@ export type Listing = {
   name: string;
   category: string;
   player: string | null;
+  team?: string | null;
+  teamSource?: string | null;
   autographed?: boolean;
   grade: string | null;
   grader: string | null;
@@ -202,6 +205,8 @@ export const storedListingSchema = z.object({
   name: z.string().max(1000),
   category: z.string().max(100),
   player: z.string().nullable(),
+  team: z.string().max(100).nullable().optional(),
+  teamSource: z.string().url().nullable().optional(),
   grade: z.string().nullable(),
   grader: z.string().nullable(),
   cert: z.string().nullable(),

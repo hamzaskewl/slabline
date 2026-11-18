@@ -4,7 +4,9 @@ import { Layers3 } from "lucide-react";
 import {
   payoutTarget,
   rewardForPayout,
-  teamRewardMatch,
+  teamCardMatch,
+  selectedRewardTeam,
+  cardTeam,
   cents,
   type Book,
   type Listing,
@@ -13,6 +15,7 @@ import {
 } from "@collectible/domain";
 import { usd } from "@/lib/utils";
 import { GrailReward } from "./grail-reward";
+import { RewardBrowser } from "./reward-browser";
 
 const shares = (value: string) =>
   Number(value).toLocaleString("en-US", { maximumFractionDigits: 6 });
@@ -25,6 +28,8 @@ export function RewardTarget({
   stale,
   payout,
   onStake,
+  loading,
+  error,
 }: {
   cards: Listing[];
   tokens: GrailToken[];
@@ -34,11 +39,14 @@ export function RewardTarget({
   stale: boolean;
   payout: string | null;
   onStake: (value: string) => void;
+  loading?: boolean;
+  error?: string | null;
 }) {
+  const [selectedMint, setSelectedMint] = useState<string | null>(null);
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const { card, next, covered } = useMemo(
-    () => rewardForPayout(cards, payout),
-    [cards, payout],
+    () => rewardForPayout(cards, payout, selectedMint),
+    [cards, payout, selectedMint],
   );
   const target = useMemo(() => {
     if (!card || !book || stale) return null;
@@ -56,7 +64,8 @@ export function RewardTarget({
       return null;
     }
   }, [next, book, side, stale]);
-  const team = market && card ? teamRewardMatch(market, card) : null;
+  const team = market && card ? teamCardMatch(market, card) : null;
+  const selectedTeam = market ? selectedRewardTeam(market) : null;
   if (!card)
     return tokens[0] ? (
       <GrailReward
@@ -65,7 +74,21 @@ export function RewardTarget({
         payout={payout}
         side={side}
       />
-    ) : null;
+    ) : (
+      <aside className="reward-target panel" aria-label="Potential reward">
+        <h2>{selectedTeam ? `${selectedTeam.name} cards` : "Related cards"}</h2>
+        <p className="reward-empty-copy">
+          {loading
+            ? "Loading listed cards…"
+            : (error ?? "No verified matching cards are listed right now.")}
+        </p>
+        {!loading && !error && (
+          <a className="reward-browse-button" href="/rewards">
+            Browse all cards
+          </a>
+        )}
+      </aside>
+    );
   return (
     <aside className="reward-target panel" aria-label="Potential reward">
       <div className="reward-result-heading">
@@ -74,6 +97,10 @@ export function RewardTarget({
           {payout ? usd(payout) : "—"} <small>USD</small>
         </strong>
       </div>
+      <p className="reward-team-heading">
+        {selectedTeam ? `${selectedTeam.name} · ` : ""}
+        {cards.length} listed {cards.length === 1 ? "card" : "cards"}
+      </p>
       <div
         className="reward-card-summary"
         aria-live="polite"
@@ -93,6 +120,9 @@ export function RewardTarget({
         </div>
         <div className="reward-card-copy">
           <h3>{card.name}</h3>
+          <p className="reward-card-team">
+            Team on card: {cardTeam(card) ?? "Not verified"}
+          </p>
           <div className="reward-ask">
             {Number(card.ask).toLocaleString("en-US", {
               minimumFractionDigits: 2,
@@ -109,6 +139,15 @@ export function RewardTarget({
           </span>
         </div>
       </div>
+      <RewardBrowser
+        cards={cards}
+        selected={card}
+        team={selectedTeam?.name}
+        payout={payout}
+        onSelect={setSelectedMint}
+        onAuto={() => setSelectedMint(null)}
+        automatic={!selectedMint || !cards.some((c) => c.mint === selectedMint)}
+      />
       <dl className="reward-target-stats">
         <div>
           <dt>Winning shares needed</dt>
@@ -146,7 +185,7 @@ export function RewardTarget({
           disabled={!nextTarget?.stake}
           onClick={() => nextTarget?.stake && onStake(nextTarget.stake)}
         >
-          Next card · {usd(next.ask)} USDC{" "}
+          Target {usd(next.ask)} USDC card{" "}
           <span>
             {nextTarget?.stake
               ? `Set stake to ${usd(nextTarget.stake)}`
@@ -162,7 +201,8 @@ export function RewardTarget({
         </p>
         {team && (
           <a href={team.source} target="_blank" rel="noreferrer">
-            {team.name} · {team.player}
+            {team.name} · {team.player} (
+            {team.basis === "card" ? "card image" : "team history"})
           </a>
         )}
       </details>
