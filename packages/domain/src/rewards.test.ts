@@ -104,7 +104,7 @@ const tokens = [
   token("gPIKA", ["TCG"]),
 ];
 
-test("team rewards require the exact selected NBA team and an unexpired roster link", () => {
+test("team rewards require the exact selected NBA team and verified history", () => {
   const phoenix = {
     symbol: "GEMI-NBA-2611152100-LAL-PHX-M-PHX",
     label: "Phoenix",
@@ -123,15 +123,14 @@ test("team rewards require the exact selected NBA team and an unexpired roster l
     contracts: [lakers, phoenix],
   };
   const booker = card("2015 Devin Booker PSA 9", "Basketball", "125");
-  const now = Date.parse("2026-11-14T00:00:00Z");
   expect(
-    teamRewardMatch(outcomeRewardMarket(event, phoenix), booker, now)?.name,
+    teamRewardMatch(outcomeRewardMarket(event, phoenix), booker)?.name,
   ).toBe("Phoenix Suns");
   expect(
-    teamRewardMatch(outcomeRewardMarket(event, lakers), booker, now),
+    teamRewardMatch(outcomeRewardMarket(event, lakers), booker),
   ).toBeNull();
   expect(
-    teamRewardMatch(event, card("Random football player", "Football"), now),
+    teamRewardMatch(event, card("Random football player", "Football")),
   ).toBeNull();
   expect(
     teamRewardMatch(
@@ -142,12 +141,9 @@ test("team rewards require the exact selected NBA team and an unexpired roster l
         ],
       },
       booker,
-      now,
     ),
   ).toBeNull();
-  expect(
-    teamRewardMatch(event, booker, Date.parse("2026-12-15T00:00:00Z")),
-  ).toBeNull();
+  expect(teamRewardMatch(event, booker)).toBeNull();
 });
 
 test("only active markets with a real inventory relationship qualify", () => {

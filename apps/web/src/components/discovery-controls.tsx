@@ -12,7 +12,7 @@ import { Popover, Select, Switch } from "radix-ui";
 import { useEffect, useId, useState } from "react";
 import type { MarketSort } from "@collectible/domain";
 
-function MarketSelect({
+export function MarketSelect({
   label,
   value,
   options,

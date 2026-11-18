@@ -31,6 +31,8 @@ import {
   money,
   matchingCards,
   outcomeRewardMarket,
+  cardTeam,
+  sportCategories,
   matchingTokens,
   filterCards,
   type GrailToken,
@@ -1042,6 +1044,9 @@ function MarketDetail({
           </div>
         </aside>
         <RewardTarget
+          key={symbol}
+          loading={rewardsLoading}
+          error={rewardsError}
           cards={possibleMatches}
           tokens={possibleTokens}
           market={rewardMarket}
@@ -1102,6 +1107,9 @@ function CardTile({ card }: { card: Listing }) {
         </span>
         <h3>{card.name}</h3>
         {card.set ? <p>{card.set}</p> : null}
+        {sportCategories.includes(card.category) && (
+          <p>Team on card: {cardTeam(card) ?? "Not verified"}</p>
+        )}
         <div className="card-price">
           <div>
             <small>Listing ask · USDC</small>
@@ -1161,6 +1169,7 @@ function RewardCatalog({
     max: "",
     feature: "",
     sort: "high",
+    team: "",
   };
   const [filters, setFilters] = useState<RewardFilters>(defaults);
   const [source, setSource] = useState<"cards" | "tokens">("cards");
@@ -1241,6 +1250,13 @@ function RewardCatalog({
               "category",
               "Sport / category",
               [...new Set(cards.map((c) => c.category))].sort(),
+            )}
+            {select(
+              "team",
+              "Team on card",
+              [
+                ...new Set(cards.map(cardTeam).filter((t): t is string => !!t)),
+              ].sort(),
             )}
             {select(
               "grader",

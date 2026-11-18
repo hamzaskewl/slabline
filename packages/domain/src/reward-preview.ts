@@ -1,7 +1,11 @@
 import { units, money, type Listing } from "./index";
 
 /** Inputs must already be matched to the selected outcome, never the whole event. */
-export function rewardForPayout(cards: Listing[], payout: string | null) {
+export function rewardForPayout(
+  cards: Listing[],
+  payout: string | null,
+  preferredMint?: string | null,
+) {
   const sorted = cards
     .filter((c) => c.currency === "USDC" && units(c.ask) > 0n)
     .sort((a, b) =>
@@ -14,7 +18,11 @@ export function rewardForPayout(cards: Listing[], payout: string | null) {
   const budget = payout === null ? null : units(payout);
   const affordable =
     budget === null ? [] : sorted.filter((c) => units(c.ask) <= budget);
-  const card = affordable.at(-1) ?? sorted[0] ?? null;
+  const card =
+    sorted.find((c) => c.mint === preferredMint) ??
+    affordable.at(-1) ??
+    sorted[0] ??
+    null;
   const next = card
     ? (sorted.find((c) => units(c.ask) > units(card.ask)) ?? null)
     : null;
