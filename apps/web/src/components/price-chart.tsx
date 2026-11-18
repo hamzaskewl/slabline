@@ -198,19 +198,24 @@ export default function PriceChart({
   });
   const loading = datasets.some((d) => d.loading),
     error = datasets.some((d) => d.error);
+  const missing = datasets.filter((d) => !d.points.length && !d.loading);
+  const failed = missing.filter((d) => d.error);
+  const empty = missing.filter((d) => !d.error);
   return (
     <div className="market-chart">
       <div className="outcome-legend" aria-label="Charted outcomes">
-        {datasets.map(({ o, points, loading }) => (
+        {datasets.map(({ o, points, loading, error }) => (
           <div
             key={o.symbol}
             title={
               o.label +
               (loading
                 ? " · Loading history"
-                : !points.length
-                  ? " · No history available"
-                  : "")
+                : error
+                  ? " · History unavailable"
+                  : !points.length
+                    ? " · No recorded trades in this range"
+                    : "")
             }
           >
             <i style={{ background: o.color }} />
@@ -293,14 +298,15 @@ export default function PriceChart({
           ))}
         </div>
       </div>
-      {count > 0 && datasets.some((d) => !d.points.length && !d.loading) && (
+      {count > 0 && failed.length > 0 && (
         <div className="missing-history" role="status">
-          History unavailable for{" "}
-          {datasets
-            .filter((d) => !d.points.length && !d.loading)
-            .map((d) => d.o.label)
-            .join(", ")}
-          .
+          History unavailable for {failed.map((d) => d.o.label).join(", ")}.
+        </div>
+      )}
+      {count > 0 && empty.length > 0 && (
+        <div className="missing-history" role="status">
+          No recorded trades in this range for{" "}
+          {empty.map((d) => d.o.label).join(", ")}.
         </div>
       )}
     </div>

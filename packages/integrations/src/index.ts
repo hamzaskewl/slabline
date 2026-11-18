@@ -1,4 +1,5 @@
 export * from "./gemini";
+export * from "./provider-error";
 export * from "./catalog";
 export * from "./fixtures";
 export * from "./security";

@@ -1,4 +1,6 @@
 /** Read-only discovery snapshots. Never use this cache for balances, orders or books. */
+import { publicProviderError } from "@collectible/integrations";
+
 export type Snapshot<T> = { value: T; observedAt: number };
 type Storage<T> = {
   read(key: string): Promise<Snapshot<T> | null>;
@@ -11,6 +13,7 @@ type Entry<T> = {
   refresh?: Promise<void>;
   load: () => Promise<T>;
   retryAt: number;
+  failures: number;
   lastAccess: number;
   error: string | null;
 };
@@ -36,6 +39,7 @@ export class SnapshotCache<T> {
         hydrated: false,
         load,
         retryAt: 0,
+        failures: 0,
         lastAccess: this.now(),
         error: null,
       };
@@ -96,6 +100,8 @@ export class SnapshotCache<T> {
         const snapshot = { value, observedAt: this.now() };
         e.snapshot = snapshot;
         e.error = null;
+        e.failures = 0;
+        e.retryAt = 0;
         try {
           await this.storage.write(key, snapshot);
         } catch {
@@ -104,10 +110,12 @@ export class SnapshotCache<T> {
       } catch (error) {
         console.warn(
           "Gemini discovery refresh failed",
-          error instanceof Error ? error.name : "UnknownError",
+          publicProviderError(error),
         );
         e.error = "Gemini refresh is delayed.";
-        e.retryAt = this.now() + 30000;
+        e.failures = Math.min(e.failures + 1, 5);
+        e.retryAt =
+          this.now() + Math.min(300000, 30000 * 2 ** (e.failures - 1));
       }
     })().finally(() => {
       e.refresh = undefined;
