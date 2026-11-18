@@ -39,6 +39,7 @@ export default function PriceChart({
   onRangeChange,
   latestTrade,
   compact = false,
+  background = "#010304",
 }: {
   outcomes: Outcome[];
   volume?: string | null;
@@ -47,6 +48,7 @@ export default function PriceChart({
   onRangeChange: (r: ChartRange) => void;
   latestTrade: (PricePoint & { symbol: string }) | null;
   compact?: boolean;
+  background?: string;
 }) {
   const host = useRef<HTMLDivElement>(null),
     chartRef = useRef<IChartApi | null>(null),
@@ -83,7 +85,7 @@ export default function PriceChart({
     const chart = createChart(host.current, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: "#010304" },
+        background: { type: ColorType.Solid, color: background },
         textColor: "#93999d",
         fontFamily: "Inter Variable, Arial, sans-serif",
         fontSize: 12,
@@ -135,7 +137,7 @@ export default function PriceChart({
       chartRef.current = null;
       chart.remove();
     };
-  }, []);
+  }, [background]);
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;

@@ -14,8 +14,8 @@ import {
 } from "@collectible/integrations";
 import {
   marketPreview,
+  discoveryMarkets,
   rewardCategories,
-  sportsForMarket,
   type Book,
   type Market,
   type PricePoint,
@@ -23,6 +23,7 @@ import {
 } from "@collectible/domain";
 import { getDb, marketSnapshots } from "@collectible/db";
 import { processWebhookDelivery } from "./reconciliation";
+import { searchCatalog } from "./market-search";
 import {
   savedMarkets,
   savedMarket,
@@ -274,17 +275,13 @@ const server = Bun.serve({
         ...result,
         // Prediction discovery must not wait on a separate collectible provider.
         // A sports event may have no matching reward; never invent a related player.
-        data: result.data
-          .filter(
-            (m) => m.category === "Sports" || sportsForMarket(m).length > 0,
-          )
-          .map(marketPreview)
-          .filter(
-            (m) =>
-              (!category || m.category === category) &&
-              (!search ||
-                (m.searchText ?? m.title).toLowerCase().includes(search)),
-          ),
+        ...(search
+          ? await searchCatalog(search, category, result)
+          : {
+              data: discoveryMarkets(result.data)
+                .map(marketPreview)
+                .filter((m) => !category || m.category === category),
+            }),
       });
     }
     if (url.pathname === "/rewards" || url.pathname === "/cards") {

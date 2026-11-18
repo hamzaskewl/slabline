@@ -5,6 +5,7 @@ import {
   type ChartRange,
   type PriceHistory,
   type Market,
+  marketTeams,
 } from "@collectible/domain";
 import { z } from "zod";
 
@@ -44,6 +45,7 @@ type RawEvent = {
   description?: string | null;
   expiryDate?: string | null;
   startTime?: string | null;
+  sportsMarket?: { type: string; subject?: string; sport?: string } | null;
 };
 const event: z.ZodType<RawEvent> = z.lazy(() =>
   z.object({
@@ -60,10 +62,17 @@ const event: z.ZodType<RawEvent> = z.lazy(() =>
     description: z.string().nullable().optional(),
     expiryDate: z.string().nullable().optional(),
     startTime: z.string().nullish(),
+    sportsMarket: z
+      .object({
+        type: z.string(),
+        subject: z.string().optional(),
+        sport: z.string().optional(),
+      })
+      .nullish(),
   }),
 );
 export function normalizeEvent(raw: RawEvent): Market {
-  return {
+  const market: Market = {
     id: raw.id,
     ticker: raw.ticker,
     title: raw.title,
@@ -73,6 +82,7 @@ export function normalizeEvent(raw: RawEvent): Market {
         ? String(raw.volume)
         : null,
     subcategory: raw.subcategory?.name ?? null,
+    sportsMarket: raw.sportsMarket ?? null,
     status: raw.status ?? "unknown",
     imageUrl: safeImage(raw.imageUrl),
     description: raw.description ?? "",
@@ -95,6 +105,16 @@ export function normalizeEvent(raw: RawEvent): Market {
     })),
     children: (raw.events ?? []).map(normalizeEvent),
   };
+  const teams = marketTeams(market);
+  if (teams.length) {
+    market.teams = teams;
+    const inherit = (child: Market) => {
+      child.teams = teams;
+      child.children.forEach(inherit);
+    };
+    market.children.forEach(inherit);
+  }
+  return market;
 }
 let clientPromise: ReturnType<typeof createClient> | undefined;
 export function geminiClient() {
@@ -112,6 +132,17 @@ export async function listMarkets(
   category?: string,
 ): Promise<Market[]> {
   const client = await geminiClient();
+  // Provider title search finds events omitted by the general category feed.
+  if (search)
+    return collectMarketPages((offset, limit) =>
+      client.predictions.listEvents({
+        status: ["active"],
+        search,
+        limit,
+        offset,
+        ...(category ? { category: [category] } : {}),
+      }),
+    );
   // Unfiltered reads currently omit older active categories such as Business.
   // Page every provider category and deduplicate overlapping category views.
   const categories = category
@@ -120,26 +151,54 @@ export async function listMarkets(
         .object({ categories: z.array(z.string()) })
         .parse(await client.predictions.getCategories({ status: ["active"] }))
         .categories;
+  return collectMarketCategories(categories, (category, offset, limit) =>
+    client.predictions.listEvents(
+      {
+        status: ["active"],
+        limit,
+        offset,
+        ...(category ? { category: [category] } : {}),
+      },
+      { timeoutMs: limit === 100 ? 12000 : 40000 },
+    ),
+  );
+}
+export async function collectMarketCategories(
+  categories: string[],
+  load: (
+    category: string | undefined,
+    offset: number,
+    limit: number,
+  ) => PromiseLike<unknown>,
+): Promise<Market[]> {
   const groups: Market[][] = [];
   const queue = (categories.length ? categories : [undefined]).map(
     (category, index) => ({ category, index }),
   );
+  const queued = new Set(categories);
+  let nextIndex = queue.length;
   await Promise.all(
     Array.from({ length: Math.min(3, queue.length) }, async () => {
       while (queue.length) {
         const next = queue.shift()!;
         groups[next.index] = await collectMarketPages((offset, limit) =>
-          client.predictions.listEvents(
-            {
-              status: ["active"],
-              limit,
-              offset,
-              ...(search ? { search } : {}),
-              ...(next.category ? { category: [next.category] } : {}),
-            },
-            { timeoutMs: limit === 100 ? 12000 : 40000 },
-          ),
+          load(next.category, offset, limit),
         );
+        // Gemini's broad Sports view omits older active futures, even after its
+        // reported last page. League category views include them (e.g. NFL MVP).
+        // Discover league names from provider metadata rather than hardcoding teams.
+        const visit = (m: Market) => {
+          if (
+            m.category === "Sports" &&
+            m.subcategory &&
+            !queued.has(m.subcategory)
+          ) {
+            queued.add(m.subcategory);
+            queue.push({ category: m.subcategory, index: nextIndex++ });
+          }
+          m.children.forEach(visit);
+        };
+        groups[next.index]!.forEach(visit);
       }
     }),
   );

@@ -3,30 +3,34 @@ import Link from "next/link";
 import {
   Bookmark,
   ChevronDown,
-  Compass,
-  Gift,
-  Layers3,
   Radio,
+  RefreshCw,
   Search,
   SlidersHorizontal,
-  Trophy,
-  Zap,
+  X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   buyPercent,
   eventVolume,
+  isPlayerProp,
+  marketMatches,
+  sortMarkets,
   type Market,
+  type MarketSort,
   type ProviderResult,
 } from "@collectible/domain";
 import { SnapshotStatus } from "./snapshot-status";
-import { MarketArtwork } from "./market-artwork";
+import { MarketArt } from "./market-art";
+import { FeaturedMarkets } from "./featured-markets";
 
 export function Discovery({
   markets,
+  catalog,
   category,
   setCategory,
   loading,
+  searching,
   error,
   retry,
   search,
@@ -35,9 +39,11 @@ export function Discovery({
   snapshot,
 }: {
   markets: Market[];
+  catalog: Market[];
   category: string;
   setCategory: (c: string) => void;
   loading: boolean;
+  searching: boolean;
   error?: string | null;
   retry: () => void;
   search: string;
@@ -46,97 +52,258 @@ export function Discovery({
   snapshot?: ProviderResult<Market[]>;
 }) {
   const [limit, setLimit] = useState(24);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sort, setSort] = useState<MarketSort>("volume");
+  const [league, setLeague] = useState("");
+  const [includeProps, setIncludeProps] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [saveError, setSaveError] = useState("");
+  useEffect(() => {
+    try {
+      const saved: unknown = JSON.parse(
+        localStorage.getItem("cm-favorites-v1") ?? "[]",
+      );
+      if (Array.isArray(saved))
+        setFavorites(
+          saved.filter((id): id is string => typeof id === "string"),
+        );
+    } catch {
+      /* Browsing still works when local storage is unavailable. */
+    }
+  }, []);
+  useEffect(
+    () => setLimit(24),
+    [search, category, league, sort, includeProps, favoritesOnly],
+  );
+  useEffect(() => {
+    setLeague("");
+  }, [category]);
+  useEffect(() => {
+    setLeague("");
+    setFavoritesOnly(false);
+  }, [search]);
   const categories = [
     "All markets",
-    ...new Set(
-      markets
-        .map((m) => m.category)
-        .sort((a, b) =>
-          a === "Sports" ? -1 : b === "Sports" ? 1 : a.localeCompare(b),
-        ),
-    ),
+    ...new Set([...catalog, ...markets].map((m) => m.category).sort()),
   ];
-  const searchable = (m: Market): string =>
-    m.searchText ??
-    [m.title, ...m.contracts.map((c) => c.label), ...m.children.map(searchable)]
-      .join(" ")
-      .toLowerCase();
-  const visible = markets.filter(
-    (m) =>
-      (category === "All markets" || m.category === category) &&
-      searchable(m).includes(search.trim().toLowerCase()),
+  const leagues = [
+    ...new Set(
+      [...catalog, ...markets]
+        .filter((m) => category === "All markets" || m.category === category)
+        .flatMap((m) => (m.subcategory ? [m.subcategory] : [])),
+    ),
+  ].sort();
+  const visible = useMemo(
+    () =>
+      sortMarkets(
+        markets.filter(
+          (m) =>
+            (category === "All markets" || m.category === category) &&
+            (!league || m.subcategory === league) &&
+            marketMatches(m, search) &&
+            (includeProps || !!search.trim() || !isPlayerProp(m)) &&
+            (!favoritesOnly || favorites.includes(m.id)),
+        ),
+        sort,
+      ),
+    [
+      markets,
+      category,
+      league,
+      search,
+      includeProps,
+      favoritesOnly,
+      favorites,
+      sort,
+    ],
   );
+  const changeCategory = (value: string) => {
+    setCategory(value);
+    setLeague("");
+  };
+  const clear = () => {
+    setSearch("");
+    setCategory("All markets");
+    setLeague("");
+    setFavoritesOnly(false);
+    setIncludeProps(false);
+    setSort("volume");
+  };
+  const toggleFavorite = (id: string) => {
+    const next = favorites.includes(id)
+      ? favorites.filter((f) => f !== id)
+      : [...favorites, id];
+    setFavorites(next);
+    try {
+      localStorage.setItem("cm-favorites-v1", JSON.stringify(next));
+      setSaveError("");
+    } catch {
+      setSaveError(
+        "Favorites are saved for this visit only. Browser storage is unavailable.",
+      );
+    }
+  };
   return (
     <div className="discovery-layout">
-      <aside className="discovery-rail" aria-label="Market filters">
-        {categories.map((c) => (
-          <button
-            key={c}
-            onClick={() => {
-              setCategory(c);
-              setLimit(24);
-            }}
-            className={category === c ? "active" : ""}
-          >
-            {c === "All markets" ? (
-              <Compass size={17} />
-            ) : c === "Sports" ? (
-              <Trophy size={17} />
-            ) : c === "Crypto" ? (
-              <Zap size={17} />
-            ) : (
-              <Layers3 size={17} />
-            )}
-            <span>{c === "All markets" ? "All" : c}</span>
-            {c === "All markets" ? <small>{markets.length}</small> : null}
-          </button>
-        ))}
-        <div className="rail-rule" />
-        <Link href="/rewards">
-          <Gift size={17} /> Collectible rewards
-        </Link>
-        <Link href="/portfolio">
-          <Layers3 size={17} /> My positions
-        </Link>
-      </aside>
-      <section className="discovery-content">
+      <section className="discovery-content" aria-label="Browse markets">
         <nav className="phone-categories" aria-label="Market categories">
           {categories.map((c) => (
             <button
               key={c}
               aria-pressed={category === c}
-              onClick={() => {
-                setCategory(c);
-                setLimit(24);
-              }}
+              onClick={() => changeCategory(c)}
             >
               {c === "All markets" ? "All" : c}
             </button>
           ))}
           <button onClick={onPractice}>Practice</button>
         </nav>
+        {!search.trim() &&
+          category === "All markets" &&
+          !league &&
+          !favoritesOnly && <FeaturedMarkets markets={catalog} />}
         <div className="discovery-heading">
-          <h1>{category === "All markets" ? "Markets" : category}</h1>
+          <h1>{search.trim() ? "Search results" : category}</h1>
           <label className="discovery-search">
             <Search size={17} />
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              maxLength={100}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setLeague("");
+              }}
               placeholder="Search markets"
-              aria-label="Filter market cards"
+              aria-label="Search market catalog"
             />
+            {search && (
+              <button
+                className="icon-button"
+                aria-label="Clear search"
+                onClick={() => setSearch("")}
+              >
+                <X size={16} />
+              </button>
+            )}
           </label>
-          <button
-            className="icon-button"
-            aria-label="Refresh active market catalog"
-            onClick={retry}
-          >
-            <SlidersHorizontal size={18} />
-          </button>
+          <div className="discovery-actions">
+            <select
+              aria-label="Sort markets"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as MarketSort)}
+            >
+              <option value="volume">Highest volume</option>
+              <option value="closing">Closing soon</option>
+              <option value="name">Alphabetical</option>
+            </select>
+            <button
+              className="filter-toggle"
+              aria-expanded={filtersOpen}
+              aria-controls="market-filters"
+              onClick={() => setFiltersOpen((v) => !v)}
+            >
+              <SlidersHorizontal size={16} />
+              Filters
+              {league || favoritesOnly || includeProps ? (
+                <span className="filter-count">
+                  {Number(!!league) +
+                    Number(favoritesOnly) +
+                    Number(includeProps)}
+                </span>
+              ) : null}
+            </button>
+            <button
+              className="icon-button"
+              aria-label="Refresh markets"
+              disabled={searching}
+              onClick={retry}
+            >
+              <RefreshCw size={16} />
+            </button>
+          </div>
+        </div>
+        {filtersOpen && (
+          <div className="market-filters" id="market-filters">
+            <label>
+              Category
+              <select
+                value={category}
+                onChange={(e) => changeCategory(e.target.value)}
+              >
+                {categories.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              League or topic
+              <select
+                value={league}
+                onChange={(e) => setLeague(e.target.value)}
+              >
+                <option value="">All leagues and topics</option>
+                {leagues.map((l) => (
+                  <option key={l}>{l}</option>
+                ))}
+              </select>
+            </label>
+            <label className="check-filter">
+              <input
+                type="checkbox"
+                checked={includeProps || !!search.trim()}
+                disabled={!!search.trim()}
+                onChange={(e) => setIncludeProps(e.target.checked)}
+              />
+              Include player props
+            </label>
+            <label className="check-filter">
+              <input
+                type="checkbox"
+                checked={favoritesOnly}
+                onChange={(e) => setFavoritesOnly(e.target.checked)}
+              />
+              Favorites only
+            </label>
+            <button className="text-link" onClick={clear}>
+              Reset filters
+            </button>
+          </div>
+        )}
+        <div className="discovery-summary" role="status" aria-live="polite">
+          {searching ? (
+            <span>Searching Gemini…</span>
+          ) : loading && !markets.length ? (
+            <span>Loading markets…</span>
+          ) : (
+            <span>
+              {visible.length.toLocaleString()}{" "}
+              {visible.length === 1 ? "market" : "markets"}
+              {search.trim() ? ` matching “${search.trim()}”` : ""}
+            </span>
+          )}
+          {(search.trim() ||
+            category !== "All markets" ||
+            league ||
+            favoritesOnly) && (
+            <button onClick={clear}>
+              Clear search and filters <X size={13} />
+            </button>
+          )}
         </div>
         <SnapshotStatus result={snapshot} />
+        {saveError && (
+          <p role="status" className="discovery-message">
+            {saveError}
+          </p>
+        )}
+        {error && markets.length > 0 && (
+          <p role="alert" className="discovery-message">
+            {error} <button onClick={retry}>Retry</button>
+          </p>
+        )}
         {loading && !markets.length ? (
-          <div className="prediction-grid">
+          <div className="prediction-grid" aria-busy="true">
             {Array.from({ length: 9 }, (_, i) => (
               <div className="market-skeleton" key={i} />
             ))}
@@ -144,7 +311,7 @@ export function Discovery({
         ) : error && !markets.length ? (
           <div className="empty-state">
             <Radio size={28} />
-            <h2>Market feed unavailable</h2>
+            <h2>{search ? "Search unavailable" : "Market feed unavailable"}</h2>
             <p>{error}</p>
             <button className="button button-outline" onClick={retry}>
               Retry connection
@@ -153,49 +320,70 @@ export function Discovery({
         ) : !visible.length ? (
           <div className="empty-state">
             <Search size={28} />
-            <h2>No markets found</h2>
-            <p>Try another category or search.</p>
+            <h2>
+              {searching
+                ? "Searching all active markets…"
+                : "No matching markets"}
+            </h2>
+            <p>
+              {searching
+                ? "Checking Gemini for events beyond the saved catalog."
+                : "Try another search or clear your filters."}
+            </p>
+            {!searching && (
+              <button className="button button-outline" onClick={clear}>
+                Show all markets
+              </button>
+            )}
           </div>
         ) : (
           <>
-            <div className="prediction-grid">
+            <div className="prediction-grid" aria-busy={searching}>
               {visible.slice(0, limit).map((m) => (
-                <PredictionCard market={m} key={m.id} />
+                <PredictionCard
+                  market={m}
+                  key={m.id}
+                  saved={favorites.includes(m.id)}
+                  onSave={() => toggleFavorite(m.id)}
+                />
               ))}
             </div>
-            {visible.length > limit ? (
+            {visible.length > limit && (
               <div className="show-more">
                 <button onClick={() => setLimit((l) => l + 24)}>
                   Show more markets <ChevronDown size={15} />
                 </button>
               </div>
-            ) : null}
+            )}
           </>
         )}
       </section>
     </div>
   );
 }
-function PredictionCard({ market }: { market: Market }) {
-  const [saved, setSaved] = useState(false);
-  const outcomes = market.contracts.length
-    ? market.contracts.slice(0, 2)
-    : market.children.flatMap((c) => c.contracts).slice(0, 2);
+function PredictionCard({
+  market,
+  saved,
+  onSave,
+}: {
+  market: Market;
+  saved: boolean;
+  onSave: () => void;
+}) {
+  const outcomes = market.contracts.slice(0, 2);
+  const href = `/markets/${market.ticker ?? market.id}`;
   return (
     <article className="prediction-card">
       <div className="prediction-card-heading">
-        {market.imageUrl && !outcomes.some((c) => c.imageUrl) && (
-          <Link
-            href={`/markets/${market.ticker ?? market.id}`}
-            aria-label={`Open ${market.title}`}
-          >
-            <MarketArtwork src={market.imageUrl} label={market.title} />
-          </Link>
-        )}
         <Link
-          href={`/markets/${market.ticker ?? market.id}`}
-          className="prediction-card-title"
+          href={href}
+          className="prediction-card-image"
+          tabIndex={-1}
+          aria-hidden="true"
         >
+          <MarketArt market={market} />
+        </Link>
+        <Link href={href} className="prediction-card-title">
           {market.title}
         </Link>
       </div>
@@ -203,21 +391,23 @@ function PredictionCard({ market }: { market: Market }) {
         {outcomes.map((c) => (
           <div className="prediction-outcome" key={c.symbol}>
             <Link
-              href={`/markets/${market.ticker ?? market.id}?contract=${encodeURIComponent(c.symbol)}`}
+              href={`${href}?contract=${encodeURIComponent(c.symbol)}`}
               className="outcome-label"
             >
-              <MarketArtwork src={c.imageUrl} label={c.label} />
+              <MarketArt market={market} outcome={c} />
               <span>{c.label}</span>
             </Link>
             <Link
-              href={`/markets/${market.ticker ?? market.id}?contract=${encodeURIComponent(c.symbol)}&side=yes`}
+              href={`${href}?contract=${encodeURIComponent(c.symbol)}&side=yes`}
               className="outcome-yes"
+              aria-label={`Yes ${c.label}, ${buyPercent(c.buyYes)}`}
             >
               Yes {buyPercent(c.buyYes)}
             </Link>
             <Link
-              href={`/markets/${market.ticker ?? market.id}?contract=${encodeURIComponent(c.symbol)}&side=no`}
+              href={`${href}?contract=${encodeURIComponent(c.symbol)}&side=no`}
               className="outcome-no"
+              aria-label={`No ${c.label}, ${buyPercent(c.buyNo)}`}
             >
               No {buyPercent(c.buyNo)}
             </Link>
@@ -225,18 +415,17 @@ function PredictionCard({ market }: { market: Market }) {
         ))}
       </div>
       <div className="prediction-card-footer">
-        {market.volume != null && Number(market.volume) > 0 && (
-          <Link href={`/markets/${market.ticker ?? market.id}`}>
-            {eventVolume(market.volume)}
+        <span className="card-volume">{eventVolume(market.volume)}</span>
+        <span className="card-category">
+          {market.subcategory ?? market.category}
+        </span>
+        {(market.outcomeCount ?? outcomes.length) > 2 && (
+          <Link href={href}>
+            +{(market.outcomeCount ?? outcomes.length) - 2} more
           </Link>
         )}
-        {(market.outcomeCount ?? market.contracts.length) > 2 ? (
-          <Link href={`/markets/${market.ticker ?? market.id}`}>
-            +{(market.outcomeCount ?? market.contracts.length) - 2} more
-          </Link>
-        ) : null}
         <button
-          onClick={() => setSaved(!saved)}
+          onClick={onSave}
           className={`icon-button ${saved ? "saved" : ""}`}
           aria-label={`${saved ? "Remove" : "Add"} ${market.title} ${saved ? "from" : "to"} favorites`}
           aria-pressed={saved}

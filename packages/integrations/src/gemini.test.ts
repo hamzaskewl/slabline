@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { ApiError, SdkError, createClient } from "@gemini-markets/sdk/server";
 import {
   collectMarketPages,
+  collectMarketCategories,
   normalizeCandles,
   readPriceHistory,
   CandleRequestError,
@@ -13,6 +14,43 @@ import {
   eventVolume,
   buyPercent,
 } from "@collectible/domain";
+
+test("league feeds recover active MVP futures omitted by the broad Sports catalog", async () => {
+  const calls: string[] = [];
+  const game = {
+    id: "game",
+    title: "Boston vs Denver",
+    category: "Sports",
+    subcategory: { name: "Pro Football" },
+  };
+  const result = await collectMarketCategories(
+    ["Sports", "Live"],
+    async (category) => {
+      calls.push(category!);
+      const data =
+        category === "Pro Football"
+          ? [
+              game,
+              {
+                id: "mvp",
+                title: "Pro Football MVP Winner",
+                category: "Sports",
+                subcategory: { name: "Pro Football" },
+              },
+            ]
+          : [game];
+      return { data, pagination: { total: data.length } };
+    },
+  );
+  expect(result.map((m) => m.id)).toEqual(["game", "mvp"]);
+  expect(calls.filter((c) => c === "Pro Football")).toHaveLength(1);
+  await expect(
+    collectMarketCategories(["Sports"], async (category) => {
+      if (category === "Pro Football") throw new Error("League unavailable");
+      return { data: [game], pagination: { total: 1 } };
+    }),
+  ).rejects.toThrow("League unavailable");
+});
 
 test("an ask is never presented as a last trade", () => {
   const market = normalizeEvent({

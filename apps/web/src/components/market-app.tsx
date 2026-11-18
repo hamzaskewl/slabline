@@ -53,7 +53,7 @@ import { RewardTarget } from "./reward-target";
 import { useLiveBook } from "@/lib/use-live-book";
 import { retainMarketSnapshot } from "@/lib/market-snapshot";
 import { SnapshotStatus } from "./snapshot-status";
-import { MarketArtwork } from "./market-artwork";
+import { MarketArt } from "./market-art";
 const PriceChart = dynamic(() => import("./price-chart"), {
   ssr: false,
   loading: () => <div className="chart-loading">Loading chart…</div>,
@@ -122,6 +122,14 @@ export function MarketApp({
     [menuOpen, setMenuOpen] = useState(false);
   const [orders, setOrders] = useState<PracticeOrder[]>([]),
     [notice, setNotice] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    setSearch(new URLSearchParams(window.location.search).get("q") ?? "");
+  }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
   const marketQuery = api.markets.useQuery(
     { search: "" },
     {
@@ -132,6 +140,14 @@ export function MarketApp({
           incoming as ProviderResult<Market[]>,
         ),
       enabled: section === "markets" && !selectedId && !practice,
+    },
+  );
+  const searchQuery = api.markets.useQuery(
+    { search: debouncedSearch },
+    {
+      enabled:
+        section === "markets" && !selectedId && !practice && !!debouncedSearch,
+      staleTime: 30000,
     },
   );
   const rewardQuery = api.rewards.useQuery(undefined, {
@@ -222,15 +238,31 @@ export function MarketApp({
                 <Link href="/wallet">Wallet</Link>
               </nav>
             ) : (
-              <label className="global-search">
+              <form
+                className="global-search"
+                role="search"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (section !== "markets")
+                    router.push(`/?q=${encodeURIComponent(search.trim())}`);
+                  else {
+                    setCategory("All markets");
+                    setDebouncedSearch(search.trim());
+                  }
+                }}
+              >
                 <Search size={18} />
                 <input
                   aria-label="Search markets"
                   placeholder="Search markets..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  maxLength={100}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setCategory("All markets");
+                  }}
                 />
-              </label>
+              </form>
             )}
             <div className="topbar-actions">
               <span className="mode-badge">SIMULATED</span>
@@ -252,13 +284,18 @@ export function MarketApp({
           >
             <Link
               href="/"
+              onClick={() => {
+                setCategory("All markets");
+                setSearch("");
+                setPractice(false);
+              }}
               className={
                 section === "markets" && category === "All markets"
                   ? "active"
                   : ""
               }
             >
-              <Zap size={14} /> Trending
+              <Zap size={14} /> All markets
             </Link>
             {[...new Set(markets.map((m) => m.category))]
               .sort((a, b) =>
@@ -342,17 +379,44 @@ export function MarketApp({
                 <Discovery
                   onPractice={() => setPractice(true)}
                   search={search}
-                  setSearch={setSearch}
-                  markets={markets}
+                  setSearch={(value) => {
+                    setSearch(value);
+                    setCategory("All markets");
+                  }}
+                  markets={
+                    search.trim() && debouncedSearch === search.trim()
+                      ? (searchQuery.data?.data ?? markets)
+                      : markets
+                  }
+                  catalog={markets}
+                  searching={
+                    !!search.trim() &&
+                    (search.trim() !== debouncedSearch ||
+                      searchQuery.isFetching)
+                  }
                   category={category}
                   setCategory={setCategory}
                   loading={
                     marketQuery.isLoading ||
                     (!!marketQuery.data?.refreshing && !markets.length)
                   }
-                  snapshot={practice ? undefined : marketQuery.data}
-                  error={marketQuery.data?.error}
-                  retry={() => void marketQuery.refetch()}
+                  snapshot={
+                    search.trim() && debouncedSearch === search.trim()
+                      ? searchQuery.data
+                      : marketQuery.data
+                  }
+                  error={
+                    search.trim()
+                      ? (searchQuery.data?.error ??
+                        (searchQuery.isError
+                          ? "Search is unavailable. Please retry."
+                          : null))
+                      : marketQuery.data?.error
+                  }
+                  retry={() => {
+                    void marketQuery.refetch();
+                    if (debouncedSearch) void searchQuery.refetch();
+                  }}
                 />
               ) : (
                 <>
@@ -698,9 +762,7 @@ function MarketDetail({
     <>
       <section className="market-detail panel">
         <div className="event-identity">
-          {market.imageUrl && (
-            <MarketArtwork src={market.imageUrl} label={market.title} />
-          )}
+          <MarketArt market={market} />
           <div>
             <h1>{market.title}</h1>
           </div>
@@ -742,7 +804,7 @@ function MarketDetail({
                     )
                   }
                 >
-                  <MarketArtwork src={c.imageUrl} label={c.label} />
+                  <MarketArt market={market} outcome={c} />
                   <strong>{c.label}</strong>
                   <ChevronDown size={16} />
                 </button>
@@ -834,9 +896,7 @@ function MarketDetail({
           </h2>
           <p className="ticket-event">{market.title}</p>
           <label className="ticket-outcome">
-            {contract && (
-              <MarketArtwork src={contract.imageUrl} label={contract.label} />
-            )}
+            {contract && <MarketArt market={market} outcome={contract} />}
             <select
               aria-label="Prediction outcome"
               value={symbol ?? ""}
