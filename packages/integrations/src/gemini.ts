@@ -1,4 +1,4 @@
-import { createClient } from "@gemini-markets/sdk/server";
+import { ApiError, SdkError, createClient } from "@gemini-markets/sdk/server";
 import {
   historyIntervals,
   normalizePricePoints,
@@ -155,21 +155,23 @@ export async function collectMarketPages(
     data: z.array(event),
     pagination: z.object({ total: z.number().int().nonnegative() }),
   });
-  // A 500-event sports page can exceed the SDK's 16 MiB safety limit.
-  // Use bounded pages, with no cap on the number of pages.
+  // Nested sports events vary in size. Keep the SDK's response limit and
+  // shrink an oversized/slow page at the same offset instead of losing the scan.
   let limit = 100;
   for (let offset = 0; ;) {
     let raw: unknown;
     try {
       raw = await load(offset, limit);
     } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        error.name !== "RequestTimeoutError" ||
-        limit <= 25
-      )
-        throw error;
-      limit = Math.floor(limit / 2);
+      const tooLarge =
+        error instanceof SdkError &&
+        /^HTTP response exceeded the configured \d+-byte limit$/.test(
+          error.message,
+        );
+      const timedOut =
+        error instanceof Error && error.name === "RequestTimeoutError";
+      if ((!tooLarge && !timedOut) || limit === 1) throw error;
+      limit = Math.max(1, Math.floor(limit / 2));
       continue;
     }
     const page = pageSchema.parse(raw);
@@ -227,7 +229,15 @@ export async function getPriceHistory(
         `${origin}/v2/candles/${encodeURIComponent(symbol)}/1day`,
         { signal: AbortSignal.timeout(12000) },
       );
-      if (!response.ok) throw new CandleRequestError(response.status);
+      if (!response.ok) {
+        const body = z
+          .object({ reason: z.string() })
+          .safeParse(await response.json().catch(() => null));
+        throw new CandleRequestError(
+          response.status,
+          body.success ? body.data.reason : undefined,
+        );
+      }
       return response.json();
     } else {
       return client.marketData.listCandles({
@@ -238,7 +248,10 @@ export async function getPriceHistory(
   });
 }
 export class CandleRequestError extends Error {
-  constructor(public statusCode: number) {
+  constructor(
+    public statusCode: number,
+    public reason?: string,
+  ) {
     super(`Gemini history unavailable (${statusCode})`);
   }
 }
@@ -252,24 +265,32 @@ export async function readPriceHistory(
   let frame: CandleFrame = (
     { ALL: "1day", "1D": "1m", "1W": "5m", "1M": "30m" } as const
   )[range];
-  let raw: unknown;
-  try {
-    raw = await load(frame);
-  } catch (error) {
-    // Newly opened contracts can have minute candles but no daily candle yet.
-    if (
-      frame !== "1day" ||
-      !(error instanceof CandleRequestError) ||
-      ![400, 404].includes(error.statusCode)
-    )
+  const read = async (interval: CandleFrame) => {
+    try {
+      return await load(interval);
+    } catch (error) {
+      // Gemini reports an empty history as HTTP 400 NoDataFound, including
+      // through the SDK. Other 4xx, outages and malformed bodies remain errors.
+      const status =
+        error instanceof ApiError
+          ? error.status
+          : error instanceof CandleRequestError
+            ? error.statusCode
+            : null;
+      if (
+        status === 400 &&
+        (error instanceof ApiError || error instanceof CandleRequestError) &&
+        error.reason === "NoDataFound"
+      )
+        return [];
       throw error;
-    frame = "1m";
-    raw = await load(frame);
-  }
+    }
+  };
+  const raw = await read(frame);
   let history = normalizeCandles(raw, symbol, range);
   if (!history.points.length && frame !== "1m") {
     frame = "1m";
-    history = normalizeCandles(await load(frame), symbol, range);
+    history = normalizeCandles(await read(frame), symbol, range);
   }
   return {
     ...history,

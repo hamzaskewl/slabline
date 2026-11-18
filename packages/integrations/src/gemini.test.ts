@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { ApiError, SdkError, createClient } from "@gemini-markets/sdk/server";
 import {
   collectMarketPages,
   normalizeCandles,
@@ -34,7 +35,7 @@ test("new contracts fall back to real minute candles, while outages stay errors"
     "ALL",
     async (frame) => {
       requests.push(frame);
-      if (frame === "1day") throw new CandleRequestError(400);
+      if (frame === "1day") throw new CandleRequestError(400, "NoDataFound");
       return [[1800000000000, 0.2, 0.3, 0.2, 0.25, 10]];
     },
   );
@@ -46,6 +47,116 @@ test("new contracts fall back to real minute candles, while outages stay errors"
       throw new CandleRequestError(503);
     }),
   ).rejects.toThrow("503");
+});
+
+test("Gemini NoDataFound is empty history at every range, not a provider outage", async () => {
+  for (const range of ["1D", "1W", "1M", "ALL"] as const) {
+    const requests: string[] = [];
+    const history = await readPriceHistory(
+      "GEMI-TEST-YES",
+      range,
+      async (frame) => {
+        requests.push(frame);
+        if (frame === "1day") throw new CandleRequestError(400, "NoDataFound");
+        throw ApiError.fromResponse({
+          status: 400,
+          body: { reason: "NoDataFound", message: "Candles are empty" },
+        });
+      },
+    );
+    expect(history.points).toEqual([]);
+    expect(history.intervalSeconds).toBe(60);
+    expect(requests.at(-1)).toBe("1m");
+    expect(requests).toHaveLength(range === "1D" ? 1 : 2);
+  }
+});
+
+test("empty coarse candles recover real minute data; invalid symbols and outages stay errors", async () => {
+  const requests: string[] = [];
+  const history = await readPriceHistory(
+    "GEMI-TEST-YES",
+    "1W",
+    async (frame) => {
+      requests.push(frame);
+      if (frame === "5m")
+        throw ApiError.fromResponse({
+          status: 400,
+          body: { reason: "NoDataFound" },
+        });
+      return [[1800000000000, 0.2, 0.3, 0.2, 0.25, 10]];
+    },
+  );
+  expect(requests).toEqual(["5m", "1m"]);
+  expect(history.points).toEqual([{ time: 1800000000, value: 0.25 }]);
+  for (const status of [400, 404, 429, 503]) {
+    const error = ApiError.fromResponse({
+      status,
+      body: { reason: "InvalidSymbol" },
+    });
+    await expect(
+      readPriceHistory("GEMI-TEST-YES", "ALL", async () => {
+        throw error;
+      }),
+    ).rejects.toBe(error);
+    await expect(
+      readPriceHistory("GEMI-TEST-YES", "ALL", async () => {
+        throw new CandleRequestError(status, "InvalidSymbol");
+      }),
+    ).rejects.toThrow(String(status));
+  }
+});
+
+test("catalog shrinks actual SDK response-limit failures without skipping events", async () => {
+  const calls: number[][] = [];
+  const client = await createClient({
+    env: "production",
+    skipWsInit: true,
+    maxRetries: 0,
+    maxResponseSizeBytes: 2048,
+    fetch: async (url) => {
+      const params = new URL(url).searchParams;
+      const offset = Number(params.get("offset")),
+        limit = Number(params.get("limit"));
+      calls.push([offset, limit]);
+      return new Response(
+        JSON.stringify({
+          data: Array.from(
+            { length: Math.min(limit, 173 - offset) },
+            (_, i) => ({
+              id: String(offset + i),
+              title: "Nested sports event with provider metadata",
+            }),
+          ),
+          pagination: { total: 173 },
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    },
+  });
+  const markets = await collectMarketPages((offset, limit) =>
+    client.predictions.listEvents({ offset, limit }),
+  );
+  expect(calls.slice(0, 3)).toEqual([
+    [0, 100],
+    [0, 50],
+    [0, 25],
+  ]);
+  expect(markets.map((m) => m.id)).toEqual(
+    Array.from({ length: 173 }, (_, i) => String(i)),
+  );
+});
+
+test("an unreadable single event stops pagination instead of looping or publishing a partial catalog", async () => {
+  const limits: number[] = [];
+  await expect(
+    collectMarketPages(async (_offset, limit) => {
+      limits.push(limit);
+      throw new SdkError(
+        "HTTP response exceeded the configured 16777216-byte limit",
+      );
+    }),
+  ).rejects.toThrow("byte limit");
+  expect(limits).toEqual([100, 50, 25, 12, 6, 3, 1]);
 });
 
 test("catalog walks past 100 and 500, retaining nested and unpriced markets", async () => {
