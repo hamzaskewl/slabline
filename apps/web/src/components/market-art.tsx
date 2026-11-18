@@ -25,14 +25,12 @@ export function MarketArt({
       : market.imageUrl
         ? [{ src: market.imageUrl, label: market.title }]
         : [];
-  if (outcome && !images.length) return null;
+  if (!images.length) return null;
   return (
     <span className={`market-art ${images.length > 1 ? "team-pair" : ""}`}>
-      {images.length ? (
-        images.map((i) => <MarketArtwork key={i.src} {...i} />)
-      ) : (
-        <MarketArtwork src={null} label={market.title} />
-      )}
+      {images.map((i) => (
+        <MarketArtwork key={i.src} {...i} />
+      ))}
     </span>
   );
 }

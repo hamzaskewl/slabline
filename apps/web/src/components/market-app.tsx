@@ -127,7 +127,10 @@ export function MarketApp({
     setSearch(new URLSearchParams(window.location.search).get("q") ?? "");
   }, []);
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    const timer = setTimeout(
+      () => setDebouncedSearch(search.trim()),
+      search.trim() ? 500 : 0,
+    );
     return () => clearTimeout(timer);
   }, [search]);
   const marketQuery = api.markets.useQuery(
@@ -379,12 +382,13 @@ export function MarketApp({
                 <Discovery
                   onPractice={() => setPractice(true)}
                   search={search}
+                  query={debouncedSearch}
                   setSearch={(value) => {
                     setSearch(value);
                     setCategory("All markets");
                   }}
                   markets={
-                    search.trim() && debouncedSearch === search.trim()
+                    debouncedSearch
                       ? (searchQuery.data?.data ?? markets)
                       : markets
                   }
@@ -401,9 +405,7 @@ export function MarketApp({
                     (!!marketQuery.data?.refreshing && !markets.length)
                   }
                   snapshot={
-                    search.trim() && debouncedSearch === search.trim()
-                      ? searchQuery.data
-                      : marketQuery.data
+                    debouncedSearch ? searchQuery.data : marketQuery.data
                   }
                   error={
                     search.trim()

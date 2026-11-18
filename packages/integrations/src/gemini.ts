@@ -389,7 +389,12 @@ export function safeImage(raw: string | null | undefined): string | null {
       "grailxyz-public.s3.us-east-2.amazonaws.com",
       "wildcard-public.s3.us-east-2.amazonaws.com",
     ];
-    return url.protocol === "https:" && allowed.some((h) => url.hostname === h)
+    // Gemini's older team helmets/shoes are served from its Contentful space.
+    const geminiContentful =
+      url.hostname === "images.ctfassets.net" &&
+      url.pathname.startsWith("/jg6lo9a2ukvr/");
+    return url.protocol === "https:" &&
+      (allowed.some((h) => url.hostname === h) || geminiContentful)
       ? url.toString()
       : null;
   } catch {
