@@ -3,7 +3,6 @@ import Link from "next/link";
 import {
   Bookmark,
   ChevronDown,
-  Clock3,
   Compass,
   Gift,
   Layers3,
@@ -21,6 +20,7 @@ import {
   type ProviderResult,
 } from "@collectible/domain";
 import { SnapshotStatus } from "./snapshot-status";
+import { MarketArtwork } from "./market-artwork";
 
 export function Discovery({
   markets,
@@ -98,10 +98,6 @@ export function Discovery({
         <Link href="/portfolio">
           <Layers3 size={17} /> My positions
         </Link>
-        <div className="rail-note">
-          <span className="live-dot" /> Gemini public data
-          <p>Trading is simulated.</p>
-        </div>
       </aside>
       <section className="discovery-content">
         <nav className="phone-categories" aria-label="Market categories">
@@ -121,12 +117,6 @@ export function Discovery({
         </nav>
         <div className="discovery-heading">
           <h1>{category === "All markets" ? "Markets" : category}</h1>
-          <div className="discovery-filters">
-            <button className="active" onClick={() => setLimit(24)}>
-              All
-            </button>
-            <span className="public-label">Active events</span>
-          </div>
           <label className="discovery-search">
             <Search size={17} />
             <input
@@ -194,21 +184,14 @@ function PredictionCard({ market }: { market: Market }) {
   return (
     <article className="prediction-card">
       <div className="prediction-card-heading">
-        <Link
-          href={`/markets/${market.ticker ?? market.id}`}
-          className="prediction-card-image"
-        >
-          {market.imageUrl ? (
-            <img
-              src={market.imageUrl}
-              alt=""
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <Layers3 size={23} />
-          )}
-        </Link>
+        {market.imageUrl && !outcomes.some((c) => c.imageUrl) && (
+          <Link
+            href={`/markets/${market.ticker ?? market.id}`}
+            aria-label={`Open ${market.title}`}
+          >
+            <MarketArtwork src={market.imageUrl} label={market.title} />
+          </Link>
+        )}
         <Link
           href={`/markets/${market.ticker ?? market.id}`}
           className="prediction-card-title"
@@ -223,7 +206,8 @@ function PredictionCard({ market }: { market: Market }) {
               href={`/markets/${market.ticker ?? market.id}?contract=${encodeURIComponent(c.symbol)}`}
               className="outcome-label"
             >
-              {c.label}
+              <MarketArtwork src={c.imageUrl} label={c.label} />
+              <span>{c.label}</span>
             </Link>
             <Link
               href={`/markets/${market.ticker ?? market.id}?contract=${encodeURIComponent(c.symbol)}&side=yes`}
@@ -241,10 +225,11 @@ function PredictionCard({ market }: { market: Market }) {
         ))}
       </div>
       <div className="prediction-card-footer">
-        <Link href={`/markets/${market.ticker ?? market.id}`}>
-          <span className="live-dot" /> Active{" "}
-          <span className="footer-divider">·</span> {market.category}
-        </Link>
+        {market.volume != null && Number(market.volume) > 0 && (
+          <Link href={`/markets/${market.ticker ?? market.id}`}>
+            {eventVolume(market.volume)}
+          </Link>
+        )}
         {(market.outcomeCount ?? market.contracts.length) > 2 ? (
           <Link href={`/markets/${market.ticker ?? market.id}`}>
             +{(market.outcomeCount ?? market.contracts.length) - 2} more

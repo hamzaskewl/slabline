@@ -18,7 +18,6 @@ import {
   Menu,
   RefreshCw,
   Search,
-  ShieldCheck,
   Trophy,
   Wallet,
   X,
@@ -54,6 +53,7 @@ import { RewardTarget } from "./reward-target";
 import { useLiveBook } from "@/lib/use-live-book";
 import { retainMarketSnapshot } from "@/lib/market-snapshot";
 import { SnapshotStatus } from "./snapshot-status";
+import { MarketArtwork } from "./market-artwork";
 const PriceChart = dynamic(() => import("./price-chart"), {
   ssr: false,
   loading: () => <div className="chart-loading">Loading chart…</div>,
@@ -336,19 +336,6 @@ export function MarketApp({
               </button>
             </div>
           ) : null}
-          {practice ? (
-            <div className="mode-strip">
-              <ShieldCheck size={16} />
-              <span>
-                {practice
-                  ? "SIMULATED fixture. No real event, order, settlement or funds."
-                  : "Public provider data. Live financial actions are disabled."}
-              </span>
-              <Link href="/wallet">
-                Connection status <ArrowRight size={14} />
-              </Link>
-            </div>
-          ) : null}
           {section === "markets" ? (
             <>
               {!selectedId && !practice ? (
@@ -459,10 +446,6 @@ export function MarketApp({
               <div className="section-heading">
                 <div>
                   <h2>Practice positions</h2>
-                  <p>
-                    SIMULATED · Stored on this device · No provider orders or
-                    settlement
-                  </p>
                 </div>
               </div>
               {orders.length ? (
@@ -525,27 +508,13 @@ export function MarketApp({
             ) : (
               <Empty
                 title="Wallet connection unavailable"
-                detail="Account configuration is required to read your collection."
+                detail="Please try again shortly."
               />
             )
           ) : (
             <div className="redeem-flow panel">
               <h2>Physical redemption</h2>
-              <p>
-                Physical redemption is separate from owning a Solana asset.
-                Collector Crypt manages its vault, shipping eligibility and
-                delivery.
-              </p>
-              <ol>
-                <li>Verify the collectible is in your wallet.</li>
-                <li>
-                  Open the provider and review redemption fees and delivery
-                  options.
-                </li>
-                <li>
-                  Authorize redemption with the provider. Track shipping there.
-                </li>
-              </ol>
+              <p>Choose shipping and delivery options on Collector Crypt.</p>
               <Button asChild>
                 <a
                   href="https://collectorcrypt.com"
@@ -558,7 +527,6 @@ export function MarketApp({
             </div>
           )}
           <footer className="page-footer">
-            <span>Collectible Markets</span>
             <Link href="/about">About &amp; credits</Link>
           </footer>
         </main>
@@ -611,7 +579,7 @@ function LoadingRows() {
       {[1, 2, 3, 4, 5].map((i) => (
         <div className="skeleton" key={i} />
       ))}
-      <span className="subtle">Fetching public provider data…</span>
+      <span className="sr-only">Loading…</span>
     </div>
   );
 }
@@ -730,12 +698,8 @@ function MarketDetail({
     <>
       <section className="market-detail panel">
         <div className="event-identity">
-          {market.imageUrl ? (
-            <img src={market.imageUrl} alt="" referrerPolicy="no-referrer" />
-          ) : (
-            <div className="event-fallback">
-              <Layers3 size={28} />
-            </div>
+          {market.imageUrl && (
+            <MarketArtwork src={market.imageUrl} label={market.title} />
           )}
           <div>
             <h1>{market.title}</h1>
@@ -778,15 +742,7 @@ function MarketDetail({
                     )
                   }
                 >
-                  <i style={{ background: c.color }} />
-                  {c.imageUrl && (
-                    <img
-                      src={c.imageUrl}
-                      alt=""
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                  )}
+                  <MarketArtwork src={c.imageUrl} label={c.label} />
                   <strong>{c.label}</strong>
                   <ChevronDown size={16} />
                 </button>
@@ -861,7 +817,6 @@ function MarketDetail({
           {market.closesAt && (
             <p>Closes {new Date(market.closesAt).toLocaleString("en-US")}</p>
           )}
-          <p className="subtle break-all">{symbol}</p>
           <a
             href="https://exchange.gemini.com/predictions"
             target="_blank"
@@ -879,7 +834,9 @@ function MarketDetail({
           </h2>
           <p className="ticket-event">{market.title}</p>
           <label className="ticket-outcome">
-            <i style={{ background: contract?.color }} />
+            {contract && (
+              <MarketArtwork src={contract.imageUrl} label={contract.label} />
+            )}
             <select
               aria-label="Prediction outcome"
               value={symbol ?? ""}
@@ -1316,10 +1273,6 @@ function RewardCatalog({
         <LoadingRows />
       ) : visibleTokens.length ? (
         <>
-          <p className="token-catalog-note">
-            Fractional collectible tokens. View prices and redemption options on
-            Grail.
-          </p>
           <GrailCatalog tokens={visibleTokens.slice(0, limit)} />
         </>
       ) : (

@@ -200,7 +200,6 @@ export default function PriceChart({
     error = datasets.some((d) => d.error);
   const missing = datasets.filter((d) => !d.points.length && !d.loading);
   const failed = missing.filter((d) => d.error);
-  const empty = missing.filter((d) => !d.error);
   return (
     <div className="market-chart">
       <div className="outcome-legend" aria-label="Charted outcomes">
@@ -301,12 +300,6 @@ export default function PriceChart({
       {count > 0 && failed.length > 0 && (
         <div className="missing-history" role="status">
           History unavailable for {failed.map((d) => d.o.label).join(", ")}.
-        </div>
-      )}
-      {count > 0 && empty.length > 0 && (
-        <div className="missing-history" role="status">
-          No recorded trades in this range for{" "}
-          {empty.map((d) => d.o.label).join(", ")}.
         </div>
       )}
     </div>

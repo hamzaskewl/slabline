@@ -205,12 +205,10 @@ export default function RelayFunding() {
     >
       <div className="relay-heading">
         <h2 id="relay-heading">Bridge quote</h2>
-        <span className="mode-badge">Quotes only</span>
+        <span className="mode-badge">
+          {route.environment === "testnet" ? "Test quote" : "Quotes only"}
+        </span>
       </div>
-      <p>
-        Review a transfer from your own wallet. Sending and gas sponsorship are
-        disabled.
-      </p>
       <div className="relay-form">
         <label>
           Route
@@ -296,16 +294,6 @@ export default function RelayFunding() {
           </>
         )}
       </div>
-      {route.environment === "mainnet" ? (
-        <p className="relay-network-note">
-          Mainnet quote only. This does not withdraw Gemini funds or change your
-          Solana devnet balance.
-        </p>
-      ) : (
-        <p className="relay-network-note">
-          Test ETH only. Relay currently has no Solana devnet route.
-        </p>
-      )}
       <div className="relay-actions">
         {!authenticated ? (
           <Button onClick={login}>Log in to get a quote</Button>
@@ -359,7 +347,7 @@ export default function RelayFunding() {
         </p>
       )}
       {availability?.keyConfigured === false && (
-        <p role="status">Mainnet quotes are waiting for Relay API setup.</p>
+        <p role="status">Quotes are temporarily unavailable.</p>
       )}
       {error && (
         <p role="alert" className="relay-error">
