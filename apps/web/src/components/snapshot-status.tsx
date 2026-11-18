@@ -6,23 +6,10 @@ export function SnapshotStatus({
 }: {
   result: ProviderResult<unknown> | undefined;
 }) {
-  if (!result?.observedAt) return null;
+  if (!result?.error) return null;
   return (
     <p className="snapshot-status" role="status">
-      Saved odds ·{" "}
-      <time dateTime={result.observedAt}>
-        {new Date(result.observedAt).toLocaleString("en-US", {
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        })}
-      </time>
-      {result.error
-        ? " · Updates delayed"
-        : result.refreshing
-          ? " · Updating…"
-          : ""}
+      Market updates delayed
     </p>
   );
 }

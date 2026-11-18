@@ -71,7 +71,7 @@ export function RewardTarget({
       <div className="reward-result-heading">
         <h2>If {side.toUpperCase()} wins</h2>
         <strong>
-          {payout ? usd(payout) : "—"} <small>USD*</small>
+          {payout ? usd(payout) : "—"} <small>USD</small>
         </strong>
       </div>
       <div
@@ -102,7 +102,7 @@ export function RewardTarget({
           </div>
           <span className={`reward-fit ${covered ? "covered" : ""}`}>
             {covered
-              ? "Within gross payout*"
+              ? "Within estimated payout"
               : payout
                 ? "Closest card"
                 : "Card target"}
@@ -155,12 +155,10 @@ export function RewardTarget({
         </button>
       )}
       <details className="reward-assumptions">
-        <summary>* Fees & availability</summary>
+        <summary>Fees & availability</summary>
         <p>
-          Gross payout before fees, assuming $1 USD = 1 USDC. A losing
-          prediction pays $0. Conversion, withdrawal and purchase costs reduce
-          the amount available. Cards are not reserved. Live trading and
-          redemption are disabled.
+          Payout is before fees, assuming $1 USD = 1 USDC. Cards are not
+          reserved.
         </p>
         {team && (
           <a href={team.source} target="_blank" rel="noreferrer">

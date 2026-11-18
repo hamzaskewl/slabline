@@ -174,9 +174,6 @@ function WalletBalances({
             {query.data.usdc ?? "Unavailable"}{" "}
             {query.data.network === "devnet" ? "test USDC" : "USDC"}
           </p>
-          <p className="account-observed">
-            Updated {new Date(query.data.observedAt).toLocaleString()}
-          </p>
         </>
       ) : null}
     </div>

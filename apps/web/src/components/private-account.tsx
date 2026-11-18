@@ -102,8 +102,8 @@ export function PrivateAccount({ compact = false }: { compact?: boolean }) {
           ) : null}
           {snapshot.error ? (
             <p role="alert">
-              {snapshot.error.message} Balance and position data are
-              unavailable.
+              {snapshot.error.message}
+              {data ? " Displayed balances may be outdated." : ""}
             </p>
           ) : null}
           {data ? (
@@ -126,10 +126,6 @@ export function PrivateAccount({ compact = false }: { compact?: boolean }) {
                   </strong>
                 </div>
               </div>
-              <p className="account-observed">
-                Updated {new Date(data.observedAt).toLocaleString()}
-                {snapshot.isError ? " · Saved view; refresh failed" : ""}
-              </p>
               {!compact ? (
                 <>
                   <h3>Positions</h3>
@@ -161,7 +157,7 @@ export function PrivateAccount({ compact = false }: { compact?: boolean }) {
                       </table>
                     </div>
                   ) : (
-                    <p>No open positions returned.</p>
+                    <p>No open positions.</p>
                   )}
                   <h3>Open orders</h3>
                   {data.activeOrders.length ? (
@@ -194,7 +190,7 @@ export function PrivateAccount({ compact = false }: { compact?: boolean }) {
                       </table>
                     </div>
                   ) : (
-                    <p>No open orders returned.</p>
+                    <p>No open orders.</p>
                   )}
                   <h3>Settlements</h3>
                   {data.settlements.length ? (
@@ -223,7 +219,7 @@ export function PrivateAccount({ compact = false }: { compact?: boolean }) {
                       </table>
                     </div>
                   ) : (
-                    <p>No settlements returned.</p>
+                    <p>No settlements yet.</p>
                   )}
                 </>
               ) : null}

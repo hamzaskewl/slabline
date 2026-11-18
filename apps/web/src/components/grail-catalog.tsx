@@ -51,10 +51,6 @@ function GrailTile({ token }: { token: GrailToken }) {
             {token.chain} · Chain {token.chainId}
           </p>
           <code>{token.address}</code>
-          <p>
-            Fractional token. Physical redemption depends on Grail’s
-            requirements and available inventory.
-          </p>
         </details>
       </div>
     </article>

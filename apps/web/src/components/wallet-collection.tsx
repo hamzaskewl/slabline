@@ -108,17 +108,11 @@ export function WalletCollection() {
               {collection.isPending ? (
                 <p role="status">Reading wallet collectibles…</p>
               ) : null}
-              {pages ? (
-                <p className="account-observed">
-                  Wallet read {new Date(pages[0]!.observedAt).toLocaleString()}
-                  {collection.isError ? " · Saved view; refresh failed" : ""}
-                </p>
-              ) : null}
               {pages && !assets.length ? (
                 <p>
                   {collection.hasNextPage
-                    ? "No collectible assets on this page. Continue to the next page."
-                    : "No collectible assets returned for this wallet."}
+                    ? "No collectibles on this page."
+                    : "No collectibles in this wallet."}
                 </p>
               ) : null}
               <div className="wallet-collection-grid">
