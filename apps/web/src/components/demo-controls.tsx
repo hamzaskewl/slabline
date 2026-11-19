@@ -590,87 +590,16 @@ export function PositionRow({
   );
 }
 function SellPosition({ position }: { position: DemoPosition }) {
-  const a = useDemoAction();
-  const [quantity, setQuantity] = useState(position.quantity);
-  const [quote, setQuote] = useState<{
-    proceeds: string;
-    quantity: string;
-    at: number;
-  } | null>(null);
-  const key = useRef(crypto.randomUUID());
-  useEffect(() => {
-    setQuantity(position.quantity);
-    setQuote(null);
-    key.current = crypto.randomUUID();
-  }, [position.id, position.quantity, position.cost, a.user?.id, a.network]);
-  const valid =
-    /^\d+(\.\d{1,6})?$/.test(quantity) &&
-    Number(quantity) > 0 &&
-    Number(quantity) <= Number(position.quantity);
+  const query = new URLSearchParams({ trade: "sell", side: position.side });
+  if (position.rehearsal) query.set("scenario", position.rehearsal);
+  if (!position.replay) query.set("contract", position.symbol);
   return (
-    <div className="sell-position">
-      <label className="sell-quantity">
-        Shares to sell
-        <span>
-          <input
-            aria-label="Shares to sell"
-            inputMode="decimal"
-            value={quantity}
-            disabled={a.busy}
-            onChange={(e) => {
-              setQuantity(e.target.value);
-              setQuote(null);
-              key.current = crypto.randomUUID();
-            }}
-          />
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={a.busy}
-            onClick={() => {
-              setQuantity(position.quantity);
-              setQuote(null);
-            }}
-          >
-            Max
-          </Button>
-        </span>
-      </label>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={a.busy || !valid}
-        onClick={() =>
-          void a.run(async () => {
-            if (!quote || Date.now() - quote.at > 15000) {
-              const result = await a.request<{
-                proceeds: string;
-                quantity: string;
-              }>({ action: "sell-quote", id: position.id, quantity });
-              setQuote({ ...result, at: Date.now() });
-              return;
-            }
-            await a.request({
-              action: "sell",
-              id: position.id,
-              quantity: quote.quantity,
-              key: key.current,
-              minimumProceeds: quote.proceeds,
-            });
-            setQuote(null);
-            key.current = crypto.randomUUID();
-          })
-        }
-      >
-        {a.busy
-          ? "Please wait…"
-          : quote
-            ? `Sell for ${usd(quote.proceeds)}`
-            : "Review sale"}
-      </Button>
-      {quote && <span>Proceeds go to your cash balance.</span>}
-      {a.error && <p role="alert">{a.error}</p>}
-    </div>
+    <Link
+      className="button button-outline button-pill"
+      href={`${position.replay ? "/demo" : `/markets/${position.eventTicker}`}?${query}`}
+    >
+      Sell
+    </Link>
   );
 }
 export function DemoReplayControls() {
@@ -758,6 +687,27 @@ export function MarketPositionStatus({
     matches.find((p) => p.reward?.state === "available") ??
     matches[0];
   if (network !== "devnet" || !position) return null;
+  if (position.state === "open")
+    return (
+      <div className="ticket-held-summary">
+        <span>
+          {Number(position.quantity).toLocaleString("en-US", {
+            maximumFractionDigits: 2,
+          })}{" "}
+          shares held
+        </span>
+        <span>
+          Avg. entry{" "}
+          {usd(
+            money((units(position.cost) * 1000000n) / units(position.quantity)),
+          )}
+        </span>
+        <PositionShare
+          reference={{ source: "demo", id: position.id }}
+          revision={JSON.stringify(position)}
+        />
+      </div>
+    );
   return (
     <div className="ticket-position">
       <div className="position-value-share">
@@ -811,8 +761,6 @@ export function MarketPositionStatus({
         </p>
       ) : position.reward ? (
         <PositionRewards position={position} />
-      ) : position.state === "open" ? (
-        <SellPosition position={position} />
       ) : null}
     </div>
   );

@@ -18,7 +18,12 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ section: string }>;
-  searchParams: Promise<{ scenario?: string; stake?: string }>;
+  searchParams: Promise<{
+    scenario?: string;
+    stake?: string;
+    trade?: string;
+    side?: string;
+  }>;
 }) {
   const { section } = await params;
   if (section === "cart" || section === "collection") redirect("/portfolio");
@@ -50,6 +55,8 @@ export default async function Page({
   return (
     <MarketApp
       section={section}
+      initialTrade={query.trade === "sell" ? "sell" : "buy"}
+      initialSide={query.side === "no" ? "no" : "yes"}
       rehearsal={
         section === "demo" && query.scenario === "grail" ? "grail" : undefined
       }

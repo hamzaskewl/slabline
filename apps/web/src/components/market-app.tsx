@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import {
   asksForSide,
+  bookForSide,
   DEMO_REPLAY,
   DEMO_GRAIL_REPLAY,
   DEMO_REPLAY_CARD,
@@ -70,6 +71,10 @@ import { MarketArt } from "./market-art";
 import { NetworkSettings, useNetwork } from "./network-settings";
 const DemoOrder = dynamic(
   () => import("./demo-controls").then((m) => m.DemoOrder),
+  { ssr: false },
+);
+const DemoSellOrder = dynamic(
+  () => import("./demo-sell-order").then((m) => m.DemoSellOrder),
   { ssr: false },
 );
 const PositionHoldings = dynamic(
@@ -130,6 +135,7 @@ export function MarketApp({
   section = "markets",
   selectedId,
   initialSide = "yes",
+  initialTrade = "buy",
   initialOutcome = 0,
   initialSymbol,
   initialStake = "25",
@@ -138,6 +144,7 @@ export function MarketApp({
   section?: string;
   selectedId?: string;
   initialSide?: "yes" | "no";
+  initialTrade?: "buy" | "sell";
   initialOutcome?: number;
   initialSymbol?: string;
   initialStake?: string;
@@ -519,6 +526,7 @@ export function MarketApp({
                           initialSymbol,
                           initialOutcome,
                           initialSide,
+                          initialTrade,
                         ].join(":")}
                         market={selected}
                         practice={practice}
@@ -545,6 +553,7 @@ export function MarketApp({
                         onSimulate={simulate}
                         initialStake={initialStake}
                         initialSide={initialSide}
+                        initialTrade={initialTrade}
                         initialOutcome={initialOutcome}
                         initialSymbol={practice ? undefined : initialSymbol}
                       />
@@ -736,6 +745,7 @@ function MarketDetail({
   tokens,
   onSimulate,
   initialSide,
+  initialTrade,
   initialOutcome,
   initialSymbol,
   initialStake,
@@ -750,6 +760,7 @@ function MarketDetail({
   tokens: GrailToken[];
   onSimulate: (o: Omit<PracticeOrder, "id" | "createdAt">) => void;
   initialSide: "yes" | "no";
+  initialTrade: "buy" | "sell";
   initialOutcome: number;
   initialSymbol?: string;
   initialStake: string;
@@ -764,6 +775,7 @@ function MarketDetail({
     [expanded, setExpanded] = useState(false),
     [expandedSymbol, setExpandedSymbol] = useState<string | null>(null),
     [side, setSide] = useState<"yes" | "no">(initialSide),
+    [tradeMode, setTradeMode] = useState<"buy" | "sell">(initialTrade),
     [stake, setStake] = useState(initialStake),
     [stakeRevision, setStakeRevision] = useState(0),
     [range, setRange] = useState<ChartRange>("ALL"),
@@ -785,6 +797,12 @@ function MarketDetail({
     : live;
   const livePrice = (s: "yes" | "no") =>
     !book || stale ? null : (asksForSide(book, s)[0]?.price ?? null);
+  const ticketPrice = (s: "yes" | "no") =>
+    tradeMode === "buy"
+      ? livePrice(s)
+      : !book || stale
+        ? null
+        : (bookForSide(book, s).bids[0]?.price ?? null);
   const charted = contracts.slice(0, 3);
   if (contract && !charted.some((c) => c.symbol === symbol))
     charted.splice(2, 1, contract);
@@ -836,7 +854,7 @@ function MarketDetail({
     rehearsal === "grail" ? (
       <GrailRehearsal
         payout={
-          quote
+          quote && tradeMode === "buy"
             ? money(units(heldShares) + units(quote.totalPayout))
             : units(heldShares) > 0n
               ? heldShares
@@ -863,13 +881,14 @@ function MarketDetail({
         side={side}
         stale={stale}
         payout={
-          quote
+          quote && tradeMode === "buy"
             ? money(units(heldShares) + units(quote.totalPayout))
             : units(heldShares) > 0n
               ? heldShares
               : null
         }
         onStake={(value) => {
+          setTradeMode("buy");
           setStake(String(Number(value)));
           setReview(false);
         }}
@@ -1043,6 +1062,25 @@ function MarketDetail({
               ))}
             </Select>
           </label>
+          <div
+            className="trade-mode-tabs"
+            role="group"
+            aria-label="Trade direction"
+          >
+            {(["buy", "sell"] as const).map((mode) => (
+              <button
+                type="button"
+                key={mode}
+                aria-pressed={tradeMode === mode}
+                onClick={() => {
+                  setTradeMode(mode);
+                  setReview(false);
+                }}
+              >
+                {mode === "buy" ? "Buy" : "Sell"}
+              </button>
+            ))}
+          </div>
           <div className="side-toggle">
             {(["yes", "no"] as const).map((s) => (
               <button
@@ -1052,7 +1090,7 @@ function MarketDetail({
                 disabled={!contract}
                 onClick={() => contract && selectOutcome(contract.symbol, s)}
               >
-                {s === "yes" ? "Yes" : "No"} <b>{buyPercent(livePrice(s))}</b>
+                {s === "yes" ? "Yes" : "No"} <b>{buyPercent(ticketPrice(s))}</b>
               </button>
             ))}
           </div>
@@ -1067,75 +1105,159 @@ function MarketDetail({
                 : "Connecting to live odds…"}
             </p>
           )}
-          <label className="stake-label" htmlFor="stake">
-            Your stake <span>USD</span>
-          </label>
-          <div className="stake-input">
-            <span>$</span>
-            <input
-              id="stake"
-              inputMode="decimal"
-              value={stake}
-              onChange={(e) => {
-                setStake(e.target.value);
-                setStakeRevision((revision) => revision + 1);
-                setReview(false);
-              }}
-              aria-describedby="quote-note"
-            />
-          </div>
-          <div className="stake-presets">
-            {[50, 100, 500].map((v) => (
-              <button
-                key={v}
-                onClick={() => {
-                  setStakeRevision((revision) => revision + 1);
-                  setStake(
-                    String(
-                      Math.min(
-                        1000000,
-                        Math.round(((Number(stake) || 0) + v) * 100) / 100,
-                      ),
-                    ),
-                  );
-                  setReview(false);
-                }}
-              >
-                +${v}
-              </button>
-            ))}
-            <button
-              disabled
-              title="A verified spendable USD balance is required"
-            >
-              Max
-            </button>
-          </div>
-          {!practice && process.env.NEXT_PUBLIC_PRIVY_APP_ID && symbol && (
-            <DemoOrder
-              onFilled={() => {
-                setStake("0");
-                setReview(false);
-              }}
-              targetMint={
-                explicitTarget?.symbol === symbol &&
-                explicitTarget.side === side
-                  ? explicitTarget.mint
-                  : undefined
-              }
-              eventTicker={market.ticker ?? market.id}
+          {tradeMode === "buy" ? (
+            <>
+              <label className="stake-label" htmlFor="stake">
+                Your stake <span>USD</span>
+              </label>
+              <div className="stake-input">
+                <span>$</span>
+                <input
+                  id="stake"
+                  inputMode="decimal"
+                  value={stake}
+                  onChange={(e) => {
+                    setStake(e.target.value);
+                    setStakeRevision((revision) => revision + 1);
+                    setReview(false);
+                  }}
+                  aria-describedby="quote-note"
+                />
+              </div>
+              <div className="stake-presets">
+                {[50, 100, 500].map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => {
+                      setStakeRevision((revision) => revision + 1);
+                      setStake(
+                        String(
+                          Math.min(
+                            1000000,
+                            Math.round(((Number(stake) || 0) + v) * 100) / 100,
+                          ),
+                        ),
+                      );
+                      setReview(false);
+                    }}
+                  >
+                    +${v}
+                  </button>
+                ))}
+                <button
+                  disabled
+                  title="A verified spendable USD balance is required"
+                >
+                  Max
+                </button>
+              </div>
+              {!practice && process.env.NEXT_PUBLIC_PRIVY_APP_ID && symbol && (
+                <DemoOrder
+                  onFilled={() => {
+                    setTradeMode("sell");
+                    setStake("0");
+                    setReview(false);
+                  }}
+                  targetMint={
+                    explicitTarget?.symbol === symbol &&
+                    explicitTarget.side === side
+                      ? explicitTarget.mint
+                      : undefined
+                  }
+                  eventTicker={market.ticker ?? market.id}
+                  symbol={symbol}
+                  side={side}
+                  stake={String(Number(stake))}
+                  shares={quote?.contracts ?? null}
+                  replay={replay}
+                  rehearsal={rehearsal}
+                />
+              )}
+              {network === "mainnet" && (
+                <p className="snapshot-status">
+                  Gemini trading connection pending.
+                </p>
+              )}
+              {practice && (
+                <Button
+                  className={`ticket-action trade-submit ${side}`}
+                  disabled={!quote || units(quote.contracts) === 0n}
+                  onClick={() => {
+                    if (!review) {
+                      setReview(true);
+                      return;
+                    }
+                    if (quote) {
+                      onSimulate({
+                        symbol: symbol ?? "SIMULATED",
+                        side,
+                        stake,
+                        contracts: quote.contracts,
+                      });
+                      setReview(false);
+                    }
+                  }}
+                >
+                  {review
+                    ? "Confirm trade"
+                    : `Buy ${side === "yes" ? "Yes" : "No"}`}
+                </Button>
+              )}
+              {quote && (
+                <div
+                  className="execution-estimate"
+                  aria-label="New order estimate"
+                >
+                  <div>
+                    <span title="Weighted average across available orders, before fees">
+                      Order average
+                    </span>
+                    <strong>
+                      {cents(
+                        quote?.averagePrice ?? null,
+                        book?.priceIncrement,
+                        true,
+                      )}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>
+                      New shares
+                      {quote?.exhausted && (
+                        <small className="shares-limit">max available</small>
+                      )}
+                    </span>
+                    <strong>
+                      {quote
+                        ? Number(quote.contracts).toLocaleString("en-US", {
+                            maximumFractionDigits: 2,
+                          })
+                        : "—"}
+                    </strong>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : !practice && process.env.NEXT_PUBLIC_PRIVY_APP_ID && symbol ? (
+            <DemoSellOrder
+              key={`${symbol}:${side}:${replay}:${rehearsal}:${network}`}
               symbol={symbol}
               side={side}
-              stake={String(Number(stake))}
-              shares={quote?.contracts ?? null}
               replay={replay}
               rehearsal={rehearsal}
+              book={book}
+              stale={stale}
             />
-          )}
-          {network === "mainnet" && (
-            <p className="snapshot-status">
-              Gemini trading connection pending.
-            </p>
+          ) : (
+            <div className="sell-order">
+              <div className="sell-amount">
+                <span>Shares</span>
+                <strong>0</strong>
+              </div>
+              <Button className="ticket-action trade-sell-submit" disabled>
+                No shares to sell
+              </Button>
+            </div>
           )}
           {!practice && process.env.NEXT_PUBLIC_PRIVY_APP_ID && symbol && (
             <MarketPositionStatus
@@ -1144,62 +1266,6 @@ function MarketDetail({
               replay={replay}
               rehearsal={rehearsal}
             />
-          )}
-          {practice && (
-            <Button
-              className={`ticket-action trade-submit ${side}`}
-              disabled={!quote || units(quote.contracts) === 0n}
-              onClick={() => {
-                if (!review) {
-                  setReview(true);
-                  return;
-                }
-                if (quote) {
-                  onSimulate({
-                    symbol: symbol ?? "SIMULATED",
-                    side,
-                    stake,
-                    contracts: quote.contracts,
-                  });
-                  setReview(false);
-                }
-              }}
-            >
-              {review
-                ? "Confirm trade"
-                : `Buy ${side === "yes" ? "Yes" : "No"}`}
-            </Button>
-          )}
-          {quote && (
-            <div className="execution-estimate" aria-label="New order estimate">
-              <div>
-                <span title="Weighted average across available orders, before fees">
-                  Order average
-                </span>
-                <strong>
-                  {cents(
-                    quote?.averagePrice ?? null,
-                    book?.priceIncrement,
-                    true,
-                  )}
-                </strong>
-              </div>
-              <div>
-                <span>
-                  New shares
-                  {quote?.exhausted && (
-                    <small className="shares-limit">max available</small>
-                  )}
-                </span>
-                <strong>
-                  {quote
-                    ? Number(quote.contracts).toLocaleString("en-US", {
-                        maximumFractionDigits: 6,
-                      })
-                    : "—"}
-                </strong>
-              </div>
-            </div>
           )}
         </aside>
         {process.env.NEXT_PUBLIC_PRIVY_APP_ID && !practice ? (
