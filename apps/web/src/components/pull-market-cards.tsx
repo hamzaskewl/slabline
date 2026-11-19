@@ -5,27 +5,15 @@ import Link from "next/link";
 import {
   buyPercent,
   eventVolume,
-  canonicalPullTheme,
+  pullOutcomeLabel,
   pullMarketTitle,
-  marketMatches,
-  marketOutcomes,
+  pullThemeOutcomes,
   type PullTheme,
   type Market,
-  type Contract,
 } from "@collectible/domain";
 import { MarketArt } from "./market-art";
 import { Button } from "./ui/button";
 import { api } from "@/lib/trpc";
-
-function outcomeLabel(market: Market, outcome: Contract) {
-  return market.teams?.some((team) => team.label === outcome.label)
-    ? (
-        canonicalPullTheme({ kind: "team", label: outcome.label }) as {
-          label: string;
-        }
-      ).label
-    : outcome.label;
-}
 
 export function PullMarketCard({
   market,
@@ -40,37 +28,27 @@ export function PullMarketCard({
   disabled?: boolean;
   preview?: boolean;
   theme?: PullTheme;
-  onSelect?: (market: Market, symbol?: string, side?: "yes" | "no") => void;
+  onSelect?: (market: Market, symbol: string, side: "yes" | "no") => void;
 }) {
   const href = `/markets/${market.ticker ?? market.id}`;
   const title = pullMarketTitle(market);
-  const canonical = theme && canonicalPullTheme(theme);
-  const player = canonical?.kind === "player" ? canonical.label : "";
+  const canonical = theme ?? ({ kind: "all" } as const);
+  const [expanded, setExpanded] = useState(false);
+  const needsDetail =
+    (market.outcomeCount ?? market.contracts.length) > market.contracts.length;
   const detail = api.market.useQuery(
     { id: market.ticker ?? market.id },
-    { enabled: !!player },
+    { enabled: needsDetail, staleTime: 30000 },
   );
-  const outcomes =
-    player && detail.data?.data
-      ? marketOutcomes(detail.data.data)
-      : market.contracts;
-  const displayOutcomes = player
-    ? [...outcomes].sort((a, b) => {
-        const matches = (contract: Contract) =>
-          marketMatches(
-            {
-              ...market,
-              title: "",
-              ticker: "",
-              searchText: "",
-              contracts: [contract],
-              children: [],
-            },
-            player,
-          );
-        return Number(matches(b)) - Number(matches(a));
-      })
-    : outcomes;
+  const full = detail.data?.data ?? market;
+  const displayOutcomes = pullThemeOutcomes(full, canonical);
+  const loading = needsDetail && !detail.data?.data && detail.isPending;
+  const visible = expanded ? displayOutcomes : displayOutcomes.slice(0, 2);
+  const choose = () => {
+    if (displayOutcomes.length === 1)
+      onSelect?.(full, displayOutcomes[0]!.symbol, "yes");
+    else setExpanded(true);
+  };
   return (
     <article
       className="prediction-card pull-market-card"
@@ -86,8 +64,8 @@ export function PullMarketCard({
           <button
             type="button"
             className="prediction-card-title"
-            disabled={disabled}
-            onClick={() => onSelect(market)}
+            disabled={disabled || loading || !displayOutcomes.length}
+            onClick={choose}
           >
             {title}
           </button>
@@ -98,11 +76,11 @@ export function PullMarketCard({
         )}
       </div>
       <div className="prediction-outcomes">
-        {displayOutcomes.slice(0, 2).map((outcome) => (
+        {visible.map((outcome) => (
           <div className="prediction-outcome" key={outcome.symbol}>
             <span className="outcome-label">
               <MarketArt market={market} outcome={outcome} />
-              <span>{outcomeLabel(market, outcome)}</span>
+              <span>{pullOutcomeLabel(full, outcome)}</span>
             </span>
             {(["yes", "no"] as const).map((side) => {
               const label = `${side === "yes" ? "Yes" : "No"} ${buyPercent(side === "yes" ? outcome.buyYes : outcome.buyNo)}`;
@@ -117,7 +95,7 @@ export function PullMarketCard({
                   className={`outcome-${side}`}
                   disabled={disabled}
                   aria-label={`${outcome.label}: ${label}`}
-                  onClick={() => onSelect(market, outcome.symbol, side)}
+                  onClick={() => onSelect(full, outcome.symbol, side)}
                 >
                   {label}
                 </button>
@@ -139,20 +117,36 @@ export function PullMarketCard({
         <span className="card-category">
           {market.subcategory ?? market.category}
         </span>
-        {(market.outcomeCount ?? market.contracts.length) > 2 && (
-          <span>
-            +{(market.outcomeCount ?? market.contracts.length) - 2} outcomes
-          </span>
+        {!expanded && displayOutcomes.length > 2 && (
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => setExpanded(true)}
+          >
+            +{displayOutcomes.length - 2} predictions
+          </button>
         )}
       </div>
+      {loading && (
+        <p className="pull-muted" role="status">
+          Loading matching predictions…
+        </p>
+      )}
+      {!loading && !displayOutcomes.length && (
+        <p className="pull-muted">No open prediction for this selection.</p>
+      )}
       {onSelect && !preview && (
         <Button
           variant={selected ? "default" : "outline"}
-          disabled={disabled}
+          disabled={disabled || loading || !displayOutcomes.length}
           aria-pressed={!!selected}
-          onClick={() => onSelect(market)}
+          onClick={choose}
         >
-          {selected ? "Selected market" : "Choose market"}
+          {selected
+            ? "Selected prediction"
+            : displayOutcomes.length === 1
+              ? "Choose prediction"
+              : "Show all predictions"}
         </Button>
       )}
     </article>
@@ -170,7 +164,7 @@ export function PullMarketCards({
   selectedId?: string;
   disabled?: boolean;
   theme?: PullTheme;
-  onSelect?: (market: Market, symbol?: string, side?: "yes" | "no") => void;
+  onSelect?: (market: Market, symbol: string, side: "yes" | "no") => void;
 }) {
   const [limit, setLimit] = useState(5);
   return (

@@ -7,7 +7,7 @@ import {
   grailMarket,
 } from "@collectible/integrations";
 import { GrailTrading } from "@/components/grail-trading";
-import { NetworkSettings } from "@/components/network-settings";
+import { UserRound } from "lucide-react";
 
 export default async function TokenPage({
   params,
@@ -35,8 +35,13 @@ export default async function TokenPage({
     <main className="token-page">
       <nav>
         <Link href="/rewards">‹ Rewards</Link>
-        <Link href="/wallet">Wallet</Link>
-        <NetworkSettings />
+        <Link
+          className="profile-entry"
+          href="/profile"
+          aria-label="Profile and settings"
+        >
+          <UserRound size={21} aria-hidden="true" />
+        </Link>
       </nav>
       <GrailTrading
         token={token}

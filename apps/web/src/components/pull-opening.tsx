@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  activeMarket,
-  canonicalPullTheme,
+  pullOutcomeLabel,
   pullMarketTitle,
   marketOutcomes,
   units,
@@ -13,8 +12,11 @@ import {
   type PullTheme,
   type quoteDepth,
 } from "@collectible/domain";
-import { api } from "@/lib/trpc";
-import { usdc } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { Layers3, Coins, Trophy } from "lucide-react";
+import { MarketArt } from "./market-art";
+import { UsdcAmount } from "./usdc-amount";
+import { usdc, number } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { usePullCatalog } from "./pull-catalog";
 import type { PullActions } from "./pull-account";
@@ -78,7 +80,11 @@ export function PullOpeningPanel({
             </div>
           </div>
           {opening.state === "ready" ? (
-            <PullRedemption opening={opening} actions={actions} />
+            <PullRedemption
+              key={opening.id}
+              opening={opening}
+              actions={actions}
+            />
           ) : (
             opening.redemption && (
               <>
@@ -91,8 +97,8 @@ export function PullOpeningPanel({
                     </dd>
                   </div>
                   <div>
-                    <dt>Contracts</dt>
-                    <dd>{opening.redemption.quantity}</dd>
+                    <dt>Shares</dt>
+                    <dd>{number(opening.redemption.quantity)}</dd>
                   </div>
                   <div>
                     <dt>Cost</dt>
@@ -166,14 +172,40 @@ function PullRedemption({
   opening: PullOpening;
   actions: PullActions;
 }) {
-  const theme = canonicalPullTheme(opening.theme ?? allMarkets);
+  const theme = opening.theme ?? allMarkets;
   const [search, setSearch] = useState("");
   const [selection, setSelection] = useState<{
     market: Market;
-    symbol?: string;
-    side?: Side;
+    symbol: string;
+    side: Side;
   } | null>(null);
   const catalog = usePullCatalog(theme, search);
+  if (selection)
+    return (
+      <section
+        className="pull-trade-selection"
+        aria-label="Selected prediction"
+      >
+        <div className="pull-panel-heading">
+          <h3>{pullMarketTitle(selection.market)}</h3>
+          <Button
+            variant="ghost"
+            disabled={actions.busy}
+            onClick={() => setSelection(null)}
+          >
+            Change market
+          </Button>
+        </div>
+        <PullTrade
+          key={`${selection.market.id}:${selection.symbol}:${selection.side}`}
+          opening={opening}
+          chosen={selection.market}
+          initialSymbol={selection.symbol}
+          initialSide={selection.side}
+          actions={actions}
+        />
+      </section>
+    );
   return (
     <div className="pull-stack">
       <div className="pull-panel-heading">
@@ -189,31 +221,6 @@ function PullRedemption({
           onChange={(event) => setSearch(event.target.value)}
         />
       </label>
-      {selection && (
-        <section
-          className="pull-trade-selection"
-          aria-label="Selected prediction"
-        >
-          <div className="pull-panel-heading">
-            <h3>{pullMarketTitle(selection.market)}</h3>
-            <Button
-              variant="ghost"
-              disabled={actions.busy}
-              onClick={() => setSelection(null)}
-            >
-              Change market
-            </Button>
-          </div>
-          <PullTrade
-            key={`${selection.market.id}:${selection.symbol}:${selection.side}`}
-            opening={opening}
-            chosen={selection.market}
-            initialSymbol={selection.symbol}
-            initialSide={selection.side}
-            actions={actions}
-          />
-        </section>
-      )}
       {catalog.searching && (
         <p className="pull-muted" role="status">
           Finding markets…
@@ -251,7 +258,6 @@ function PullRedemption({
         key={search}
         markets={catalog.markets}
         theme={theme}
-        selectedId={selection?.market.id}
         disabled={actions.busy}
         onSelect={(market, symbol, side) => {
           setSelection({ market, symbol, side });
@@ -266,204 +272,144 @@ function PullRedemption({
   );
 }
 
-function PullTrade({
+export function PullTrade({
   opening,
   chosen,
   actions,
-  initialSymbol = "",
+  initialSymbol,
   initialSide = "yes",
 }: {
   opening: PullOpening;
   chosen: Market;
-  initialSymbol?: string;
+  initialSymbol: string;
   initialSide?: Side;
   actions: PullActions;
 }) {
-  const [symbol, setSymbol] = useState(initialSymbol);
   const [side, setSide] = useState<Side>(initialSide);
-  const [review, setReview] = useState<{
-    quote: Quote;
-    eventTicker: string;
-    symbol: string;
-    side: Side;
-  }>();
-  const detail = api.market.useQuery({ id: chosen.ticker ?? chosen.id });
-  const market = detail.data?.data;
-  const outcomes = market
-    ? marketOutcomes(market).filter((outcome) =>
-        /^(active|open)$/i.test(outcome.status),
-      )
-    : [];
-  const selected =
-    outcomes.find((outcome) => outcome.symbol === symbol) ??
-    (outcomes.length === 1 ? outcomes[0] : undefined);
-  const eventTicker = market?.ticker;
-  const ready =
-    eventTicker &&
-    selected &&
-    market &&
-    activeMarket(market) &&
-    !detail.error &&
-    !detail.data?.error;
-  const quote =
-    review &&
-    review.eventTicker === eventTicker &&
-    review.symbol === selected?.symbol &&
-    review.side === side
-      ? review.quote
-      : undefined;
-  const hasFill = quote && units(quote.contracts) > 0n && quote.feesVerified;
-
+  const selected = marketOutcomes(chosen).find(
+    (outcome) => outcome.symbol === initialSymbol,
+  );
+  const eventTicker = chosen.ticker ?? chosen.id;
+  const request = { id: opening.id, eventTicker, symbol: initialSymbol, side };
+  const preview = useQuery({
+    queryKey: ["pull-prediction", opening.id, initialSymbol, side],
+    enabled: !!selected && !actions.busy,
+    queryFn: () =>
+      actions.request<{ quote: Quote }>({ action: "quote", ...request }),
+    retry: 2,
+    retryDelay: 1000,
+    staleTime: 10000,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+  });
+  const quote = preview.data?.quote;
+  const hasFill =
+    !!quote &&
+    units(quote.contracts) > 0n &&
+    quote.feesVerified &&
+    !preview.error;
+  if (!selected)
+    return (
+      <p className="pull-error" role="alert">
+        Choose a prediction from a market card.
+      </p>
+    );
+  const label = pullOutcomeLabel(chosen, selected);
   return (
     <div className="pull-stack">
-      {detail.isPending ? (
+      <div className="pull-selected-outcome">
+        <MarketArt market={chosen} outcome={selected} />
+        <strong>{label}</strong>
+      </div>
+      <fieldset disabled={actions.busy}>
+        <legend>Prediction</legend>
+        <div className="pull-tier-options pull-side-options">
+          {(["yes", "no"] as const).map((value) => (
+            <label key={value} className="pull-choice">
+              <input
+                type="radio"
+                name={`pull-side-${opening.id}`}
+                checked={side === value}
+                onChange={() => setSide(value)}
+              />
+              {value === "yes" ? "Yes" : "No"}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <h3>Confirm prediction</h3>
+      {preview.isPending && (
         <p className="pull-muted" role="status">
-          Loading outcomes…
+          Loading prediction…
         </p>
-      ) : !market || detail.error || detail.data?.error ? (
-        <>
-          <p className="pull-error" role="alert">
-            Market details unavailable.
-          </p>
-          <PullRetry onClick={() => void detail.refetch()}>
-            Refresh market
+      )}
+      {preview.error && (
+        <div role="alert">
+          <p className="pull-error">{preview.error.message}</p>
+          <PullRetry onClick={() => void preview.refetch()}>
+            Try again
           </PullRetry>
-        </>
-      ) : outcomes.length === 0 ? (
-        <p className="pull-muted">No open contracts. Choose another market.</p>
-      ) : (
-        <>
-          <label className="pull-field">
-            <span>Contract</span>
-            <select
-              value={selected?.symbol ?? ""}
-              disabled={actions.busy}
-              onChange={(event) => {
-                setSymbol(event.target.value);
-                setReview(undefined);
-              }}
-            >
-              <option value="" disabled>
-                Choose a contract
-              </option>
-              {outcomes.map((outcome) => (
-                <option value={outcome.symbol} key={outcome.symbol}>
-                  {outcome.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <fieldset disabled={actions.busy}>
-            <legend>Prediction</legend>
-            <div className="pull-tier-options pull-side-options">
-              {(["yes", "no"] as const).map((value) => (
-                <label key={value} className="pull-choice">
-                  <input
-                    type="radio"
-                    name="pull-side"
-                    checked={side === value}
-                    onChange={() => {
-                      setSide(value);
-                      setReview(undefined);
-                    }}
-                  />
-                  {value === "yes" ? "Yes" : "No"}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <Button
-            variant={quote ? "outline" : "default"}
-            className="pull-action"
-            disabled={!ready || actions.busy}
-            onClick={() =>
-              ready &&
-              void actions.run(async () => {
-                setReview(undefined);
-                const result = await actions.request<{ quote: Quote }>({
-                  action: "quote",
-                  id: opening.id,
-                  eventTicker,
-                  symbol: selected.symbol,
-                  side,
-                });
-                setReview({
-                  quote: result.quote,
-                  eventTicker,
-                  symbol: selected.symbol,
-                  side,
-                });
-              })
-            }
-          >
-            {quote ? "Refresh quote" : "Review depth quote"}
-          </Button>
-        </>
+        </div>
       )}
       {quote && (
-        <>
-          <h3>Quote review</h3>
-          <dl className="pull-facts" aria-live="polite">
-            <div>
-              <dt>Contracts</dt>
-              <dd>{quote.contracts}</dd>
-            </div>
-            <div>
-              <dt>Average entry</dt>
-              <dd>
-                {quote.averagePrice === null ? "—" : usdc(quote.averagePrice)}
-              </dd>
-            </div>
-            <div>
-              <dt>Cost before fees</dt>
-              <dd>{usdc(quote.cost)}</dd>
-            </div>
-            <div>
-              <dt>Fees</dt>
-              <dd>{quote.fees === null ? "Unverified" : usdc(quote.fees)}</dd>
-            </div>
-            <div>
-              <dt>Payout if correct</dt>
-              <dd>{usdc(quote.totalPayout)}</dd>
-            </div>
-            <div>
-              <dt>Returned to balance</dt>
-              <dd>{usdc(quote.unspent)}</dd>
-            </div>
-          </dl>
-          {!hasFill ? (
-            <p className="pull-muted">
-              No executable quote. Refresh or choose a different prediction.
-            </p>
-          ) : (
-            <Button
-              className="pull-action"
-              disabled={!ready || actions.busy}
-              onClick={() =>
-                ready &&
-                void actions.run(async () => {
-                  setReview(undefined);
-                  const result = await actions.request<{
-                    opening: PullOpening;
-                    balance?: string;
-                  }>({
-                    action: "redeem",
-                    id: opening.id,
-                    eventTicker,
-                    symbol: selected.symbol,
-                    side,
-                    minimumContracts: quote.contracts,
-                    maximumCost: quote.cost,
-                  });
-                  actions.save(result.opening, result.balance);
-                })
-              }
-            >
-              Confirm prediction
-            </Button>
-          )}
-        </>
+        <dl className="pull-facts pull-confirmation-facts" aria-live="polite">
+          <div>
+            <dt>
+              <Layers3 size={16} aria-hidden="true" /> Shares
+            </dt>
+            <dd>{number(quote.contracts)}</dd>
+          </div>
+          <div>
+            <dt>
+              <Coins size={16} aria-hidden="true" /> Cost
+            </dt>
+            <dd>
+              <UsdcAmount value={quote.cost} />
+            </dd>
+          </div>
+          <div>
+            <dt>
+              <Trophy size={16} aria-hidden="true" /> If correct
+            </dt>
+            <dd>
+              <UsdcAmount value={quote.totalPayout} />
+            </dd>
+          </div>
+        </dl>
       )}
+      {quote && !hasFill && !preview.error && (
+        <p className="pull-muted">
+          No shares are available at this price. Choose another prediction.
+        </p>
+      )}
+      <Button
+        className="pull-action"
+        disabled={!hasFill || actions.busy || preview.isFetching}
+        onClick={() => {
+          if (!quote || !hasFill) return;
+          void actions.run(async () => {
+            try {
+              const result = await actions.request<{
+                opening: PullOpening;
+                balance?: string;
+              }>({
+                action: "redeem",
+                ...request,
+                minimumContracts: quote.contracts,
+                maximumCost: quote.cost,
+              });
+              actions.save(result.opening, result.balance);
+            } catch (error) {
+              void preview.refetch();
+              throw error;
+            }
+          });
+        }}
+      >
+        {actions.busy
+          ? "Confirming…"
+          : `Confirm ${side === "yes" ? "Yes" : "No"}`}
+      </Button>
     </div>
   );
 }

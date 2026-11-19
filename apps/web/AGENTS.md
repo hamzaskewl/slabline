@@ -7,3 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Shared UI rules
+
+For any interface change, follow [UI_CONSISTENCY.md](../../docs/UI_CONSISTENCY.md). Use the shared Select and Button components, the documented spacing scale, and the single profile/settings entry point. Keep team/player pack outcomes bound to the selected subject.

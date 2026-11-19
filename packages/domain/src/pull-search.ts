@@ -1,5 +1,10 @@
-import type { Market, PullTheme } from "./index";
-import { marketMatches, marketTeams, marketSearchText } from "./discovery";
+import {
+  marketOutcomes,
+  type Contract,
+  type Market,
+  type PullTheme,
+} from "./index";
+import { marketTeams, marketSearchText } from "./discovery";
 import history from "./nba-team-history.json";
 const teams = history.teams.map((team) =>
   team.code === "LAC"
@@ -21,6 +26,18 @@ const playerAliases: Record<string, string> = {
   jokic: "Nikola Jokic",
   lebron: "LeBron James",
 };
+function playerAliasPrefix(label: string) {
+  const query = normalize(label);
+  if (query.length < 3) return undefined;
+  const names = [
+    ...new Set(
+      Object.entries(playerAliases)
+        .filter(([alias]) => alias.startsWith(query))
+        .map(([, name]) => name),
+    ),
+  ];
+  return names.length === 1 ? names[0] : undefined;
+}
 const teamAliases = (team: (typeof history.teams)[number]) =>
   [
     team.name,
@@ -37,20 +54,39 @@ const teamAliases = (team: (typeof history.teams)[number]) =>
   ].filter(Boolean);
 
 export function pullTeam(label: string) {
-  return teams.find((team) =>
-    teamAliases(team).some((alias) => normalize(alias) === normalize(label)),
+  const query = normalize(label);
+  const exact = teams.find((team) =>
+    teamAliases(team).some((alias) => normalize(alias) === query),
   );
+  if (exact || query.length < 3) return exact;
+  const prefixes = teams.filter((team) =>
+    teamAliases(team).some((alias) => normalize(alias).startsWith(query)),
+  );
+  return prefixes.length === 1 ? prefixes[0] : undefined;
 }
 
-export function canonicalPullTheme(theme: PullTheme): PullTheme {
+export function canonicalPullTheme(
+  theme: PullTheme,
+  markets: Market[] = [],
+): PullTheme {
   if (theme.kind === "all") return theme;
   const label = theme.label.trim();
   return {
     ...theme,
     label:
       theme.kind === "team"
-        ? (pullTeam(label)?.name ?? label)
-        : (playerAliases[normalize(label)] ?? label),
+        ? markets.some(
+            (market) =>
+              otherSport(market) &&
+              marketTeams(market).some((team) =>
+                phraseMatches(team.label, label),
+              ),
+          )
+          ? label
+          : (pullTeam(label)?.name ?? label)
+        : (playerAliases[normalize(label)] ??
+          playerAliasPrefix(label) ??
+          label),
   };
 }
 
@@ -62,35 +98,88 @@ export function pullSearchQuery(theme: PullTheme, search = "") {
     : canonical.label;
 }
 
-export function matchesPullTheme(market: Market, theme: PullTheme) {
-  if (theme.kind === "all") return true;
-  if (!theme.label.trim()) return false;
-  const canonical = canonicalPullTheme(theme);
-  if (canonical.kind === "all") return true;
-  if (canonical.kind === "player")
-    return (
-      marketMatches(market, canonical.label) ||
-      marketMatches(market, theme.label)
-    );
-  const team = pullTeam(canonical.label);
-  const aliases = team ? teamAliases(team) : [canonical.label];
-  return aliases.some(
-    (alias) =>
-      marketTeams(market).some((entry) =>
-        alias.length <= 3
-          ? normalize(entry.label) === normalize(alias)
-          : normalize(entry.label).includes(normalize(alias)),
-      ) ||
-      (alias.length > 3 &&
-        ` ${normalize(`${marketSearchText(market)} ${market.searchText ?? ""}`)} `.includes(
-          ` ${normalize(alias)} `,
-        )),
+export function sportsPullMarket(market: Market): boolean {
+  return (
+    !!market.sportsMarket?.sport ||
+    /^(sports|basketball|football|baseball|soccer|hockey|tennis|golf|racing|boxing(?: & mma)?|cricket|rugby|wrestling)$/i.test(
+      market.category,
+    )
   );
 }
 
+const phraseMatches = (text: string, label: string) =>
+  !!normalize(label) &&
+  ` ${normalize(text)} `.includes(` ${normalize(label)} `);
+
+function otherSport(market: Market): boolean {
+  return /\b(football|nfl|baseball|mlb|hockey|nhl|soccer|tennis|golf|racing|cricket|rugby)\b/i.test(
+    [
+      market.category,
+      market.subcategory,
+      market.sportsMarket?.sport,
+      market.ticker,
+    ].join(" "),
+  );
+}
+
+export function pullOutcomeLabel(market: Market, outcome: Contract) {
+  return otherSport(market)
+    ? outcome.label
+    : (pullTeam(outcome.label)?.name ?? outcome.label);
+}
+
+function themeLabels(
+  theme: Exclude<PullTheme, { kind: "all" }>,
+  market: Market,
+) {
+  if (theme.kind === "team" && otherSport(market)) return [theme.label];
+  const canonical = canonicalPullTheme(theme) as typeof theme;
+  const team = canonical.kind === "team" && pullTeam(canonical.label);
+  return team ? teamAliases(team) : [canonical.label];
+}
+
+export function matchesPullTheme(market: Market, theme: PullTheme): boolean {
+  if (theme.kind === "all") return true;
+  if (!sportsPullMarket(market) || !theme.label.trim()) return false;
+  const labels = themeLabels(theme, market);
+  // A contiguous name is required: Josh Jacobs + Keenan Allen is not Josh Allen.
+  const text = `${marketSearchText(market)} ${market.searchText ?? ""}`;
+  return labels.some(
+    (label) =>
+      phraseMatches(text, label) ||
+      marketTeams(market).some((team) => phraseMatches(team.label, label)),
+  );
+}
+
+/** Limit a themed pack to its selected subject, including outcomes hidden in previews. */
+export function pullThemeOutcomes(
+  market: Market,
+  theme: PullTheme,
+): Contract[] {
+  const outcomes = marketOutcomes(market).filter((outcome) =>
+    /^(active|open)$/i.test(outcome.status),
+  );
+  if (theme.kind === "all") return outcomes;
+  if (!matchesPullTheme(market, theme)) return [];
+  const labels = themeLabels(theme, market);
+  const direct = outcomes.filter((outcome) =>
+    labels.some((label) => phraseMatches(outcome.label, label)),
+  );
+  if (direct.length) return direct;
+  // A named player/team prop may have generic Yes, Over, or Under outcomes.
+  return labels.some((label) => phraseMatches(market.title, label)) &&
+    (outcomes.length === 1 ||
+      outcomes.every((outcome) =>
+        /^(yes|no|over|under|more|less)(?:\b|$)/i.test(outcome.label),
+      ))
+    ? outcomes
+    : [];
+}
+
 export function availablePullTeams(markets: Market[]) {
+  markets = markets.filter(sportsPullMarket);
   const labels = markets.flatMap((market) =>
-    marketTeams(market).map((team) => team.label),
+    marketTeams(market).map((team) => pullOutcomeLabel(market, team)),
   );
   // Futures may expose teams only as contract labels or searchable outcome text.
   teams.forEach((team) => {
@@ -101,12 +190,11 @@ export function availablePullTeams(markets: Market[]) {
     )
       labels.push(team.name);
   });
-  return [
-    ...new Set(labels.map((label) => pullTeam(label)?.name ?? label)),
-  ].sort((a, b) => a.localeCompare(b));
+  return [...new Set(labels)].sort((a, b) => a.localeCompare(b));
 }
 
 export function pullMarketTitle(market: Market) {
+  if (otherSport(market)) return market.title;
   return marketTeams(market).reduce((title, team) => {
     const canonical = pullTeam(team.label)?.name;
     if (!canonical || canonical === team.label) return title;

@@ -35,6 +35,8 @@ import {
   startMarketRefresh,
 } from "./market-store";
 
+import { waitForBookSnapshot } from "./book-snapshot";
+
 type Session = {
   book: Book | null;
   latestTrade: PricePoint | null;
@@ -331,10 +333,11 @@ const server = Bun.serve({
     if (url.pathname === "/book") {
       try {
         const session = await subscribe(url.searchParams.get("symbol") ?? "");
+        const book = await waitForBookSnapshot(() => session.book);
         return Response.json({
-          book: session.book,
+          book,
           observedAt: new Date().toISOString(),
-          error: session.book ? null : "Waiting for Gemini book snapshot",
+          error: book ? null : "Waiting for Gemini book snapshot",
         });
       } catch {
         return Response.json(
