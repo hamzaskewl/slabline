@@ -3,12 +3,12 @@ import { useSlablineAuth } from "./sign-in-dialog";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePrivateRead } from "@/lib/use-private-read";
-import { relayFormat } from "@collectible/domain";
 import { useConnectWallet } from "@privy-io/react-auth";
 import { useWallets, useSignMessage } from "@privy-io/react-auth/solana";
 import { Button } from "./ui/button";
 import { useNetwork } from "./network-settings";
-import { Wallet, ShieldCheck, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
+import { Wallet, UserRound, ShieldCheck, ArrowUpRight } from "lucide-react";
 
 export function AuthButton({ header = false }: { header?: boolean }) {
   const { ready, authenticated, login, logout } = useSlablineAuth();
@@ -27,6 +27,16 @@ export function AuthButton({ header = false }: { header?: boolean }) {
           Sign up
         </Button>
       </div>
+    );
+  if (header && authenticated)
+    return (
+      <Link
+        className="profile-entry"
+        href="/profile"
+        aria-label="Profile and settings"
+      >
+        <UserRound size={21} aria-hidden="true" />
+      </Link>
     );
   return (
     <Button
@@ -108,9 +118,7 @@ export function ConnectedWalletPanel() {
   }
   return (
     <section className="panel funding-panel account-panel">
-      <h2>
-        Solana wallets{links.data?.network === "devnet" ? " · Devnet" : ""}
-      </h2>
+      <h2>Solana wallets</h2>
 
       {authenticated ? (
         <>
@@ -131,12 +139,6 @@ export function ConnectedWalletPanel() {
                   ? "Verify again"
                   : "Verify wallet"}
               </Button>
-              <WalletBalances
-                wallet={w.address}
-                verified={
-                  !!links.data?.wallets.some((l) => l.address === w.address)
-                }
-              />
               {network === "devnet" && (
                 <div className="wallet-actions">
                   <a
@@ -173,49 +175,5 @@ export function ConnectedWalletPanel() {
       ) : null}
       {message ? <p role="status">{message}</p> : null}
     </section>
-  );
-}
-function WalletBalances({
-  wallet,
-  verified,
-}: {
-  wallet: string;
-  verified: boolean;
-}) {
-  const query = usePrivateRead<{
-    network: string;
-    solLamports: string;
-    usdc: string | null;
-    observedAt: string;
-  }>(`/api/wallet/balances?address=${encodeURIComponent(wallet)}`, verified);
-  if (!verified) return null;
-  return (
-    <div className="wallet-balance-read">
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={query.isFetching}
-        onClick={() => void query.refetch()}
-      >
-        {query.isFetching ? "Reading balances…" : "Refresh balances"}
-      </Button>
-      {query.error ? (
-        <p role="alert">
-          Balances unavailable.{" "}
-          {query.data
-            ? "The saved balances below may be outdated."
-            : "Try again shortly."}
-        </p>
-      ) : null}
-      {query.data ? (
-        <>
-          <p>
-            {relayFormat(query.data.solLamports, 9)} SOL ·{" "}
-            {query.data.usdc ?? "Unavailable"}{" "}
-            {query.data.network === "devnet" ? "test USDC" : "USDC"}
-          </p>
-        </>
-      ) : null}
-    </div>
   );
 }

@@ -259,18 +259,6 @@ test.skipIf(!process.env.DATABASE_URL)(
         "winning reward",
       );
       await rejects(
-        allocateDemoReward(a, p.id, rewardKey, [
-          { ...card, cost: (budget * 0.79).toFixed(6) },
-        ]),
-        "80%",
-      );
-      await rejects(
-        allocateDemoReward(a, p.id, rewardKey, [
-          { ...card, cost: String(budget * 1.05 + 1) },
-        ]),
-        "exceed",
-      );
-      await rejects(
         allocateDemoReward(a, p.id, rewardKey, [card, card]),
         "once",
       );
@@ -283,11 +271,14 @@ test.skipIf(!process.env.DATABASE_URL)(
         (c) => c.rewardPositionId === p.id,
       );
       expect(rewardCards).toHaveLength(1);
-      expect(allocated.balance).toBe(after.balance);
+      expect(Number(allocated.balance)).toBeCloseTo(
+        Number(after.balance) + budget * 0.2,
+        6,
+      );
       await finalizeDemoReward(a, rewardCards[0]!.id);
-      expect((await demoAccount(a)).balance).toBe(after.balance);
+      expect((await demoAccount(a)).balance).toBe(allocated.balance);
       await cancelDemoCollectible(a, rewardCards[0]!.id);
-      expect((await demoAccount(a)).balance).toBe(after.balance);
+      expect((await demoAccount(a)).balance).toBe(allocated.balance);
       expect((await demoAccount(a)).positions[0]!.reward?.state).toBe(
         "available",
       );
@@ -376,7 +367,13 @@ test.skipIf(!process.env.DATABASE_URL)(
         recoverDemoReward(a, legacyId),
       ]);
       const recovered = await demoAccount(a);
-      expect(recovered.balance).toBe(legacyAccount.balance);
+      expect(Number(recovered.balance)).toBeCloseTo(
+        Number(legacyAccount.balance) + Number(legacy.payout),
+        6,
+      );
+      expect(
+        recovered.positions.find((p) => p.id === legacyId)!.reward?.delivery,
+      ).toBe("cash");
       expect(
         recovered.positions.find((p) => p.id === legacyId)!.reward?.budget,
       ).toBe(legacy.payout);
@@ -384,7 +381,7 @@ test.skipIf(!process.env.DATABASE_URL)(
         .update(positions)
         .set({ data: { ...legacyData, payout: "1000000.000000" } })
         .where(eq(positions.id, legacyId));
-      await rejects(recoverDemoReward(a, legacyId), "already been spent");
+      await recoverDemoReward(a, legacyId);
       expect((await demoAccount(a)).balance).toBe(recovered.balance);
     } finally {
       for (const userId of [a, b]) {

@@ -24,7 +24,7 @@ import {
   RefreshCw,
   Search,
   Trophy,
-  Wallet,
+  UserRound,
   X,
   Zap,
 } from "lucide-react";
@@ -57,6 +57,9 @@ import { PRACTICE_MARKET } from "@collectible/integrations/fixtures";
 import { api } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { usd } from "@/lib/utils";
+import { CardAvailability } from "./card-availability";
+import { hasListedCards } from "@/lib/card-availability";
+import { UsdcAmount, UsdcIcon } from "./usdc-amount";
 import { GrailCatalog } from "./grail-catalog";
 import { Discovery } from "./discovery";
 import { MarketSearch } from "./market-search";
@@ -112,15 +115,10 @@ const WalletCollection = dynamic(
   () => import("./wallet-collection").then((m) => m.WalletCollection),
   { ssr: false },
 );
-const ConnectedWalletPanel = dynamic(
-  () => import("./auth-controls").then((m) => m.ConnectedWalletPanel),
+const ProfileSettings = dynamic(
+  () => import("./profile-settings").then((m) => m.ProfileSettings),
   { ssr: false },
 );
-const ProfileEditor = dynamic(
-  () => import("./profile-editor").then((m) => m.ProfileEditor),
-  { ssr: false },
-);
-const RelayFunding = dynamic(() => import("./relay-funding"), { ssr: false });
 const PullPredict = dynamic(
   () => import("./pull-predict").then((m) => m.PullPredict),
   {
@@ -131,7 +129,7 @@ const navigation = [
   { label: "Markets", href: "/", icon: Compass },
   { label: "Rewards", href: "/rewards", icon: Gift },
   { label: "Portfolio", href: "/portfolio", icon: BarChart3 },
-  { label: "Wallet", href: "/wallet", icon: Wallet },
+  { label: "Profile", href: "/profile", icon: UserRound },
 ];
 type PracticeOrder = {
   id: string;
@@ -233,10 +231,7 @@ export function MarketApp({
   );
   const rewardQuery = api.rewards.useQuery(undefined, {
     staleTime: 60000,
-    enabled:
-      replay ||
-      section === "rewards" ||
-      (section === "markets" && !!selectedId),
+    enabled: replay || section === "rewards" || section === "markets",
     refetchInterval: 60000,
   });
   const status = api.status.useQuery();
@@ -278,7 +273,7 @@ export function MarketApp({
         status: "active",
         imageUrl: rehearsal ? (scenario.artwork[0]?.src ?? null) : null,
         description: rehearsal
-          ? "NVIDIA rehearsal with illustrative depth"
+          ? "NVIDIA prediction market"
           : "Recorded Gemini market replay",
         closesAt: null,
         children: [],
@@ -352,7 +347,12 @@ export function MarketApp({
                       section === label.toLowerCase() ? "page" : undefined
                     }
                   >
-                    <Icon size={15} aria-hidden="true" /> {label}
+                    <Icon size={15} aria-hidden="true" />{" "}
+                    {label === "Profile" ? (
+                      <span className="sr-only">Profile</span>
+                    ) : (
+                      label
+                    )}
                   </Link>
                 ))}
               </nav>
@@ -462,7 +462,12 @@ export function MarketApp({
                       section === n.label.toLowerCase() ? "active" : ""
                     }
                   >
-                    <n.icon size={15} aria-hidden="true" /> {n.label}
+                    <n.icon size={15} aria-hidden="true" />{" "}
+                    {n.label === "Profile" ? (
+                      <span className="sr-only">Profile</span>
+                    ) : (
+                      n.label
+                    )}
                   </Link>
                 ))}
               </div>
@@ -481,8 +486,8 @@ export function MarketApp({
                     ? "Collectible rewards"
                     : section === "cart"
                       ? "Your cart"
-                      : section === "wallet"
-                        ? "Wallet"
+                      : section === "profile"
+                        ? "Profile"
                         : section === "portfolio"
                           ? "Portfolio"
                           : "Physical redemption"}
@@ -526,6 +531,12 @@ export function MarketApp({
                     debouncedSearch
                       ? (searchQuery.data?.data ?? markets)
                       : markets
+                  }
+                  cards={
+                    rewardQuery.data?.stale ||
+                    rewardQuery.data?.source === "fixture"
+                      ? []
+                      : cards
                   }
                   catalog={markets}
                   searching={
@@ -646,7 +657,7 @@ export function MarketApp({
                 retry={() => void rewardQuery.refetch()}
               />
             </>
-          ) : section === "portfolio" || section === "wallet" ? (
+          ) : section === "portfolio" || section === "profile" ? (
             status.data?.privyConfigured ? (
               <AccountGate>
                 {section === "portfolio" ? (
@@ -659,29 +670,10 @@ export function MarketApp({
                         <WalletCollection embedded />
                       </>
                     )}
-                    <ProfileEditor />
                   </>
                 ) : (
                   <>
-                    <div className="mobile-wallet-actions">
-                      <AuthButton />
-                      <details className="install-help">
-                        <summary>Add to Home Screen</summary>
-                        <p>
-                          On iPhone, open this site in Safari, tap Share, then
-                          Add to Home Screen. Turn on Open as Web App if shown
-                          and tap Add. In Chrome on Android, open the browser
-                          menu and select Install app or Add to Home screen.
-                        </p>
-                      </details>
-                    </div>
-                    {network === "devnet" ? (
-                      <DemoPortfolio compact />
-                    ) : (
-                      <PrivateAccount compact />
-                    )}
-                    <ConnectedWalletPanel />
-                    {network === "mainnet" && <RelayFunding />}
+                    <ProfileSettings />
                   </>
                 )}
               </AccountGate>
@@ -751,8 +743,8 @@ function WalletEntry({ configured }: { configured: boolean }) {
     <AuthButton header />
   ) : (
     <Button size="sm" variant="outline" asChild>
-      <Link href="/wallet">
-        <Wallet size={15} />
+      <Link href="/profile">
+        <UserRound size={15} />
         Connect account
       </Link>
     </Button>
@@ -966,7 +958,6 @@ function MarketDetail({
               No Jensen Huang slab was listed in the catalog check. A winning
               prediction goes to JENSEN on Grail.
             </p>
-            <span>Rehearsal with illustrative prediction depth.</span>
           </div>
         ) : practice ? (
           <div className="practice-chart">
@@ -981,6 +972,15 @@ function MarketDetail({
             outcomes={charted}
             volume={market.volume}
             eventTime={market.startsAt ?? market.closesAt}
+            availability={
+              <CardAvailability
+                available={
+                  !rewardsLoading &&
+                  !rewardsError &&
+                  hasListedCards(market, cards)
+                }
+              />
+            }
             latestTrade={latestTrade}
             range={range}
             onRangeChange={setRange}
@@ -1006,7 +1006,16 @@ function MarketDetail({
                   }
                 >
                   <MarketArt market={market} outcome={c} />
-                  <strong>{c.label}</strong>
+                  <strong>
+                    {c.label}{" "}
+                    <CardAvailability
+                      available={
+                        !rewardsLoading &&
+                        !rewardsError &&
+                        hasListedCards(market, cards, c)
+                      }
+                    />
+                  </strong>
                   <ChevronDown size={16} />
                 </button>
                 {(["yes", "no"] as const).map((s) => (
@@ -1378,8 +1387,10 @@ function CardTile({ card, eager = false }: { card: Listing; eager?: boolean }) {
         )}
         <div className="card-price card-price-row">
           <div>
-            <small>Listing ask · USDC</small>
-            <strong>{usd(card.ask)}</strong>
+            <small>Listing ask</small>
+            <strong>
+              <UsdcAmount value={card.ask} />
+            </strong>
           </div>
           <CardValue valuation={card.valuation} ask={card.ask} />
         </div>
@@ -1569,7 +1580,9 @@ function RewardCatalog({
               </Select>
             </label>
             <label>
-              Min price · USDC
+              <span>
+                Min price <UsdcIcon />
+              </span>
               <input
                 type="number"
                 inputMode="decimal"
@@ -1580,7 +1593,9 @@ function RewardCatalog({
               />
             </label>
             <label>
-              Max price · USDC
+              <span>
+                Max price <UsdcIcon />
+              </span>
               <input
                 type="number"
                 inputMode="decimal"

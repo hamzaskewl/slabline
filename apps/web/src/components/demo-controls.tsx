@@ -25,7 +25,11 @@ import { CardValue } from "./card-value";
 import { PortfolioOverview } from "./portfolio-overview";
 import { WalletCollection } from "./wallet-collection";
 import { usePrivateRead } from "@/lib/use-private-read";
-import { usd } from "@/lib/utils";
+import { HoldingSection } from "./holding-section";
+import { PortfolioPacks } from "./portfolio-packs";
+import { BalanceActions } from "./balance-actions";
+import { UsdcAmount } from "./usdc-amount";
+import { usd, number } from "@/lib/utils";
 import { useNetwork } from "./network-settings";
 import { Button } from "./ui/button";
 
@@ -174,7 +178,7 @@ export function DemoOrder({
                 );
                 setReceipt(
                   position
-                    ? `${Number(position.quantity).toLocaleString()} shares held · ${usd(position.cost)}`
+                    ? `${number(position.quantity)} shares held · ${usd(position.cost)}`
                     : "Trade saved",
                 );
                 setReview(false);
@@ -191,7 +195,7 @@ export function DemoOrder({
           </Button>
           <p className="trade-confirmation" aria-live="polite">
             {review
-              ? `Up to ${usd(stake)} · ${Number(shares).toLocaleString()} estimated shares`
+              ? `Up to ${usd(stake)} · ${number(shares ?? "0")} estimated shares`
               : null}
           </p>
         </>
@@ -218,9 +222,7 @@ export function DemoPortfolio({
       "/api/demo",
       a.network === "devnet",
     );
-  const [tab, setTab] = useState("all"),
-    [positionFilter, setPositionFilter] = useState("all");
-  const key = useRef(crypto.randomUUID());
+  const [positionFilter, setPositionFilter] = useState("active");
   if (a.network !== "devnet") return null;
   if (!a.authenticated)
     return (
@@ -238,9 +240,6 @@ export function DemoPortfolio({
   const wins = positions.filter(
     (p) => p.reward && p.reward.state !== "claimed",
   );
-  const rewardResults = positions.filter(
-    (p) => p.state === "won" && p.reward?.state !== "claimed",
-  );
   const openCost = positions
     .filter((p) => p.state === "open")
     .reduce((sum, p) => sum + units(p.cost), 0n);
@@ -252,13 +251,18 @@ export function DemoPortfolio({
     (sum, p) =>
       sum +
       units(p.reward!.budget) -
+      (p.reward!.remainderCredited ? units(p.reward!.remainder) : 0n) -
       cards
         .filter((c) => c.rewardPositionId === p.id)
         .reduce((v, c) => v + units(c.cost) - units(c.topUp ?? "0"), 0n),
     0n,
   );
   const total = money(
-    units(data?.balance ?? "0") + openCost + cardCost + rewardValue,
+    units(data?.balance ?? "0") +
+      units(data?.packValue ?? "0") +
+      openCost +
+      cardCost +
+      rewardValue,
   );
   const visiblePositions = positions.filter(
     (p) =>
@@ -288,133 +292,79 @@ export function DemoPortfolio({
           predictionValue={money(openCost)}
           collectibleValue={money(cardCost)}
           rewardValue={money(rewardValue)}
+          packValue={data?.packValue}
           history={data?.history}
-          actions={
-            <>
-              <Button
-                disabled={a.busy || !data}
-                onClick={() =>
-                  void a.run(async () => {
-                    await a.request({ action: "topup", key: key.current });
-                    key.current = crypto.randomUUID();
-                  })
-                }
-              >
-                Add $100
-              </Button>
-            </>
-          }
+          actions={<BalanceActions balance={data?.balance} />}
         />
-      )}
-      {rewardResults.length > 0 && (
-        <section className="portfolio-rewards" aria-label="Winning rewards">
-          {rewardResults.map((p) => (
-            <div className="won-reward" key={p.id}>
-              <PositionArtwork position={p} />
-              <div>
-                <div className="position-value-share">
-                  <h3>You won {usd(p.reward?.budget ?? p.payout ?? "0")}</h3>
-                  <PositionShare
-                    reference={{ source: "demo", id: p.id }}
-                    revision={JSON.stringify(p)}
-                  />
-                </div>
-                <p>
-                  {p.label} · {p.side.toUpperCase()} ·{" "}
-                  {!p.reward
-                    ? "Earlier payout · available in your balance"
-                    : p.reward.state === "available"
-                      ? "Choose your cards"
-                      : "Cards selected · transfer pending"}
-                </p>
-              </div>
-              <PositionRewards position={p} />
-            </div>
-          ))}
-        </section>
-      )}
-      {!compact && grailHoldings.length > 0 && (
-        <section
-          className="portfolio-holdings panel"
-          aria-label="Grail holdings"
-        >
-          <h2>Grail holdings</h2>
-          {grailHoldings.map((p) => (
-            <div className="collection-row" key={p.id}>
-              <CardImage src={DEMO_GRAIL.image} alt={DEMO_GRAIL.name} />
-              <div className="collection-copy">
-                <h3>
-                  {Number(p.grailHolding!.quantity).toLocaleString("en-US", {
-                    maximumFractionDigits: 6,
-                  })}{" "}
-                  {p.grailHolding!.symbol}
-                </h3>
-                <p>Devnet rehearsal · saved in your account</p>
-              </div>
-              <div className="collection-value">
-                <strong>{usd(p.grailHolding!.cost)}</strong>
-              </div>
-              <a
-                className="button button-outline button-pill"
-                href={DEMO_GRAIL.url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                View Grail <ArrowUpRight size={15} />
-              </a>
-            </div>
-          ))}
-        </section>
       )}
       {!compact && (
         <section className="portfolio-holdings panel">
-          {!collection && (
-            <div className="holdings-toolbar">
-              <div className="holdings-tabs" aria-label="Portfolio holdings">
-                {[
-                  ["all", "All holdings"],
-                  ["predictions", "Predictions"],
-                  ["collectibles", "Collectibles"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    aria-pressed={tab === value}
-                    onClick={() => setTab(value!)}
+          <div className="holdings-toolbar">
+            <h2>All holdings</h2>
+            <button
+              className="text-button"
+              disabled={a.busy || snapshot.isFetching}
+              onClick={() =>
+                void a.run(async () => {
+                  await a.request({ action: "refresh" });
+                })
+              }
+            >
+              Refresh
+            </button>
+          </div>
+          <HoldingSection
+            title="Grail holdings"
+            count={grailHoldings.length}
+            storageKey={`holdings:${a.user?.id}:${a.network}:grail`}
+          >
+            {grailHoldings.length ? (
+              grailHoldings.map((p) => (
+                <div className="collection-row grail-holding-row" key={p.id}>
+                  <CardImage src={DEMO_GRAIL.image} alt={DEMO_GRAIL.name} />
+                  <div className="collection-copy">
+                    <h3>{p.grailHolding!.symbol}</h3>
+                    <p>{number(p.grailHolding!.quantity)} tokens</p>
+                  </div>
+                  <div className="collection-value">
+                    <strong>
+                      <UsdcAmount value={p.grailHolding!.cost} />
+                    </strong>
+                  </div>
+                  <a
+                    className="button button-outline button-pill"
+                    href={DEMO_GRAIL.url}
+                    target="_blank"
+                    rel="noreferrer"
                   >
-                    {label}
-                  </button>
-                ))}
+                    View Grail <ArrowUpRight size={15} />
+                  </a>
+                </div>
+              ))
+            ) : (
+              <div className="holdings-empty">
+                <p>Your Grail holdings will appear here.</p>
               </div>
-              <button
-                className="text-button"
-                disabled={a.busy || snapshot.isFetching}
-                onClick={() =>
-                  void a.run(async () => {
-                    await a.request({ action: "refresh" });
-                  })
-                }
-              >
-                Refresh
-              </button>
-            </div>
-          )}
+            )}
+          </HoldingSection>
           {snapshot.isPending && <p role="status">Loading your holdings…</p>}
-          {!collection && tab !== "collectibles" && (
-            <div className="portfolio-section">
-              <div className="portfolio-section-heading">
-                <h2>
-                  Prediction positions <span>{positions.length}</span>
-                </h2>
+          {!collection && (
+            <HoldingSection
+              title="Prediction positions"
+              count={positions.length}
+              storageKey={`holdings:${a.user?.id}:${a.network}:predictions`}
+              actions={
                 <Select
                   aria-label="Position status"
                   value={positionFilter}
                   onChange={(e) => setPositionFilter(e.target.value)}
                 >
+                  <option value="active">Active positions</option>
                   <option value="all">All positions</option>
-                  <option value="active">Active</option>
-                  <option value="closed">Closed</option>
+                  <option value="closed">Closed positions</option>
                 </Select>
-              </div>
+              }
+            >
               {visiblePositions.length ? (
                 <div className="position-list">
                   {visiblePositions.map((p) => (
@@ -424,8 +374,6 @@ export function DemoPortfolio({
                           <SellPosition position={p} />
                           <PositionRewards position={p} preview />
                         </>
-                      ) : p.state === "won" ? (
-                        <PositionRewards position={p} />
                       ) : null}
                     </PositionRow>
                   ))}
@@ -441,71 +389,77 @@ export function DemoPortfolio({
                   </Link>
                 </div>
               )}
-            </div>
+            </HoldingSection>
           )}
-          {(collection || tab !== "predictions") && (
-            <div className="portfolio-section">
-              <div className="portfolio-section-heading">
-                <h2>
-                  {collection ? "Your collection" : "Collectibles"}{" "}
-                  <span>{cards.length}</span>
-                </h2>
-                <Link
-                  className="button button-outline button-pill"
-                  href="/rewards"
-                >
-                  Browse rewards
-                </Link>
+          <HoldingSection
+            title="Collectibles"
+            count={cards.length}
+            storageKey={`holdings:${a.user?.id}:${a.network}:collectibles`}
+            actions={
+              <Link
+                className="button button-outline button-pill"
+                href="/rewards"
+              >
+                Browse rewards
+              </Link>
+            }
+          >
+            {cards.length ? (
+              <div className="collection-list">
+                {cards.map((c) => (
+                  <article className="collection-row" key={c.id}>
+                    <CardImage src={c.image} alt={c.name} />
+                    <div className="collection-copy">
+                      <h3>{c.name}</h3>
+                      <p>
+                        {c.source === "grail" ? "Grail" : "Collector Crypt"} ·{" "}
+                        {c.rewardPositionId ? "Won reward" : "Collected"}
+                      </p>
+                      <CardValue valuation={c.valuation} />
+                    </div>
+                    <div className="collection-value">
+                      <strong>
+                        <UsdcAmount value={c.cost} />
+                      </strong>
+                      <span>
+                        {c.state === "confirmed"
+                          ? "In your collection"
+                          : "Transfer pending"}
+                      </span>
+                    </div>
+                    <div className="collection-actions">
+                      {c.state === "confirmed" && c.mint ? (
+                        <a
+                          className="text-link"
+                          href={`https://explorer.solana.com/address/${c.mint}?cluster=devnet`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View asset <ArrowUpRight size={15} />
+                        </a>
+                      ) : (
+                        <DemoMintActions item={c} />
+                      )}
+                    </div>
+                  </article>
+                ))}
               </div>
-              {cards.length ? (
-                <div className="collection-list">
-                  {cards.map((c) => (
-                    <article className="collection-row" key={c.id}>
-                      <CardImage src={c.image} alt={c.name} />
-                      <div className="collection-copy">
-                        <h3>{c.name}</h3>
-                        <p>
-                          {c.source === "grail" ? "Grail" : "Collector Crypt"} ·{" "}
-                          {c.rewardPositionId ? "Won reward" : "Collected"}
-                        </p>
-                        <CardValue valuation={c.valuation} />
-                      </div>
-                      <div className="collection-value">
-                        <strong>{usd(c.cost)}</strong>
-                        <span>
-                          {c.state === "confirmed"
-                            ? "In your collection"
-                            : "Transfer pending"}
-                        </span>
-                      </div>
-                      <div className="collection-actions">
-                        {c.state === "confirmed" && c.mint ? (
-                          <a
-                            className="text-link"
-                            href={`https://explorer.solana.com/address/${c.mint}?cluster=devnet`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            View asset <ArrowUpRight size={15} />
-                          </a>
-                        ) : (
-                          <DemoMintActions item={c} />
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="holdings-empty">
-                  <p>Your collected cards will appear here.</p>
-                </div>
-              )}
-              <WalletCollection
-                embedded
-                excludeMints={cards.flatMap((c) => (c.mint ? [c.mint] : []))}
-              />
-            </div>
-          )}
+            ) : (
+              <div className="holdings-empty">
+                <p>Your collected cards will appear here.</p>
+              </div>
+            )}
+            <WalletCollection
+              embedded
+              excludeMints={cards.flatMap((c) => (c.mint ? [c.mint] : []))}
+            />
+          </HoldingSection>
+          <HoldingSection
+            title="Unplayed packs"
+            storageKey={`holdings:${a.user?.id}:${a.network}:packs`}
+          >
+            <PortfolioPacks />
+          </HoldingSection>
         </section>
       )}
     </div>
@@ -550,7 +504,7 @@ export function PositionRow({
         </Link>
         <h3>{p.label}</h3>
         <p>
-          {Number(p.quantity).toLocaleString()} shares · {usd(p.cost)} paid
+          {number(p.quantity)} shares · {usd(p.cost)} paid
         </p>
       </div>
       <div className="position-result">
@@ -558,12 +512,17 @@ export function PositionRow({
           {p.side === "yes" ? "Yes" : "No"}
         </span>
         <div className="position-value-share">
+          {p.state === "won" && <PositionRewards position={p} />}
           <strong className={p.state === "won" ? "positive" : ""}>
-            {p.state === "open"
-              ? usd(p.quantity)
-              : p.state === "sold"
-                ? usd(p.saleProceeds ?? "0")
-                : usd(p.payout ?? "0")}
+            <UsdcAmount
+              value={
+                p.state === "open"
+                  ? p.quantity
+                  : p.state === "sold"
+                    ? (p.saleProceeds ?? "0")
+                    : (p.payout ?? "0")
+              }
+            />
           </strong>
           <PositionShare
             reference={{ source: "demo", id: p.id }}
@@ -586,7 +545,7 @@ export function PositionRow({
                   : "Lost"}
         </span>
       </div>
-      <div className="position-actions">{children}</div>
+      {p.state !== "won" && <div className="position-actions">{children}</div>}
     </div>
   );
 }
@@ -758,7 +717,7 @@ export function MarketPositionStatus({
           {Number(position.grailHolding.quantity).toLocaleString("en-US", {
             maximumFractionDigits: 2,
           })}{" "}
-          {position.grailHolding.symbol} received · devnet rehearsal
+          {position.grailHolding.symbol} received
         </p>
       ) : position.reward ? (
         <PositionRewards position={position} />

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   LineSeries,
   createChart,
@@ -35,6 +35,7 @@ export default function PriceChart({
   outcomes,
   volume,
   eventTime,
+  availability,
   range,
   onRangeChange,
   latestTrade,
@@ -44,6 +45,7 @@ export default function PriceChart({
   outcomes: Outcome[];
   volume?: string | null;
   eventTime: string | null;
+  availability?: ReactNode;
   range: ChartRange;
   onRangeChange: (r: ChartRange) => void;
   latestTrade: (PricePoint & { symbol: string }) | null;
@@ -278,6 +280,7 @@ export default function PriceChart({
       <div className="chart-controls">
         {!compact && (
           <div className="chart-meta">
+            {availability}
             {eventTime && (
               <time dateTime={eventTime}>
                 {new Date(eventTime).toLocaleString("en-US", {

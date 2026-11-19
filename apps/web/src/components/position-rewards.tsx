@@ -6,12 +6,12 @@ import { useModalStatus } from "@privy-io/react-auth";
 import {
   cardPlayer,
   units,
-  rewardAllocation,
   type DemoPosition,
   type Listing,
   type GrailToken,
 } from "@collectible/domain";
 import { usePrivateRead } from "@/lib/use-private-read";
+import { UsdcAmount, UsdcIcon } from "./usdc-amount";
 import { usd } from "@/lib/utils";
 import { useDemoAction, DemoMintActions } from "./demo-controls";
 import {
@@ -47,7 +47,7 @@ export function PositionRewards({
         ? "Finish claim"
         : "Claim";
   if (position.reward?.delivery === "cash")
-    return <span role="status">Cash received</span>;
+    return <span role="status">Balance received</span>;
   if (position.reward?.delivery === "grail")
     return <span role="status">Grail received</span>;
   return (
@@ -194,7 +194,7 @@ function PositionRewardsContent({
       <div className="position-rewards-scroll">
         {position.reward?.delivery === "cash" ? (
           <div className="claim-delivery">
-            <h3>Cash received</h3>
+            <h3>Balance received</h3>
             <p>{usd(position.reward.budget)} is available in your balance.</p>
           </div>
         ) : allocated ? (
@@ -207,7 +207,7 @@ function PositionRewardsContent({
             <p>
               {position.reward?.state === "claimed"
                 ? "This reward is complete."
-                : "Finish each card transfer here. Your cash remainder is released after delivery."}
+                : "Finish each card transfer here. Any leftover is already in your balance."}
             </p>
             {selected.map((card) => (
               <article className="claim-delivery-card" key={card.id}>
@@ -224,61 +224,57 @@ function PositionRewardsContent({
           <>
             {!preview && !position.reward && (
               <div className="claim-legacy">
-                <p>
-                  This earlier win already paid {usd(position.payout ?? "0")}{" "}
-                  into your balance. Move that amount into card rewards to
-                  choose your cards.
-                </p>
-                <Button
-                  disabled={a.busy}
-                  onClick={() =>
-                    void a.run(async () => {
-                      await a.request({
-                        action: "recover-reward",
-                        id: position.id,
-                      });
-                    })
-                  }
-                >
-                  {a.busy
-                    ? "Moving reward…"
-                    : `Use ${usd(position.payout ?? "0")} for rewards`}
-                </Button>
-                {a.error && <p role="alert">{a.error}</p>}
+                <h3>Payout received</h3>
+                <p>This payout was already added to your balance.</p>
               </div>
             )}
-            {!preview && position.reward?.state === "available" && (
-              <div className="claim-cash-option">
-                <div>
-                  <h3>Keep it in cash</h3>
-                  <p>
-                    {usd(position.reward.budget)} goes to your available
-                    balance.
-                  </p>
+            {!preview &&
+              position.reward?.state === "available" &&
+              selected.length === 0 && (
+                <div className="claim-cash-option">
+                  <div>
+                    <h3>
+                      <UsdcIcon /> Add to balance
+                    </h3>
+                    <p>
+                      {<UsdcAmount value={position.reward.budget} />} goes to
+                      your available balance.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    disabled={a.busy}
+                    onClick={() =>
+                      void a.run(async () => {
+                        await a.request({
+                          action: "cash-reward",
+                          id: position.id,
+                        });
+                      })
+                    }
+                  >
+                    {a.busy ? (
+                      "Claiming…"
+                    ) : (
+                      <>
+                        Claim <UsdcIcon />
+                      </>
+                    )}
+                  </Button>
+                  {a.error && <p role="alert">{a.error}</p>}
                 </div>
-                <Button
-                  variant="outline"
-                  disabled={a.busy}
-                  onClick={() =>
-                    void a.run(async () => {
-                      await a.request({
-                        action: "cash-reward",
-                        id: position.id,
-                      });
-                    })
-                  }
-                >
-                  {a.busy ? "Claiming…" : "Claim cash"}
-                </Button>
-                {a.error && <p role="alert">{a.error}</p>}
-              </div>
-            )}
+              )}
             <p className="claim-budget-note">
-              {preview
-                ? `Potential reward: ${usd(position.quantity)}.`
-                : `Reward budget: ${usd(position.reward?.budget ?? position.payout ?? "0")}.`}{" "}
-              Choose at least 80% in cards. You can add up to 5% from your
-              wallet.
+              {preview ? "Potential reward: " : "Reward budget: "}
+              <UsdcAmount
+                value={
+                  preview
+                    ? position.quantity
+                    : (position.reward?.budget ?? position.payout ?? "0")
+                }
+              />
+              . Choose any cards. Cover the difference with your balance, or
+              keep the full reward in your balance.
             </p>
             {inventory.isPending && (
               <p role="status">Loading matching cards…</p>
@@ -421,7 +417,9 @@ export function PositionRewardCatalog({
               <div className="claim-card-copy">
                 <h3>{card.name}</h3>
                 <div className="card-price-row">
-                  <strong className="listing-price">{usd(card.ask)}</strong>
+                  <strong className="listing-price">
+                    <UsdcAmount value={card.ask} />
+                  </strong>
                   <CardValue valuation={card.valuation} ask={card.ask} />
                 </div>
                 {claimable ? (
@@ -437,11 +435,9 @@ export function PositionRewardCatalog({
                   />
                 ) : (
                   <span className="claim-card-budget">
-                    {rewardAllocation(budget, [card.ask]).overBudget
-                      ? "Above 5% limit"
-                      : units(card.ask) > units(budget)
-                        ? `${usd(Number(card.ask) - Number(budget))} extra from wallet`
-                        : "Within reward budget"}
+                    {units(card.ask) > units(budget)
+                      ? `${usd(Number(card.ask) - Number(budget))} extra from balance`
+                      : "Within reward budget"}
                   </span>
                 )}
               </div>

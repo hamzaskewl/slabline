@@ -11,10 +11,13 @@ import {
   featuredMarkets,
   isCurrentMarket,
   isLiveGame,
+  type Listing,
   type ChartRange,
   type Contract,
   type Market,
 } from "@collectible/domain";
+import { CardAvailability } from "./card-availability";
+import { hasListedCards } from "@/lib/card-availability";
 import { api } from "@/lib/trpc";
 import { MarketArt } from "./market-art";
 import { LiveBadge } from "./live-badge";
@@ -36,7 +39,13 @@ function buttonTextColor(color: string) {
     : "#fff";
 }
 
-export function FeaturedMarkets({ markets }: { markets: Market[] }) {
+export function FeaturedMarkets({
+  markets,
+  cards = [],
+}: {
+  markets: Market[];
+  cards?: Listing[];
+}) {
   const now = useMarketClock();
   const [ended, setEnded] = useState<string[]>([]);
   const hideEnded = useCallback((id: string) => {
@@ -129,6 +138,7 @@ export function FeaturedMarkets({ markets }: { markets: Market[] }) {
                 <FeaturedEvent
                   key={market.id}
                   market={market}
+                  cards={cards}
                   now={now}
                   hideEnded={hideEnded}
                 />
@@ -190,10 +200,12 @@ export function FeaturedMarkets({ markets }: { markets: Market[] }) {
 }
 function FeaturedEvent({
   market,
+  cards,
   now,
   hideEnded,
 }: {
   market: Market;
+  cards: Listing[];
   now: number;
   hideEnded: (id: string) => void;
 }) {
@@ -232,7 +244,10 @@ function FeaturedEvent({
         <Link href={href} className="featured-title">
           <MarketArt market={full} />
           <div>
-            <h2>{full.title}</h2>
+            <h2>
+              {full.title}{" "}
+              <CardAvailability available={hasListedCards(full, cards)} />
+            </h2>
             <p>
               {isLiveGame(full, now) ? (
                 <LiveBadge />
@@ -261,7 +276,10 @@ function FeaturedEvent({
                 textShadow: "none",
               }}
             >
-              <span>{c.label}</span>
+              <span>
+                {c.label}{" "}
+                <CardAvailability available={hasListedCards(full, cards, c)} />
+              </span>
               <strong>{buyPercent(c.buyYes)}</strong>
             </Link>
           ))}
@@ -283,7 +301,10 @@ function FeaturedEvent({
           {teams[0] && (
             <span>
               <MarketArt market={full} outcome={teams[0]} />
-              {teams[0].label}
+              {teams[0].label}{" "}
+              <CardAvailability
+                available={hasListedCards(full, cards, teams[0])}
+              />
             </span>
           )}
           <div>
@@ -304,7 +325,10 @@ function FeaturedEvent({
           {teams[1] && (
             <span>
               <MarketArt market={full} outcome={teams[1]} />
-              {teams[1].label}
+              {teams[1].label}{" "}
+              <CardAvailability
+                available={hasListedCards(full, cards, teams[1])}
+              />
             </span>
           )}
         </div>

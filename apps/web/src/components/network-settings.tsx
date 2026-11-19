@@ -48,12 +48,9 @@ export function NetworkSettings() {
   const [open, setOpen] = useState(false);
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger
-        className="network-trigger"
-        aria-label={`Settings, ${network}`}
-      >
+      <Dialog.Trigger className="network-trigger" aria-label="Settings">
         <Settings2 size={16} />
-        <span>{network === "devnet" ? "Devnet" : "Mainnet"}</span>
+        <span className="sr-only">Settings</span>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="reward-browser-overlay" />

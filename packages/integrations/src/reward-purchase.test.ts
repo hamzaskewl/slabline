@@ -43,7 +43,7 @@ async function rejects(action: Promise<unknown>, message: string) {
     expect(String(result!.reason)).toContain(message);
 }
 
-test("the buyer wallet pays the full NFT price through the marketplace, including any capped extra", async () => {
+test("the buyer wallet pays the full NFT price through the marketplace, including any extra", async () => {
   const allocation = rewardAllocation("145", ["152.25"]);
   expect(allocation.topUp).toBe("7.250000");
   const { context } = await simulatedCcContext();
@@ -78,6 +78,9 @@ test("the buyer wallet pays the full NFT price through the marketplace, includin
 test("demo mint guards reject extra payments and obsolete platform-transfer drafts", () => {
   expect(() => requireUnpaidDemoMint({})).not.toThrow();
   expect(() => requireUnpaidDemoMint({ topUp: "0.000000" })).not.toThrow();
+  expect(() =>
+    requireUnpaidDemoMint({ topUp: "700", topUpSource: "balance" }),
+  ).not.toThrow();
   expect(() => requireUnpaidDemoMint({ topUp: "7.25" })).toThrow(
     "marketplace purchase",
   );
@@ -87,7 +90,7 @@ test("demo mint guards reject extra payments and obsolete platform-transfer draf
 });
 
 test.skipIf(!process.env.DATABASE_URL)(
-  "demo rewards cannot charge an extra or revive legacy transfer drafts; in-budget claims still work",
+  "demo rewards use balance contributions and never revive legacy wallet-transfer drafts",
   async () => {
     const db = getDb();
     const wallet = await generateKeyPairSigner();
@@ -141,20 +144,10 @@ test.skipIf(!process.env.DATABASE_URL)(
           userId,
           position!.id,
           crypto.randomUUID(),
-          [item],
-          "7.25",
+          [{ ...item, cost: "300" }],
+          "155",
         ),
-        "marketplace purchase",
-      );
-      await rejects(
-        allocateDemoReward(
-          userId,
-          position!.id,
-          crypto.randomUUID(),
-          [{ ...item, cost: "152.250001" }],
-          "7.250001",
-        ),
-        "5% wallet limit",
+        "Top up your balance",
       );
       let account = await demoAccount(userId);
       expect(account.collectibles).toHaveLength(0);
@@ -162,17 +155,26 @@ test.skipIf(!process.env.DATABASE_URL)(
       expect(account.balance).toBe("100.000000");
       const key = crypto.randomUUID();
       await Promise.all([
-        allocateDemoReward(userId, position!.id, key, [
-          { ...item, cost: "145" },
-        ]),
-        allocateDemoReward(userId, position!.id, key, [
-          { ...item, cost: "145" },
-        ]),
+        allocateDemoReward(
+          userId,
+          position!.id,
+          key,
+          [{ ...item, cost: "200" }],
+          "55",
+        ),
+        allocateDemoReward(
+          userId,
+          position!.id,
+          key,
+          [{ ...item, cost: "200" }],
+          "55",
+        ),
       ]);
       account = await demoAccount(userId);
       expect(account.collectibles).toHaveLength(1);
-      expect(account.collectibles[0]!.topUp).toBe("0.000000");
-      expect(account.balance).toBe("100.000000");
+      expect(account.collectibles[0]!.topUp).toBe("55.000000");
+      expect(account.collectibles[0]!.topUpSource).toBe("balance");
+      expect(account.balance).toBe("45.000000");
       await cancelDemoCollectible(userId, account.collectibles[0]!.id);
       const [legacy] = await db
         .insert(orders)

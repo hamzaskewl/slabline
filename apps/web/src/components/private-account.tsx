@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { GeminiConnection, GeminiSnapshot } from "@collectible/domain";
 import { Button } from "./ui/button";
-import { usd } from "@/lib/utils";
+import { usd, number } from "@/lib/utils";
 import { usePrivateRead } from "@/lib/use-private-read";
 import { PositionShare } from "./position-share";
 export function PrivateAccount({ compact = false }: { compact?: boolean }) {
@@ -148,7 +148,11 @@ export function PrivateAccount({ compact = false }: { compact?: boolean }) {
                             <tr key={`${p.symbol}-${i}`}>
                               <td>{p.symbol}</td>
                               <td>{p.outcome ?? "Unknown"}</td>
-                              <td>{p.quantity ?? "Not supplied"}</td>
+                              <td>
+                                {p.quantity != null
+                                  ? number(p.quantity)
+                                  : "Not supplied"}
+                              </td>
                               <td>
                                 <div className="position-value-share">
                                   {p.marketValue != null
@@ -198,7 +202,11 @@ export function PrivateAccount({ compact = false }: { compact?: boolean }) {
                                   ? usd(o.price)
                                   : "Not supplied"}
                               </td>
-                              <td>{o.remainingQuantity ?? "Not supplied"}</td>
+                              <td>
+                                {o.remainingQuantity != null
+                                  ? number(o.remainingQuantity)
+                                  : "Not supplied"}
+                              </td>
                             </tr>
                           ))}
                         </tbody>

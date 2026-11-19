@@ -35,9 +35,13 @@ type MintData = DemoCollectible & {
 };
 export function requireUnpaidDemoMint(card: {
   topUp?: string;
+  topUpSource?: "balance";
   payment?: unknown;
 }) {
-  if (units(card.topUp ?? "0") > 0n || card.payment != null)
+  if (
+    (units(card.topUp ?? "0") > 0n && card.topUpSource !== "balance") ||
+    card.payment != null
+  )
     throw new DemoError(
       "Paid rewards require a marketplace purchase from your wallet. Demo card claims cannot spend wallet funds.",
       409,

@@ -9,11 +9,11 @@ export function usd(value: string | number) {
     currency: "USD",
   }).format(Number(value));
 }
-/** Preserve all six USDC decimals when reviewing a wallet charge. */
 export function usdc(value: string | number) {
+  return usd(value);
+}
+export function number(value: string | number) {
   return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 6,
+    maximumFractionDigits: 2,
   }).format(Number(value));
 }

@@ -14,6 +14,7 @@ import "./sign-in.css";
 import "./slabline.css";
 import "./fmv.css";
 import "./responsive-panels.css";
+import "./portfolio-refinements.css";
 import { Providers } from "@/components/providers";
 export const metadata: Metadata = {
   applicationName: "Slabline",

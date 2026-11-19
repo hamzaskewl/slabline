@@ -1,4 +1,5 @@
 "use client";
+import { number as formatNumber } from "@/lib/utils";
 import { useSlablineAuth } from "./sign-in-dialog";
 import { Select } from "./ui/select";
 import { useEffect, useRef, useState } from "react";
@@ -365,9 +366,12 @@ export default function WalletTrade({ token, market, blocker }: TradeProps) {
       </div>
       {balances && (
         <p className="token-balances">
-          {formatUnits(BigInt(balances.payment), balances.paymentDecimals)}{" "}
-          {balances.paymentSymbol} · {formatUnits(BigInt(balances.native), 18)}{" "}
-          ETH · {formatUnits(BigInt(balances.token), balances.decimals)}{" "}
+          {formatNumber(
+            formatUnits(BigInt(balances.payment), balances.paymentDecimals),
+          )}{" "}
+          {balances.paymentSymbol} ·{" "}
+          {formatNumber(formatUnits(BigInt(balances.native), 18))} ETH ·{" "}
+          {formatNumber(formatUnits(BigInt(balances.token), balances.decimals))}{" "}
           {token.symbol}
         </p>
       )}
@@ -428,10 +432,12 @@ export default function WalletTrade({ token, market, blocker }: TradeProps) {
               <p>
                 {order.prepared.action === "swap"
                   ? `Buy ${token.symbol}`
-                  : `Approve exactly ${formatUnits(BigInt(order.quote.sellAmount), order.quote.paymentDecimals)} ${order.quote.paymentSymbol}`}
+                  : `Approve ${formatNumber(formatUnits(BigInt(order.quote.sellAmount), order.quote.paymentDecimals))} ${order.quote.paymentSymbol}`}
                 . Estimated gas:{" "}
-                {formatUnits(BigInt(order.prepared.estimatedGasWei), 18)} ETH.
-                Your wallet shows the final fee.
+                {formatNumber(
+                  formatUnits(BigInt(order.prepared.estimatedGasWei), 18),
+                )}{" "}
+                ETH. Your wallet shows the final fee.
               </p>
               <Button
                 disabled={busy || !order.canSubmit}
@@ -476,7 +482,12 @@ export default function WalletTrade({ token, market, blocker }: TradeProps) {
           {order.state === "confirmed" && (
             <p role="status">
               Received{" "}
-              {formatUnits(BigInt(order.received ?? "0"), order.quote.decimals)}{" "}
+              {formatNumber(
+                formatUnits(
+                  BigInt(order.received ?? "0"),
+                  order.quote.decimals,
+                ),
+              )}{" "}
               {token.symbol} in {order.quote.wallet}.
             </p>
           )}
@@ -538,7 +549,7 @@ export default function WalletTrade({ token, market, blocker }: TradeProps) {
               })) as string;
               if (version === generation.current)
                 setTestResult(
-                  `Connected. ${formatUnits(BigInt(balance), 18)} test ETH. No transaction sent.`,
+                  `Connected. ${formatNumber(formatUnits(BigInt(balance), 18))} test ETH. No transaction sent.`,
                 );
             })
           }

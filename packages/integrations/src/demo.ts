@@ -79,7 +79,7 @@ export async function lockedDemoAccount(tx: Tx, userId: string) {
 export async function demoAccount(userId: string): Promise<DemoAccountView> {
   const snapshot = await getDb().transaction(async (tx) => {
     const account = await lockedDemoAccount(tx, userId);
-    const [savedPositions, collectibles] = await Promise.all([
+    const [savedPositions, collectibles, packs] = await Promise.all([
       tx
         .select()
         .from(positions)
@@ -100,11 +100,45 @@ export async function demoAccount(userId: string): Promise<DemoAccountView> {
           ),
         )
         .orderBy(sql`${orders.createdAt} desc`),
+      tx
+        .select({
+          state: pullOpenings.state,
+          tier: pullOpenings.tier,
+          budget: pullOpenings.budget,
+        })
+        .from(pullOpenings)
+        .where(
+          and(
+            eq(pullOpenings.userId, userId),
+            inArray(pullOpenings.state, ["pending", "ready"]),
+          ),
+        ),
     ]);
     const view: DemoAccountView = {
       balance: account.amount,
+      packValue: money(
+        packs.reduce(
+          (sum, pack) =>
+            sum +
+            units(
+              pack.state === "ready" ? (pack.budget ?? "0") : String(pack.tier),
+            ),
+          0n,
+        ),
+      ),
       positions: savedPositions.map((p) => ({
         ...(p.data as Omit<DemoPosition, "id" | "state" | "createdAt">),
+        ...(p.state === "won" && !(p.data as DemoPosition).reward
+          ? {
+              reward: {
+                budget: (p.data as DemoPosition).payout ?? "0",
+                state: "claimed" as const,
+                cardSpend: "0",
+                remainder: (p.data as DemoPosition).payout ?? "0",
+                delivery: "cash" as const,
+              },
+            }
+          : {}),
         id: p.id,
         state: p.state,
         createdAt: p.createdAt.toISOString(),
@@ -116,6 +150,7 @@ export async function demoAccount(userId: string): Promise<DemoAccountView> {
     );
     const value =
       units(view.balance) +
+      units(view.packValue ?? "0") +
       view.positions.reduce(
         (sum, p) =>
           sum +
@@ -124,6 +159,7 @@ export async function demoAccount(userId: string): Promise<DemoAccountView> {
             ? units(p.cost)
             : p.reward && p.reward.state !== "claimed"
               ? units(p.reward.budget) -
+                (p.reward.remainderCredited ? units(p.reward.remainder) : 0n) -
                 activeCards
                   .filter((c) => c.rewardPositionId === p.id)
                   .reduce(
@@ -229,7 +265,9 @@ export async function demoAccount(userId: string): Promise<DemoAccountView> {
 
   return snapshot;
 }
-export async function demoTopUp(userId: string, key: string) {
+export async function demoTopUp(userId: string, key: string, amount = "100") {
+  if (units(amount) <= 0n || units(amount) > units("1000000"))
+    throw new DemoError("Enter an amount between 0.01 and 1,000,000.");
   return getDb().transaction(async (tx) => {
     const account = await lockedDemoAccount(tx, userId);
     const [entry] = await tx
@@ -238,7 +276,7 @@ export async function demoTopUp(userId: string, key: string) {
         userId,
         idempotencyKey: `demo:topup:${userId}:${key}`,
         state: "credited",
-        data: { network: "devnet", amount: "100.000000" },
+        data: { network: "devnet", amount: money(units(amount)) },
       })
       .onConflictDoNothing()
       .returning();
@@ -246,7 +284,7 @@ export async function demoTopUp(userId: string, key: string) {
       await tx
         .update(fundingIntents)
         .set({
-          amount: money(units(account.amount) + units("100")),
+          amount: money(units(account.amount) + units(amount)),
           version: account.version + 1,
         })
         .where(eq(fundingIntents.id, account.id));
@@ -614,10 +652,10 @@ export async function reconcileDemoPositions(userId?: string) {
   }
 }
 
-/** Older wins were already credited as cash. Move that value, never mint it twice. */
+/** Older payouts were already credited; close their stale claim without another credit. */
 export async function recoverDemoReward(userId: string, id: string) {
   await getDb().transaction(async (tx) => {
-    const account = await lockedDemoAccount(tx, userId);
+    await lockedDemoAccount(tx, userId);
     const [position] = await tx
       .select()
       .from(positions)
@@ -633,24 +671,6 @@ export async function recoverDemoReward(userId: string, id: string) {
     if (!position || position.state !== "won" || !data?.payout)
       throw new DemoError("Winning position not found.", 404);
     if (data.reward) return;
-    if (units(account.amount) < units(data.payout))
-      throw new DemoError(
-        "This older win was paid to your balance and has already been spent. New wins go directly to card rewards.",
-        409,
-      );
-    await tx.insert(settlements).values({
-      userId,
-      idempotencyKey: `demo:recover-reward:${id}`,
-      state: "reward_ready",
-      data: { positionId: id, amount: data.payout, network: "devnet" },
-    });
-    await tx
-      .update(fundingIntents)
-      .set({
-        amount: money(units(account.amount) - units(data.payout)),
-        version: account.version + 1,
-      })
-      .where(eq(fundingIntents.id, account.id));
     await tx
       .update(positions)
       .set({
@@ -658,8 +678,9 @@ export async function recoverDemoReward(userId: string, id: string) {
           ...data,
           reward: {
             budget: data.payout,
-            state: "available",
-            cardSpend: "0.000000",
+            state: "claimed",
+            delivery: "cash",
+            cardSpend: "0",
             remainder: data.payout,
           },
         },
@@ -685,12 +706,13 @@ export function collectibleView(
     signature: d.signature,
     rewardPositionId: d.rewardPositionId,
     topUp: d.topUp,
+    topUpSource: d.topUpSource,
     paymentConfirmedAt: d.paymentConfirmedAt,
     valuation: d.valuation,
     listing: d.listing,
     confirmedAt: d.confirmedAt,
     ...(row.state === "prepared" &&
-    units(d.topUp ?? "0") === 0n &&
+    (units(d.topUp ?? "0") === 0n || d.topUpSource === "balance") &&
     d.payment == null
       ? { unsignedBase64: d.unsignedBase64 }
       : {}),
@@ -790,9 +812,14 @@ export async function cancelDemoCollectible(userId: string, id: string) {
             reward: {
               ...p.reward,
               state: "available",
+              budget: money(
+                units(p.reward.budget) -
+                  (p.reward.remainderCredited ? units(p.reward.remainder) : 0n),
+              ),
+              remainderCredited: false,
               cardSpend: money(units(p.reward.cardSpend) - units(data.cost)),
               remainder: money(
-                units(p.reward.remainder) +
+                (p.reward.remainderCredited ? 0n : units(p.reward.remainder)) +
                   units(data.cost) -
                   units(data.topUp ?? "0"),
               ),
@@ -803,6 +830,15 @@ export async function cancelDemoCollectible(userId: string, id: string) {
           },
         })
         .where(eq(positions.id, position.id));
+      if (data.topUpSource === "balance" && units(data.topUp ?? "0") > 0n) {
+        await tx
+          .update(fundingIntents)
+          .set({
+            amount: money(units(account.amount) + units(data.topUp!)),
+            version: account.version + 1,
+          })
+          .where(eq(fundingIntents.id, account.id));
+      }
     } else
       await tx
         .update(fundingIntents)
@@ -828,7 +864,7 @@ export async function allocateDemoReward(
   expectedTopUp = "0",
 ) {
   return getDb().transaction(async (tx) => {
-    await lockedDemoAccount(tx, userId);
+    const account = await lockedDemoAccount(tx, userId);
     const [position] = await tx
       .select()
       .from(positions)
@@ -889,22 +925,25 @@ export async function allocateDemoReward(
       money(committedTopUp),
     );
     if (!allocation.valid)
-      throw new DemoError(
-        allocation.overBudget
-          ? "Cards exceed your reward plus the 5% wallet limit."
-          : `Choose at least ${allocation.minimum} USDC in cards (80% of your win).`,
-        409,
-      );
+      throw new DemoError("Choose cards with a valid price.", 409);
     if (units(allocation.additionalTopUp) !== units(expectedTopUp))
       throw new DemoError(
-        "Your wallet contribution changed. Review the exact extra payment and try again.",
+        "Your balance contribution changed. Review the amount and try again.",
         409,
       );
-    if (units(allocation.topUp) > 0n)
-      throw new DemoError(
-        "Paid rewards require a marketplace purchase from your wallet. Demo card claims cannot spend wallet funds.",
-        409,
-      );
+    const debit = units(allocation.additionalTopUp);
+    if (debit > units(account.amount))
+      throw new DemoError("Top up your balance to cover the difference.", 409);
+    const credit = data.reward.remainderCredited
+      ? 0n
+      : units(allocation.remainder);
+    await tx
+      .update(fundingIntents)
+      .set({
+        amount: money(units(account.amount) - debit + credit),
+        version: account.version + 1,
+      })
+      .where(eq(fundingIntents.id, account.id));
     await tx.insert(settlements).values({
       userId,
       idempotencyKey: requestKey,
@@ -929,7 +968,8 @@ export async function allocateDemoReward(
         data: {
           ...item,
           topUp: money(topUp),
-          paymentConfirmedAt: undefined,
+          topUpSource: "balance",
+          paymentConfirmedAt: topUp > 0n ? new Date().toISOString() : undefined,
           rewardPositionId: positionId,
           network: "devnet",
         },
@@ -946,6 +986,7 @@ export async function allocateDemoReward(
             cardSpend: allocation.total,
             remainder: allocation.remainder,
             topUp: allocation.topUp,
+            remainderCredited: true,
           },
         },
       })
@@ -953,7 +994,7 @@ export async function allocateDemoReward(
   });
 }
 
-/** Release up to 20% only once every selected card is independently confirmed. */
+/** Complete delivery without crediting an already released remainder twice. */
 export async function finalizeDemoReward(userId: string, orderId: string) {
   return getDb().transaction(async (tx) => {
     const account = await lockedDemoAccount(tx, userId);
@@ -1002,19 +1043,21 @@ export async function finalizeDemoReward(userId: string, orderId: string) {
       !allocation.valid
     )
       return;
-    await tx.insert(settlements).values({
-      userId,
-      idempotencyKey: `demo:remainder:${positionId}`,
-      state: "credited",
-      data: { network: "devnet", positionId, amount: allocation.remainder },
-    });
-    await tx
-      .update(fundingIntents)
-      .set({
-        amount: money(units(account.amount) + units(allocation.remainder)),
-        version: account.version + 1,
-      })
-      .where(eq(fundingIntents.id, account.id));
+    if (!data.reward.remainderCredited) {
+      await tx.insert(settlements).values({
+        userId,
+        idempotencyKey: `demo:remainder:${positionId}`,
+        state: "credited",
+        data: { network: "devnet", positionId, amount: allocation.remainder },
+      });
+      await tx
+        .update(fundingIntents)
+        .set({
+          amount: money(units(account.amount) + units(allocation.remainder)),
+          version: account.version + 1,
+        })
+        .where(eq(fundingIntents.id, account.id));
+    }
     await tx
       .update(positions)
       .set({
@@ -1023,6 +1066,7 @@ export async function finalizeDemoReward(userId: string, orderId: string) {
           reward: {
             ...data.reward,
             state: "claimed",
+            remainderCredited: true,
             cardSpend: allocation.total,
             remainder: allocation.remainder,
             topUp: allocation.topUp,
@@ -1170,6 +1214,22 @@ export async function cashDemoReward(userId: string, id: string) {
     if (position.state !== "won" || data.reward?.state !== "available")
       throw new DemoError(
         "Cash is available before selecting a reward. Cancel pending card transfers first.",
+        409,
+      );
+    const [pendingCard] = await tx
+      .select({ id: orders.id })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.userId, userId),
+          sql`${orders.data}->>'rewardPositionId' = ${id}`,
+          sql`${orders.state} <> 'cancelled'`,
+        ),
+      )
+      .limit(1);
+    if (pendingCard)
+      throw new DemoError(
+        "Cancel pending card transfers before claiming the full balance.",
         409,
       );
     await tx.insert(settlements).values({
