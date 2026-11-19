@@ -79,13 +79,14 @@ test.skipIf(!process.env.DATABASE_URL)(
     const userId = owner!.id;
     const key = crypto.randomUUID();
     const theme = { kind: "team", label: "Toronto" } as const;
+    const practice = { source: "demo-csprng" } as const;
     try {
-      await expect(
-        openPull(userId, key, 200, "demo-csprng", null, theme),
-      ).rejects.toThrow("Insufficient");
+      await expect(openPull(userId, key, 200, practice, theme)).rejects.toThrow(
+        "Insufficient",
+      );
       const [local, retry] = await Promise.all([
-        openPull(userId, key, 25, "demo-csprng", null, theme),
-        openPull(userId, key, 25, "demo-csprng", null, theme),
+        openPull(userId, key, 25, practice, theme),
+        openPull(userId, key, 25, practice, theme),
       ]);
       expect(local).toEqual(retry);
       expect(await pullOpening(userId, local.id)).toEqual(local);
@@ -98,7 +99,7 @@ test.skipIf(!process.env.DATABASE_URL)(
       );
       const competing = await Promise.allSettled(
         [crypto.randomUUID(), crypto.randomUUID()].map((purchase) =>
-          openPull(other!.id, purchase, 100, "demo-csprng", null, theme),
+          openPull(other!.id, purchase, 100, practice, theme),
         ),
       );
       expect(competing.map(({ status }) => status).sort()).toEqual([
@@ -106,22 +107,32 @@ test.skipIf(!process.env.DATABASE_URL)(
         "rejected",
       ]);
       expect((await pullAccount(other!.id)).balance).toBe("0.000000");
-      await expect(
-        openPull(userId, key, 50, "demo-csprng", null, theme),
-      ).rejects.toThrow("already used");
-
-      const funded = await openPull(
-        userId,
-        crypto.randomUUID(),
-        50,
-        "magicblock-devnet",
-        "wallet-fixture",
-        { kind: "all" },
+      await expect(openPull(userId, key, 50, practice, theme)).rejects.toThrow(
+        "already used",
       );
+
+      const magicBlock = {
+        source: "magicblock-devnet",
+        payer: "wallet-fixture",
+        programId: "consumer-deployed",
+      } as const;
+      const drawKey = crypto.randomUUID();
+      const funded = await openPull(userId, drawKey, 50, magicBlock, {
+        kind: "all",
+      });
       expect(funded.budget).toBeNull();
-      const { seedHex } = await pullPendingRequest(userId, funded.id);
+      const replacement = { ...magicBlock, programId: "consumer-replacement" };
+      expect(
+        await openPull(userId, drawKey, 50, replacement, { kind: "all" }),
+      ).toEqual(funded);
+      const { seedHex, programId } = await pullPendingRequest(
+        userId,
+        funded.id,
+      );
+      expect(programId).toBe(magicBlock.programId);
       const proof = {
         seedHex,
+        programId,
         requestAddress: "test-address",
         requestSignature: crypto.randomUUID(),
         randomnessHex: "00".repeat(32),
@@ -129,6 +140,12 @@ test.skipIf(!process.env.DATABASE_URL)(
       };
       await expect(
         fulfillPull(userId, funded.id, { ...proof, seedHex: "00".repeat(32) }),
+      ).rejects.toThrow("does not match");
+      await expect(
+        fulfillPull(userId, funded.id, {
+          ...proof,
+          programId: replacement.programId,
+        }),
       ).rejects.toThrow("does not match");
       await expect(fulfillPull(other!.id, funded.id, proof)).rejects.toThrow(
         "not found",

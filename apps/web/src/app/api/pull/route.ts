@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { address } from "@solana/kit";
 import {
   activeMarket,
   demoPositionContext,
@@ -26,6 +27,7 @@ import {
   pullRandomnessMode,
   requireDemoNetwork,
   requireDemoWallet,
+  type PullRandomnessConfig,
 } from "@collectible/integrations";
 import {
   apiRoute,
@@ -87,13 +89,7 @@ const action = z.discriminatedUnion("action", [
   }),
 ]);
 
-function magicBlock() {
-  const programId = process.env.PULL_MAGICBLOCK_PROGRAM_ID;
-  if (!programId)
-    throw new ApiError(
-      503,
-      "The MagicBlock devnet consumer program has not been configured.",
-    );
+function magicBlock(programId: string) {
   return createMagicBlockDevnetRandomness({
     programId,
     rpcUrl: process.env.PULL_MAGICBLOCK_DEVNET_RPC_URL,
@@ -135,7 +131,7 @@ export function GET(request: Request) {
 
 async function prepare(userId: string, id: string) {
   const pending = await pullPendingRequest(userId, id);
-  const randomness = magicBlock();
+  const randomness = magicBlock(pending.programId);
   try {
     const recoveredSignature =
       await randomness.recoverRequestSignature(pending);
@@ -178,7 +174,7 @@ async function verifyOpening(
     throw new ApiError(409, "This pack has no matching onchain request.");
   }
   const pending = await pullPendingRequest(userId, opening.id);
-  const randomness = magicBlock();
+  const randomness = magicBlock(pending.programId);
   const requestSignature =
     providedSignature ??
     (await randomness.recoverRequestSignature(pending).catch(() => {
@@ -201,6 +197,7 @@ async function verifyOpening(
   return fulfillPull(userId, opening.id, {
     ...proof,
     seedHex: pending.seedHex,
+    programId: pending.programId,
   });
 }
 
@@ -285,18 +282,32 @@ export async function POST(request: Request) {
         return openingResponse(previous);
       }
       const mode = pullRandomnessMode();
+      let randomness: PullRandomnessConfig = { source: "demo-csprng" };
       if (mode === "magicblock-devnet") {
-        magicBlock();
+        let programId: string;
+        try {
+          programId = address(process.env.PULL_MAGICBLOCK_PROGRAM_ID ?? "");
+        } catch {
+          throw new ApiError(
+            503,
+            "The MagicBlock devnet consumer program has not been configured.",
+          );
+        }
         if (!payer)
           throw new ApiError(409, "Choose a verified devnet Solana wallet.");
         await requireDemoWallet(userId, payer);
+        randomness = { source: mode, payer, programId };
+      } else if (payer) {
+        throw new ApiError(
+          409,
+          "This practice draw does not use a Solana wallet.",
+        );
       }
       const opening = await openPull(
         userId,
         input.key,
         input.tier,
-        mode,
-        payer,
+        randomness,
         input.theme,
       );
       return openingResponse(opening);

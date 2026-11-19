@@ -24,6 +24,7 @@ export type PullRandomnessSource = "demo-csprng" | "magicblock-devnet";
 export type PullTheme =
   { kind: "all" } | { kind: "team" | "player"; label: string };
 export type PullProof = {
+  programId: string;
   seedHex: string;
   requestAddress: string;
   requestSignature: string;
@@ -52,5 +53,6 @@ export type PullOpening = {
     remainder: string;
   } | null;
   payer: string | null;
+  programId: string | null;
   theme: PullTheme;
 };

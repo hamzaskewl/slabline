@@ -23,7 +23,11 @@ type Row = typeof pullOpenings.$inferSelect;
 type OpeningData = Pick<
   PullOpening,
   "multiplier" | "randomnessSource" | "proof" | "redemption" | "payer" | "theme"
-> & { version: 1; price: string };
+> & { version: 1; price: string; programId?: string | null };
+
+export type PullRandomnessConfig =
+  | { source: "demo-csprng" }
+  | { source: "magicblock-devnet"; payer: string; programId: string };
 
 function view(row: Row): PullOpening {
   const data = row.data as OpeningData;
@@ -41,6 +45,7 @@ function view(row: Row): PullOpening {
     positionId: row.positionId,
     redemption: data.redemption,
     payer: data.payer,
+    programId: data.programId ?? null,
     theme: data.theme,
   };
 }
@@ -82,9 +87,19 @@ export async function pullOpeningByKey(userId: string, key: string) {
 export async function pullPendingRequest(userId: string, id: string) {
   const row = await rowFor(userId, id);
   const opening = view(row);
-  if (opening.state !== "pending" || !row.seedHex || !opening.payer)
+  if (
+    opening.state !== "pending" ||
+    !row.seedHex ||
+    !opening.payer ||
+    !opening.programId
+  )
     throw new DemoError("This pack has no pending onchain request.", 409);
-  return { opening, seedHex: row.seedHex, payer: opening.payer };
+  return {
+    opening,
+    seedHex: row.seedHex,
+    payer: opening.payer,
+    programId: opening.programId,
+  };
 }
 
 export async function pullAccount(userId: string) {
@@ -137,10 +152,11 @@ export async function openPull(
   userId: string,
   key: string,
   tier: PullTier,
-  randomnessSource: PullRandomnessSource,
-  payer: string | null,
+  randomness: PullRandomnessConfig,
   theme: PullTheme,
 ) {
+  const onchain = randomness.source === "magicblock-devnet";
+  const payer = onchain ? randomness.payer : null;
   return getDb().transaction(async (tx) => {
     const account = await lockedDemoAccount(tx, userId);
     const [existing] = await tx
@@ -156,16 +172,14 @@ export async function openPull(
     const price = units(String(tier));
     if (units(account.amount) < price)
       throw new DemoError("Insufficient Demo USD for this pack.", 409);
-    const onchain = randomnessSource === "magicblock-devnet";
-    if (onchain !== Boolean(payer))
-      throw new DemoError("Choose the wallet for this randomness mode.", 409);
     const award = onchain ? null : pullAward(tier, randomInt(10000));
     const data: OpeningData = {
       version: 1,
       price: money(price),
       multiplier: award?.multiplier ?? null,
-      randomnessSource,
+      randomnessSource: randomness.source,
       payer,
+      programId: onchain ? randomness.programId : null,
       theme,
       proof: null,
       redemption: null,
@@ -229,7 +243,8 @@ export async function fulfillPull(
     const data = row.data as OpeningData;
     if (
       data.randomnessSource !== "magicblock-devnet" ||
-      row.seedHex !== proof.seedHex
+      row.seedHex !== proof.seedHex ||
+      data.programId !== proof.programId
     )
       throw new DemoError("Randomness proof does not match this pack.", 409);
     if (row.state !== "pending") {
