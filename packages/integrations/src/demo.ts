@@ -10,6 +10,7 @@ import {
   markets,
   contracts,
   inArray,
+  pullOpenings,
 } from "@collectible/db";
 import {
   demoPayout,
@@ -32,6 +33,7 @@ import {
   type DemoPosition,
   type DemoCollectible,
   type DemoAccountView,
+  type PullOpening,
 } from "@collectible/domain";
 import { geminiClient } from "./gemini";
 import { attachCachedValuations, attachWalletValuations } from "./valuations";
@@ -50,7 +52,7 @@ export function requireDemoNetwork(network: string | null) {
 }
 type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 const accountKey = (userId: string) => `demo:account:${userId}`;
-async function lockedAccount(tx: Tx, userId: string) {
+export async function lockedDemoAccount(tx: Tx, userId: string) {
   await tx
     .insert(fundingIntents)
     .values({
@@ -76,7 +78,7 @@ async function lockedAccount(tx: Tx, userId: string) {
 }
 export async function demoAccount(userId: string): Promise<DemoAccountView> {
   const snapshot = await getDb().transaction(async (tx) => {
-    const account = await lockedAccount(tx, userId);
+    const account = await lockedDemoAccount(tx, userId);
     const [savedPositions, collectibles] = await Promise.all([
       tx
         .select()
@@ -229,7 +231,7 @@ export async function demoAccount(userId: string): Promise<DemoAccountView> {
 }
 export async function demoTopUp(userId: string, key: string) {
   return getDb().transaction(async (tx) => {
-    const account = await lockedAccount(tx, userId);
+    const account = await lockedDemoAccount(tx, userId);
     const [entry] = await tx
       .insert(settlements)
       .values({
@@ -262,53 +264,55 @@ export async function demoBuy(
     replay: boolean;
     rehearsal?: "grail";
     minimumContracts?: string;
+    maximumCost?: string;
     rewardMarket?: DemoPosition["rewardMarket"];
     artwork?: DemoPosition["artwork"];
     shareTarget?: DemoPosition["shareTarget"];
   },
   book: Book,
   observedAt = book.updatedAt,
+  pullOpeningId?: string,
 ) {
-  if (
-    input.rehearsal &&
-    (!input.replay || book.symbol !== DEMO_GRAIL_REPLAY.book.symbol)
-  )
-    throw new DemoError("Open the Grail rehearsal to use this scenario.");
-  if (units(input.stake) <= 0n || units(input.stake) > units("1000000"))
-    throw new DemoError("Enter a stake between 0 and 1,000,000.");
-  if (
-    !input.replay &&
-    (book.source !== "gemini" ||
-      book.stale ||
-      Date.now() - Date.parse(observedAt) > 20000 ||
-      Date.parse(observedAt) - Date.now() > 5000 ||
-      !Number.isFinite(Date.parse(observedAt)))
-  )
-    throw new DemoError("Waiting for fresh market depth.", 409);
-  const quote = quoteDepth({
-    ...book,
-    asks: asksForSide(book, input.side),
-    stake: input.stake,
-    feeBps: 0,
-  });
-  if (
-    input.minimumContracts &&
-    units(quote.contracts) < units(input.minimumContracts)
-  )
-    throw new DemoError(
-      "The price changed. Review the updated shares and confirm again.",
-      409,
-    );
-  if (
-    units(quote.contracts) <
-    units(book.quantityMinimum ?? book.quantityIncrement)
-  )
-    throw new DemoError(
-      "The stake cannot fill the minimum shares at current depth.",
-      409,
-    );
+  if (pullOpeningId && input.replay)
+    throw new DemoError("Choose an active market for this pack.", 409);
+  const quote = demoBuyQuote(input, book, observedAt);
   return getDb().transaction(async (tx) => {
-    const account = await lockedAccount(tx, userId);
+    const account = await lockedDemoAccount(tx, userId);
+    const [opening] = pullOpeningId
+      ? await tx
+          .select()
+          .from(pullOpenings)
+          .where(
+            and(
+              eq(pullOpenings.id, pullOpeningId),
+              eq(pullOpenings.userId, userId),
+            ),
+          )
+          .for("update")
+      : [];
+    if (pullOpeningId) {
+      if (!opening) throw new DemoError("Pack opening not found.", 404);
+      if (opening.state === "redeemed") {
+        const redemption = (opening.data as Pick<PullOpening, "redemption">)
+          .redemption;
+        if (
+          redemption?.symbol !== book.symbol ||
+          redemption.side !== input.side
+        )
+          throw new DemoError(
+            "This pack was already used on another prediction.",
+            409,
+          );
+        return opening.positionId!;
+      }
+      if (
+        opening.state !== "ready" ||
+        opening.budget !== money(units(input.stake))
+      )
+        throw new DemoError("This pack is waiting for a verified result.", 409);
+      // Recheck freshness after acquiring the write lock.
+      demoBuyQuote(input, book, observedAt);
+    }
     const idempotencyKey = `demo:position:${userId}:${key}`;
     const [existing] = await tx
       .select()
@@ -321,7 +325,7 @@ export async function demoBuy(
       .from(orders)
       .where(eq(orders.idempotencyKey, fillKey));
     if (receipt) return (receipt.data as { positionId: string }).positionId;
-    if (units(account.amount) < units(quote.cost))
+    if (!opening && units(account.amount) < units(quote.cost))
       throw new DemoError(
         "Insufficient balance. Add funds in your wallet.",
         409,
@@ -380,17 +384,95 @@ export async function demoBuy(
         quantity: quote.contracts,
         cost: quote.cost,
         network: "devnet",
+        ...(opening ? { pullOpeningId: opening.id } : {}),
       },
     });
+    if (opening) {
+      await tx
+        .update(pullOpenings)
+        .set({
+          state: "redeemed",
+          positionId: position!.id,
+          data: {
+            ...(opening.data as object),
+            redemption: {
+              eventTicker: input.eventTicker,
+              side: input.side,
+              symbol: book.symbol,
+              cost: quote.cost,
+              quantity: quote.contracts,
+              remainder: quote.unspent,
+            },
+          },
+        })
+        .where(eq(pullOpenings.id, opening.id));
+    }
     await tx
       .update(fundingIntents)
       .set({
-        amount: money(units(account.amount) - units(quote.cost)),
+        amount: money(
+          units(account.amount) +
+            (opening ? units(quote.unspent) : -units(quote.cost)),
+        ),
         version: account.version + 1,
       })
       .where(eq(fundingIntents.id, account.id));
     return position!.id;
   });
+}
+
+export function demoBuyQuote(
+  input: {
+    side: "yes" | "no";
+    stake: string;
+    replay: boolean;
+    rehearsal?: "grail";
+    minimumContracts?: string;
+    maximumCost?: string;
+  },
+  book: Book,
+  observedAt = book.updatedAt,
+) {
+  if (
+    input.rehearsal &&
+    (!input.replay || book.symbol !== DEMO_GRAIL_REPLAY.book.symbol)
+  )
+    throw new DemoError("Open the Grail rehearsal to use this scenario.");
+  if (units(input.stake) <= 0n || units(input.stake) > units("1000000"))
+    throw new DemoError("Enter a stake between 0 and 1,000,000.");
+  if (
+    !input.replay &&
+    (book.source !== "gemini" ||
+      book.stale ||
+      Date.now() - Date.parse(observedAt) > 20000 ||
+      Date.parse(observedAt) - Date.now() > 5000 ||
+      !Number.isFinite(Date.parse(observedAt)))
+  )
+    throw new DemoError("Waiting for fresh market depth.", 409);
+  const quote = quoteDepth({
+    ...book,
+    asks: asksForSide(book, input.side),
+    stake: input.stake,
+    feeBps: 0,
+  });
+  if (
+    (input.minimumContracts &&
+      units(quote.contracts) < units(input.minimumContracts)) ||
+    (input.maximumCost && units(quote.cost) > units(input.maximumCost))
+  )
+    throw new DemoError(
+      "The price changed. Review the updated shares and confirm again.",
+      409,
+    );
+  if (
+    units(quote.contracts) <
+    units(book.quantityMinimum ?? book.quantityIncrement)
+  )
+    throw new DemoError(
+      "The stake cannot fill the minimum shares at current depth.",
+      409,
+    );
+  return quote;
 }
 export async function settleDemoPosition(
   userId: string,
@@ -399,7 +481,7 @@ export async function settleDemoPosition(
   source: "gemini" | "replay",
 ) {
   return getDb().transaction(async (tx) => {
-    const account = await lockedAccount(tx, userId);
+    const account = await lockedDemoAccount(tx, userId);
     const [position] = await tx
       .select()
       .from(positions)
@@ -535,7 +617,7 @@ export async function reconcileDemoPositions(userId?: string) {
 /** Older wins were already credited as cash. Move that value, never mint it twice. */
 export async function recoverDemoReward(userId: string, id: string) {
   await getDb().transaction(async (tx) => {
-    const account = await lockedAccount(tx, userId);
+    const account = await lockedDemoAccount(tx, userId);
     const [position] = await tx
       .select()
       .from(positions)
@@ -620,7 +702,7 @@ export async function reserveDemoCollectible(
   collectible: Omit<DemoCollectible, "id" | "state">,
 ) {
   return getDb().transaction(async (tx) => {
-    const account = await lockedAccount(tx, userId);
+    const account = await lockedDemoAccount(tx, userId);
     const idempotencyKey = `demo:collectible:${userId}:${key}`;
     const [existing] = await tx
       .select()
@@ -667,7 +749,7 @@ export async function reserveDemoCollectible(
 }
 export async function cancelDemoCollectible(userId: string, id: string) {
   await getDb().transaction(async (tx) => {
-    const account = await lockedAccount(tx, userId);
+    const account = await lockedDemoAccount(tx, userId);
     const [row] = await tx
       .select()
       .from(orders)
@@ -746,7 +828,7 @@ export async function allocateDemoReward(
   expectedTopUp = "0",
 ) {
   return getDb().transaction(async (tx) => {
-    await lockedAccount(tx, userId);
+    await lockedDemoAccount(tx, userId);
     const [position] = await tx
       .select()
       .from(positions)
@@ -874,7 +956,7 @@ export async function allocateDemoReward(
 /** Release up to 20% only once every selected card is independently confirmed. */
 export async function finalizeDemoReward(userId: string, orderId: string) {
   return getDb().transaction(async (tx) => {
-    const account = await lockedAccount(tx, userId);
+    const account = await lockedDemoAccount(tx, userId);
     const [order] = await tx
       .select()
       .from(orders)
@@ -962,7 +1044,7 @@ export async function sellDemoPosition(
   quantity?: string,
 ) {
   return getDb().transaction(async (tx) => {
-    const account = await lockedAccount(tx, userId);
+    const account = await lockedDemoAccount(tx, userId);
     const [position] = await tx
       .select()
       .from(positions)
@@ -1070,7 +1152,7 @@ export async function sellDemoPosition(
 /** A winning budget is optional: release it to spendable cash exactly once. */
 export async function cashDemoReward(userId: string, id: string) {
   return getDb().transaction(async (tx) => {
-    const account = await lockedAccount(tx, userId);
+    const account = await lockedDemoAccount(tx, userId);
     const [position] = await tx
       .select()
       .from(positions)
