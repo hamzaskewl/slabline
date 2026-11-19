@@ -57,6 +57,7 @@ import { Button } from "@/components/ui/button";
 import { usd } from "@/lib/utils";
 import { GrailCatalog } from "./grail-catalog";
 import { Discovery } from "./discovery";
+import { SlablineMark } from "./slabline-mark";
 import { OutcomeDetail } from "./outcome-detail";
 import { RewardTarget } from "./reward-target";
 import { useLiveBook } from "@/lib/use-live-book";
@@ -272,8 +273,8 @@ export function MarketApp({
         <header className="exchange-header">
           <div className="exchange-header-main">
             <Link href="/" className="exchange-brand">
-              <Layers3 size={27} />
-              <span>Collectible Markets</span>
+              <SlablineMark />
+              <span>Slabline</span>
             </Link>
             <span className="brand-divider" />
             <Link href="/" className="predict-link">
@@ -630,6 +631,10 @@ export function MarketApp({
             </div>
           )}
           <footer className="page-footer">
+            <span className="footer-brand">
+              <SlablineMark height={20} />
+              Slabline
+            </span>
             <Link href="/about">About &amp; credits</Link>
           </footer>
         </main>
@@ -750,6 +755,11 @@ function MarketDetail({
     [review, setReview] = useState(false);
   const contract = contracts.find((c) => c.symbol === selectedSymbol);
   const symbol = contract?.symbol;
+  const [explicitTarget, setExplicitTarget] = useState<{
+    symbol: string;
+    side: string;
+    mint: string;
+  } | null>(null);
   const live = useLiveBook(replay ? undefined : symbol, practice);
   const { book, latestTrade, stale } = replay
     ? { book: DEMO_REPLAY.book, latestTrade: null, stale: false }
@@ -1029,6 +1039,12 @@ function MarketDetail({
           </div>
           {!practice && process.env.NEXT_PUBLIC_PRIVY_APP_ID && symbol && (
             <DemoOrder
+              targetMint={
+                explicitTarget?.symbol === symbol &&
+                explicitTarget.side === side
+                  ? explicitTarget.mint
+                  : undefined
+              }
               eventTicker={market.ticker ?? market.id}
               symbol={symbol}
               side={side}
@@ -1097,6 +1113,9 @@ function MarketDetail({
           </div>
         </aside>
         <RewardTarget
+          onTargetSelect={(mint) =>
+            symbol && setExplicitTarget({ symbol, side, mint })
+          }
           key={`${symbol}:${side}`}
           stake={stake}
           stakeRevision={stakeRevision}

@@ -13,6 +13,32 @@ const id = () => uuid("id").defaultRandom().primaryKey();
 const created = () =>
   timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
 const amount = (name: string) => numeric(name, { precision: 24, scale: 6 });
+// Private ownership/context is separate from the minimal immutable public object.
+export const positionShareTargets = pgTable("position_share_targets", {
+  key: text("key").primaryKey(),
+  userId: uuid("user_id").notNull(),
+  data: jsonb("data").notNull(),
+  updatedAt: created(),
+});
+export const positionShareDrafts = pgTable(
+  "position_share_drafts",
+  {
+    token: text("token").primaryKey(),
+    userId: uuid("user_id").notNull(),
+    reference: jsonb("reference").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    snapshot: jsonb("snapshot").notNull(),
+    png: text("png").notNull(),
+    createdAt: created(),
+  },
+  (t) => [index("share_drafts_owner_time_idx").on(t.userId, t.createdAt)],
+);
+export const publicPositionShares = pgTable("public_position_shares", {
+  token: text("token").primaryKey(),
+  snapshot: jsonb("snapshot").notNull(),
+  png: text("png").notNull(),
+  createdAt: created(),
+});
 export const providerBudgets = pgTable("provider_budgets", {
   id: text("id").primaryKey(),
   startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),

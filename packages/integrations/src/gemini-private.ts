@@ -218,11 +218,35 @@ export async function getGeminiAccountSnapshot(
         quantity: p.totalQuantity ?? null,
         outcome: p.outcome ?? null,
         marketValue: p.marketValue ?? null,
+        averageEntryPrice: p.avgPrice ?? null,
+        // Gemini's published binary contract terms pay $1 for a correct outcome.
+        // Require the provider's instrument type; never derive this from a price.
+        payoutPerShare: p.contractMetadata?.eventType === "binary" ? "1" : null,
+        resolutionSide: p.resolutionSide ?? null,
+        context: {
+          title: p.contractMetadata?.eventName ?? null,
+          label: p.contractMetadata?.contractName ?? null,
+          eventTicker: p.contractMetadata?.eventTicker ?? null,
+          contractStatus: p.contractMetadata?.contractStatus ?? null,
+          eventType: p.contractMetadata?.eventType ?? null,
+        },
       })),
       settlements: (settlements.positions ?? []).map((p) => ({
         symbol: p.instrumentSymbol ?? "Unknown",
         payout: p.payout ?? null,
         settledAt: p.settledAt ?? null,
+        outcome: p.outcome ?? null,
+        resolutionSide: p.resolutionSide ?? null,
+        quantity: p.positionQuantity ?? null,
+        costBasis: p.costBasis ?? null,
+        realizedPnl: p.realizedPnl ?? null,
+        context: {
+          title: p.contractMetadata?.eventName ?? null,
+          label: p.contractMetadata?.contractName ?? null,
+          eventTicker: p.contractMetadata?.eventTicker ?? null,
+          contractStatus: p.contractMetadata?.contractStatus ?? null,
+          eventType: p.contractMetadata?.eventType ?? null,
+        },
       })),
       activeOrders: (activeOrders.orders ?? []).map((o) => ({
         id: o.orderId == null ? null : String(o.orderId),

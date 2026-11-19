@@ -14,14 +14,20 @@ export function RewardBrowser({
   team,
   payout,
   onSelect,
+  initialOpen = false,
+  triggerLabel = "View potential rewards",
+  withinShare = false,
 }: {
   cards: Listing[];
-  selected: Listing;
+  selected?: Listing;
   team?: string;
   payout: string | null;
   onSelect: (mint: string) => void;
+  initialOpen?: boolean;
+  triggerLabel?: string;
+  withinShare?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [player, setPlayer] = useState("all");
   const [onCardOnly, setOnCardOnly] = useState(false);
   const [withinPayout, setWithinPayout] = useState(false);
@@ -35,7 +41,7 @@ export function RewardBrowser({
   const players = [
     ...new Set(cards.map(cardPlayer).filter((p): p is string => !!p)),
   ].sort();
-  const index = sorted.findIndex((c) => c.mint === selected.mint);
+  const index = sorted.findIndex((c) => c.mint === selected?.mint);
   const visible = sorted.filter(
     (c) =>
       (player === "all" || cardPlayer(c) === player) &&
@@ -55,7 +61,7 @@ export function RewardBrowser({
             <ChevronLeft size={16} />
           </button>
           <span>
-            {index + 1} / {cards.length}
+            {Math.max(0, index + 1)} / {cards.length}
           </span>
           <button
             aria-label="Next card"
@@ -68,11 +74,15 @@ export function RewardBrowser({
       </div>
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Trigger className="reward-browse-button">
-          View potential rewards
+          {triggerLabel}
         </Dialog.Trigger>
         <Dialog.Portal>
-          <Dialog.Overlay className="reward-browser-overlay" />
-          <Dialog.Content className="reward-browser">
+          <Dialog.Overlay
+            className={`reward-browser-overlay${withinShare ? " share-target-overlay" : ""}`}
+          />
+          <Dialog.Content
+            className={`reward-browser${withinShare ? " share-target-browser" : ""}`}
+          >
             <header>
               <div>
                 <Dialog.Title>
@@ -127,7 +137,7 @@ export function RewardBrowser({
                       setOpen(false);
                     }}
                     aria-label={`Choose ${c.name}`}
-                    aria-pressed={c.mint === selected.mint}
+                    aria-pressed={c.mint === selected?.mint}
                   >
                     <CardImage src={c.frontImage} alt={c.name} />
                     <span className="reward-browser-card-copy">

@@ -17,11 +17,21 @@ export type GeminiSnapshot = {
     quantity: string | null;
     outcome: string | null;
     marketValue: string | null;
+    averageEntryPrice?: string | null;
+    payoutPerShare?: string | null;
+    resolutionSide?: string | null;
+    context?: GeminiPositionContext;
   }[];
   settlements: {
     symbol: string;
     payout: string | null;
     settledAt: string | null;
+    outcome?: string | null;
+    resolutionSide?: string | null;
+    quantity?: string | null;
+    costBasis?: string | null;
+    realizedPnl?: string | null;
+    context?: GeminiPositionContext;
   }[];
   activeOrders: {
     id: string | null;
@@ -33,6 +43,13 @@ export type GeminiSnapshot = {
     status: string | null;
   }[];
   observedAt: string;
+};
+export type GeminiPositionContext = {
+  title: string | null;
+  label: string | null;
+  eventTicker: string | null;
+  contractStatus: string | null;
+  eventType: string | null;
 };
 export type WalletCollectible = {
   mint: string;

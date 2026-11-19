@@ -1,10 +1,14 @@
-# Collectible Markets
+# Slabline
 
 UBC 2026 hackathon prototype. Source of truth: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Public market discovery, Gemini WebSocket books through SSE, exact depth estimates, slab images and Grail vault data are implemented. Settings selects Mainnet or Devnet. Devnet has an authenticated, persistent $100 demo ledger, top-ups, paper positions, official-result settlement and a repeatable recorded-book replay. Collectibles use user-signed Metaplex Core creation on Solana devnet. Mainnet Gemini execution and funding remain gated.
 
 ## Development
+
+Position shares use the existing Privy and PostgreSQL configuration. Run `bun run db:migrate` before using sharing (migration 0004), and set `APP_URL` to the web origin. The share icon beside a position value opens a private PNG preview. Copy link and platform actions publish an immutable snapshot at `/share/[token]`; its image route serves the exact prepared PNG. Opening the dialog or copying/downloading its image does not publish a link.
+
+Explicit slab selections retain provider metadata; confirmed collectible receipts are separate from trade resolution. The renderer uses bundled Inter and allowlisted provider images. Private previews expire after one hour; public snapshots retain their PNG and minimal metadata. Anonymous public snapshots contain no name, wallet label, avatar or owner ID. Missing fees and ambiguous cost basis remain unavailable. Native image sharing and clipboard support depend on the browser; download and public-link fallbacks remain available.
 
 Requires Bun 1.3.11+, Node 22+ (Next.js tooling), and PostgreSQL for persistence.
 

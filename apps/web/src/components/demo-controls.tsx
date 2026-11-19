@@ -17,6 +17,7 @@ import {
 import { ArrowUpRight } from "lucide-react";
 import { MarketArtwork } from "./market-artwork";
 import { PositionRewards } from "./position-rewards";
+import { PositionShare } from "./position-share";
 import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
 import { PortfolioOverview } from "./portfolio-overview";
@@ -94,6 +95,7 @@ export function useDemoAction() {
 }
 
 export function DemoOrder({
+  targetMint,
   eventTicker,
   symbol,
   side,
@@ -101,6 +103,7 @@ export function DemoOrder({
   shares,
   replay,
 }: {
+  targetMint?: string;
   eventTicker: string;
   symbol: string;
   side: "yes" | "no";
@@ -116,7 +119,7 @@ export function DemoOrder({
     setReview(false);
     setReceipt("");
     key.current = crypto.randomUUID();
-  }, [symbol, side, stake, shares, a.user?.id, a.network]);
+  }, [symbol, side, stake, shares, targetMint, a.user?.id, a.network]);
   if (a.network !== "devnet") return null;
   return (
     <div className="demo-order">
@@ -137,6 +140,7 @@ export function DemoOrder({
               void a.run(async () => {
                 const result = await a.request<DemoAccountView>({
                   action: "buy",
+                  targetMint,
                   key: key.current,
                   eventTicker,
                   symbol,
@@ -287,7 +291,13 @@ export function DemoPortfolio({
             <div className="won-reward" key={p.id}>
               <PositionArtwork position={p} />
               <div>
-                <h3>You won {usd(p.reward?.budget ?? p.payout ?? "0")}</h3>
+                <div className="position-value-share">
+                  <h3>You won {usd(p.reward?.budget ?? p.payout ?? "0")}</h3>
+                  <PositionShare
+                    reference={{ source: "demo", id: p.id }}
+                    revision={JSON.stringify(p)}
+                  />
+                </div>
                 <p>
                   {p.label} · {p.side.toUpperCase()} ·{" "}
                   {!p.reward
@@ -494,13 +504,19 @@ export function PositionRow({
         <span className={`position-side ${p.side}`}>
           {p.side === "yes" ? "Yes" : "No"}
         </span>
-        <strong className={p.state === "won" ? "positive" : ""}>
-          {p.state === "open"
-            ? usd(p.quantity)
-            : p.state === "sold"
-              ? usd(p.saleProceeds ?? "0")
-              : usd(p.payout ?? "0")}
-        </strong>
+        <div className="position-value-share">
+          <strong className={p.state === "won" ? "positive" : ""}>
+            {p.state === "open"
+              ? usd(p.quantity)
+              : p.state === "sold"
+                ? usd(p.saleProceeds ?? "0")
+                : usd(p.payout ?? "0")}
+          </strong>
+          <PositionShare
+            reference={{ source: "demo", id: p.id }}
+            revision={JSON.stringify(p)}
+          />
+        </div>
         <span>
           {p.state === "open"
             ? "Potential reward"
@@ -630,20 +646,35 @@ export function MarketPositionStatus({ symbol }: { symbol: string }) {
     ) ??
     snapshot.data?.positions.find(
       (p) => p.symbol === symbol && p.state === "open",
-    );
+    ) ??
+    snapshot.data?.positions.find((p) => p.symbol === symbol);
   if (network !== "devnet" || !position) return null;
   return (
     <div className="ticket-position">
-      <strong>
-        {position.reward
-          ? `You won ${usd(position.reward.budget)}`
-          : `You own ${Number(position.quantity).toLocaleString()} ${position.side.toUpperCase()} shares`}
-      </strong>
+      <div className="position-value-share">
+        <strong>
+          {position.state === "open"
+            ? `Payout if correct ${usd(position.quantity)}`
+            : position.state === "won"
+              ? `Winning payout ${position.payout ? usd(position.payout) : "—"}`
+              : position.state === "sold"
+                ? `Sale proceeds ${position.saleProceeds ? usd(position.saleProceeds) : "—"}`
+                : position.state === "refunded"
+                  ? `Refund ${position.payout ? usd(position.payout) : "—"}`
+                  : position.state === "lost"
+                    ? `Final payout ${position.payout ? usd(position.payout) : "—"}`
+                    : "Settlement pending"}
+        </strong>
+        <PositionShare
+          reference={{ source: "demo", id: position.id }}
+          revision={JSON.stringify(position)}
+        />
+      </div>
       {position.reward ? (
         <PositionRewards position={position} />
-      ) : (
+      ) : position.state === "open" ? (
         <SellPosition position={position} />
-      )}
+      ) : null}
     </div>
   );
 }

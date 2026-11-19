@@ -48,6 +48,7 @@ export type DemoPosition = {
   createdAt: string;
   rewardMarket?: Market;
   artwork?: { src: string; label: string }[];
+  shareTarget?: import("./position-share").ShareSlab;
   resolution?: "yes" | "no" | "void";
   payout?: string;
   settledAt?: string;

@@ -5,6 +5,7 @@ import type { GeminiConnection, GeminiSnapshot } from "@collectible/domain";
 import { Button } from "./ui/button";
 import { usd } from "@/lib/utils";
 import { usePrivateRead } from "@/lib/use-private-read";
+import { PositionShare } from "./position-share";
 export function PrivateAccount({ compact = false }: { compact?: boolean }) {
   const { ready, authenticated, login, getAccessToken, user } = usePrivy();
   const connection = usePrivateRead<GeminiConnection>("/api/gemini/connection");
@@ -147,9 +148,21 @@ export function PrivateAccount({ compact = false }: { compact?: boolean }) {
                               <td>{p.outcome ?? "Unknown"}</td>
                               <td>{p.quantity ?? "Not supplied"}</td>
                               <td>
-                                {p.marketValue != null
-                                  ? usd(p.marketValue)
-                                  : "Not supplied"}
+                                <div className="position-value-share">
+                                  {p.marketValue != null
+                                    ? usd(p.marketValue)
+                                    : "Not supplied"}
+                                  <PositionShare
+                                    reference={{
+                                      source: "gemini",
+                                      kind: "position",
+                                      symbol: p.symbol,
+                                      outcome: p.outcome,
+                                      settledAt: null,
+                                    }}
+                                    revision={JSON.stringify(p)}
+                                  />
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -208,9 +221,21 @@ export function PrivateAccount({ compact = false }: { compact?: boolean }) {
                             <tr key={`${s.symbol}-${i}`}>
                               <td>{s.symbol}</td>
                               <td>
-                                {s.payout != null
-                                  ? usd(s.payout)
-                                  : "Not supplied"}
+                                <div className="position-value-share">
+                                  {s.payout != null
+                                    ? usd(s.payout)
+                                    : "Not supplied"}
+                                  <PositionShare
+                                    reference={{
+                                      source: "gemini",
+                                      kind: "settlement",
+                                      symbol: s.symbol,
+                                      outcome: s.outcome ?? null,
+                                      settledAt: s.settledAt,
+                                    }}
+                                    revision={JSON.stringify(s)}
+                                  />
+                                </div>
                               </td>
                               <td>{s.settledAt ?? "Not supplied"}</td>
                             </tr>

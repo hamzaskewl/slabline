@@ -82,11 +82,13 @@ export function GrailReward({
   payout = null,
   side,
   claimable = true,
+  onTargetSelect,
 }: {
   token: GrailToken;
   payout?: string | null;
   side?: "yes" | "no";
   claimable?: boolean;
+  onTargetSelect?: (reserveId: string) => void;
 }) {
   const { network } = useNetwork();
   const query = api.grailReward.useQuery(
@@ -163,6 +165,14 @@ export function GrailReward({
                     {r.vaulted} vaulted · {r.available} available
                   </span>
                   <CardValue valuation={r.valuation} />
+                  {onTargetSelect && r.available > 0 && (
+                    <button
+                      className="button button-outline"
+                      onClick={() => onTargetSelect(r.id)}
+                    >
+                      Choose target slab
+                    </button>
+                  )}
                   {claimable &&
                     network === "devnet" &&
                     process.env.NEXT_PUBLIC_PRIVY_APP_ID &&

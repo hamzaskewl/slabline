@@ -21,6 +21,8 @@ import {
   demoPositionContext,
   positionRewardMarket,
   matchingTokens,
+  DEMO_REPLAY_CARD,
+  slabFromListing,
 } from "@collectible/domain";
 import {
   withSolanaNetwork,
@@ -58,6 +60,7 @@ const bodySchema = z.discriminatedUnion("action", [
     side: z.enum(["yes", "no"]),
     stake: z.string().regex(/^\d+(\.\d{1,6})?$/),
     replay: z.boolean(),
+    targetMint: z.string().max(160).optional(),
     minimumContracts: z.string().regex(/^\d+(\.\d{1,6})?$/),
   }),
   z.object({
@@ -147,11 +150,29 @@ export async function POST(request: Request) {
       if (b.replay) {
         if (b.symbol !== DEMO_REPLAY.book.symbol)
           throw new ApiError(400, "Open the replay market from Settings.");
+        const selected = b.targetMint
+          ? b.targetMint === DEMO_REPLAY_CARD.mint
+            ? DEMO_REPLAY_CARD
+            : (
+                await listRewardCards(
+                  positionRewardMarket({
+                    ...DEMO_REPLAY,
+                    symbol: DEMO_REPLAY.book.symbol,
+                  }),
+                )
+              ).find((c) => c.mint === b.targetMint)
+          : null;
+        if (b.targetMint && !selected)
+          throw new ApiError(
+            409,
+            "The selected target is no longer listed. Choose another slab before trading.",
+          );
         await demoBuy(
           user.id,
           b.key,
           {
             ...DEMO_REPLAY,
+            ...(selected ? { shareTarget: slabFromListing(selected) } : {}),
             side: b.side,
             stake: b.stake,
             replay: true,
@@ -183,12 +204,24 @@ export async function POST(request: Request) {
             409,
             "This market is not accepting orders or its depth is unavailable.",
           );
+        const context = demoPositionContext(market.data, contract);
+        const selected = b.targetMint
+          ? (await listRewardCards(context.rewardMarket)).find(
+              (c) => c.mint === b.targetMint,
+            )
+          : null;
+        if (b.targetMint && !selected)
+          throw new ApiError(
+            409,
+            "The selected target is no longer listed. Choose another slab before trading.",
+          );
         await demoBuy(
           user.id,
           b.key,
           {
             eventTicker: market.data.ticker ?? b.eventTicker,
             eventTitle: market.data.title,
+            ...(selected ? { shareTarget: slabFromListing(selected) } : {}),
             label: contract.label,
             side: b.side,
             stake: b.stake,

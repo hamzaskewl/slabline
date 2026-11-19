@@ -261,6 +261,7 @@ export async function demoBuy(
     minimumContracts?: string;
     rewardMarket?: DemoPosition["rewardMarket"];
     artwork?: DemoPosition["artwork"];
+    shareTarget?: DemoPosition["shareTarget"];
   },
   book: Book,
   observedAt = book.updatedAt,
