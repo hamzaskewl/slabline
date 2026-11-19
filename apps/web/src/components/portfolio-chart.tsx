@@ -8,13 +8,16 @@ import {
 } from "lightweight-charts";
 import { usd } from "@/lib/utils";
 const ranges = ["1D", "1W", "1M", "ALL"] as const;
+const emptyHistory: { time: string; value: string }[] = [];
 export function PortfolioChart({
-  history = [],
+  history = emptyHistory,
+  currentValue,
 }: {
   history?: { time: string; value: string }[];
+  currentValue?: string;
 }) {
   const [range, setRange] = useState<(typeof ranges)[number]>("1D"),
-    [hover, setHover] = useState<string | null>(null);
+    [hover, setHover] = useState<{ value: number; time: string } | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const points = useMemo(() => {
     const now = Date.now(),
@@ -29,7 +32,11 @@ export function PortfolioChart({
     return [
       ...new Map(
         history
-          .filter((p) => Date.parse(p.time) >= now - duration)
+          .filter(
+            (p) =>
+              Date.parse(p.time) >= now - duration &&
+              Number.isFinite(Number(p.value)),
+          )
           .map((p) => [
             Math.floor(Date.parse(p.time) / 1000),
             {
@@ -50,9 +57,17 @@ export function PortfolioChart({
         fontFamily: "Inter Variable, sans-serif",
         attributionLogo: false,
       },
-      grid: { vertLines: { visible: false }, horzLines: { color: "#24292d" } },
-      rightPriceScale: { borderVisible: false },
-      timeScale: { borderVisible: false, timeVisible: range === "1D" },
+      grid: { vertLines: { visible: false }, horzLines: { visible: false } },
+      rightPriceScale: {
+        visible: false,
+        scaleMargins: { top: 0.15, bottom: 0.1 },
+      },
+      timeScale: {
+        borderVisible: false,
+        timeVisible: range === "1D",
+        fixLeftEdge: true,
+        fixRightEdge: true,
+      },
       handleScale: false,
       handleScroll: false,
       localization: { priceFormatter: (v: number) => usd(v) },
@@ -63,6 +78,7 @@ export function PortfolioChart({
       bottomColor: "rgba(100,181,246,0)",
       lineWidth: 2,
       priceLineVisible: false,
+      lastValueVisible: false,
     });
     series.setData(points);
     chart.timeScale().fitContent();
@@ -70,7 +86,13 @@ export function PortfolioChart({
       const row = p.seriesData.get(series);
       setHover(
         row && "value" in row
-          ? `${usd(row.value)} · ${typeof p.time === "number" ? new Date(p.time * 1000).toLocaleString() : ""}`
+          ? {
+              value: row.value,
+              time:
+                typeof p.time === "number"
+                  ? new Date(p.time * 1000).toLocaleString()
+                  : "",
+            }
           : null,
       );
     });
@@ -79,9 +101,7 @@ export function PortfolioChart({
   return (
     <div className="portfolio-chart">
       <div className="portfolio-chart-toolbar">
-        <span aria-live="polite">
-          {hover ?? "Account value history · at cost"}
-        </span>
+        <span>Balance history</span>
         <div className="chart-ranges" aria-label="Portfolio chart period">
           {ranges.map((r) => (
             <button
@@ -97,14 +117,48 @@ export function PortfolioChart({
           ))}
         </div>
       </div>
-      <div className="portfolio-chart-canvas" ref={host} />
-      {points.length < 2 && (
-        <p className="portfolio-chart-empty">
-          {history.length
-            ? "Your history starts here. New activity will appear on this chart."
-            : "Your account history will appear here."}
-        </p>
-      )}
+      <div className="portfolio-chart-readout" aria-live="polite">
+        <strong>
+          {hover
+            ? usd(hover.value)
+            : currentValue === undefined
+              ? "—"
+              : usd(currentValue)}
+        </strong>
+        <span>
+          {hover?.time ??
+            (points.length < 2 ? "Current balance" : "Account value · at cost")}
+        </span>
+      </div>
+      <div className="portfolio-chart-plot">
+        <div
+          className="portfolio-chart-canvas"
+          ref={host}
+          hidden={points.length < 2}
+        />
+        {points.length < 2 &&
+          (currentValue === undefined ? (
+            <div className="portfolio-chart-loading" role="status">
+              Loading balance…
+            </div>
+          ) : (
+            <svg
+              className="portfolio-balance-line"
+              viewBox="0 0 640 160"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label={`Current balance ${usd(currentValue)}. History is not available yet.`}
+            >
+              <path
+                d="M 0 80 H 640"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          ))}
+      </div>
     </div>
   );
 }

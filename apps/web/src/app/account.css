@@ -55,6 +55,93 @@
   display: grid;
   gap: 24px;
 }
+.prediction-surface main.portfolio-page {
+  max-width: 1040px;
+  padding: 24px 24px 0;
+}
+.portfolio-page .page-heading {
+  margin-bottom: 16px;
+}
+.portfolio-page .page-heading h1 {
+  font-size: 20px;
+}
+.portfolio-topline {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+.portfolio-topline .portfolio-overview {
+  min-width: 0;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.portfolio-topline .portfolio-summary {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 16px;
+}
+.portfolio-topline .portfolio-total {
+  font-size: 32px;
+  margin-block: 4px;
+}
+.portfolio-topline .portfolio-summary-actions {
+  gap: 8px;
+}
+.portfolio-topline .portfolio-summary-actions .button {
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.portfolio-topline .portfolio-breakdown {
+  gap: 12px;
+  margin: 20px 0 0;
+  padding-top: 16px;
+}
+.portfolio-topline .portfolio-breakdown dt {
+  font-size: 11px;
+}
+.portfolio-topline .portfolio-breakdown dd {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.portfolio-performance {
+  padding: 16px;
+  min-width: 0;
+}
+.portfolio-page .portfolio-holdings {
+  padding-inline: 16px;
+}
+.portfolio-page .holdings-tabs button {
+  padding-block: 16px 14px;
+  font-size: 13px;
+}
+.portfolio-page .portfolio-section {
+  padding-block: 16px;
+}
+.portfolio-page .portfolio-section-heading h2 {
+  font-size: 15px;
+}
+.portfolio-page .position-row,
+.portfolio-page .collection-row {
+  gap: 16px;
+  padding-block: 14px;
+}
+.portfolio-page .position-identity h3 {
+  font-size: 14px;
+}
+.portfolio-page .collection-row > .card-media {
+  height: 80px;
+  width: 56px;
+}
+.portfolio-page .won-reward {
+  padding: 16px;
+}
+.portfolio-page .won-reward h3 {
+  font-size: 15px;
+}
 .legacy-reward {
   margin-left: auto;
   display: grid;
@@ -125,7 +212,7 @@
 }
 .portfolio-chart {
   position: relative;
-  margin-top: 24px;
+  margin: 0;
 }
 .portfolio-chart-toolbar {
   display: flex;
@@ -144,8 +231,8 @@
   background: transparent;
   color: var(--muted);
   border-radius: 6px;
-  min-width: 40px;
-  min-height: 36px;
+  min-width: 36px;
+  min-height: 32px;
 }
 .chart-ranges button[aria-pressed="true"] {
   background: #30363c;
@@ -156,17 +243,39 @@
   background: #252a2f;
 }
 .portfolio-chart-canvas {
-  height: 220px;
-  margin-top: 12px;
+  height: 148px;
 }
-.portfolio-chart-empty {
-  position: absolute;
-  top: 50%;
-  left: 0;
+.portfolio-chart-readout {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+  min-height: 56px;
+}
+.portfolio-chart-readout strong {
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.portfolio-chart-readout span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.portfolio-chart-plot {
+  min-height: 148px;
+}
+.portfolio-balance-line {
+  display: block;
   width: 100%;
-  text-align: center;
-  padding: 20px;
-  font-size: 13px;
+  height: 148px;
+  color: #64b5f6;
+}
+.portfolio-chart-loading {
+  min-height: 148px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 12px;
 }
 .portfolio-rewards {
   display: grid;
@@ -734,6 +843,23 @@
   }
 }
 @media (max-width: 760px) {
+  .prediction-surface main.portfolio-page {
+    padding: 20px 16px 0;
+  }
+  .portfolio-topline {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .portfolio-topline .portfolio-overview {
+    padding: 16px;
+  }
+  .portfolio-topline .portfolio-summary-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .portfolio-topline .portfolio-summary-actions .button {
+    min-height: 44px;
+  }
   .account-navigation {
     margin-left: 0;
     flex-wrap: wrap;
@@ -765,12 +891,12 @@
     gap: 20px;
   }
   .portfolio-chart-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
   }
   .portfolio-chart-canvas {
-    height: 180px;
+    height: 148px;
   }
   .chart-ranges button {
     min-height: 44px;

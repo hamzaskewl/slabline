@@ -20,7 +20,7 @@ import {
 import { Gift, ArrowUpRight, ChartNoAxesCombined, Layers3 } from "lucide-react";
 import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
-import { PortfolioChart } from "./portfolio-chart";
+import { PortfolioOverview } from "./portfolio-overview";
 import { WalletCollection } from "./wallet-collection";
 import { usePrivateRead } from "@/lib/use-private-read";
 import { usd } from "@/lib/utils";
@@ -255,20 +255,16 @@ export function DemoPortfolio({
         </p>
       )}
       {!collection && (
-        <section className="portfolio-overview panel">
-          <div className="portfolio-summary">
-            <div>
-              <h2>{compact ? "Available balance" : "Portfolio value"}</h2>
-              <strong className="portfolio-total">
-                {data ? usd(compact ? data.balance : total) : "—"}
-              </strong>
-              <p>
-                {compact
-                  ? "Demo USD · available to trade"
-                  : "Demo account · positions and collectibles at cost"}
-              </p>
-            </div>
-            <div className="portfolio-summary-actions">
+        <PortfolioOverview
+          compact={compact}
+          balance={data?.balance}
+          total={data ? total : undefined}
+          predictionValue={money(openCost)}
+          collectibleValue={money(cardCost)}
+          rewardValue={money(rewardValue)}
+          history={data?.history}
+          actions={
+            <>
               <Button
                 disabled={a.busy || !data}
                 onClick={() =>
@@ -285,32 +281,9 @@ export function DemoPortfolio({
                   Manage wallet
                 </Link>
               )}
-            </div>
-          </div>
-          {!compact && (
-            <>
-              <dl className="portfolio-breakdown">
-                <div>
-                  <dt>Cash</dt>
-                  <dd>{data ? usd(data.balance) : "—"}</dd>
-                </div>
-                <div>
-                  <dt>Predictions</dt>
-                  <dd>{data ? usd(money(openCost)) : "—"}</dd>
-                </div>
-                <div>
-                  <dt>Collectibles</dt>
-                  <dd>{data ? usd(money(cardCost)) : "—"}</dd>
-                </div>
-                <div>
-                  <dt>Reward balance</dt>
-                  <dd>{data ? usd(money(rewardValue)) : "—"}</dd>
-                </div>
-              </dl>
-              <PortfolioChart history={data?.history} />
             </>
-          )}
-        </section>
+          }
+        />
       )}
       {rewardResults.length > 0 && (
         <section className="portfolio-rewards" aria-label="Winning rewards">
