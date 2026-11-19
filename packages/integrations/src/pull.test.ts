@@ -96,6 +96,16 @@ test.skipIf(!process.env.DATABASE_URL)(
       await expect(pullOpening(other!.id, local.id)).rejects.toThrow(
         "not found",
       );
+      const competing = await Promise.allSettled(
+        [crypto.randomUUID(), crypto.randomUUID()].map((purchase) =>
+          openPull(other!.id, purchase, 100, "demo-csprng", null, theme),
+        ),
+      );
+      expect(competing.map(({ status }) => status).sort()).toEqual([
+        "fulfilled",
+        "rejected",
+      ]);
+      expect((await pullAccount(other!.id)).balance).toBe("0.000000");
       await expect(
         openPull(userId, key, 50, "demo-csprng", null, theme),
       ).rejects.toThrow("already used");
@@ -154,6 +164,9 @@ test.skipIf(!process.env.DATABASE_URL)(
         cost: "12.000000",
         unspent: "18.000000",
       });
+      expect(() =>
+        demoBuyQuote({ ...entry, maximumCost: "11.999999" }, book),
+      ).toThrow("price changed");
       const redeem = (id = userId, sample = book, side: "yes" | "no" = "no") =>
         demoBuy(
           id,
@@ -176,6 +189,16 @@ test.skipIf(!process.env.DATABASE_URL)(
         redeem(),
       ]);
       expect(position).toBe(repeatedPosition);
+      await expect(
+        demoBuy(
+          userId,
+          `pull:${funded.id}`,
+          { ...entry, side: "yes", minimumContracts: "1" },
+          book,
+          book.updatedAt,
+          funded.id,
+        ),
+      ).rejects.toThrow("already used");
       expect(await pullOpening(userId, funded.id)).toMatchObject({
         state: "redeemed",
         positionId: position,
