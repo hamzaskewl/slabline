@@ -874,6 +874,16 @@
   .app-shell .outcome-label .market-art.team-pair {
     width: 40px;
   }
+  /* Match the nested artwork to its frame instead of the generic phone size. */
+  .app-shell .prediction-card .market-art > .market-artwork {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+  .app-shell .prediction-card .market-art.team-pair > .market-artwork {
+    width: calc(50% - 1px);
+  }
   .app-shell .prediction-card-footer .icon-button {
     min-width: 44px;
     min-height: 44px;
