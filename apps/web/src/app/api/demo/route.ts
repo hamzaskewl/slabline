@@ -9,6 +9,7 @@ import {
 import { workerRead } from "@/server/router";
 import {
   DEMO_REPLAY,
+  DEMO_GRAIL_REPLAY,
   marketOutcomes,
   activeMarket,
   money,
@@ -48,6 +49,7 @@ import {
   sellDemoPosition,
   attachCachedValuations,
   recoverDemoReward,
+  cashDemoReward,
 } from "@collectible/integrations";
 const id = z.string().uuid();
 const bodySchema = z.discriminatedUnion("action", [
@@ -60,6 +62,7 @@ const bodySchema = z.discriminatedUnion("action", [
     side: z.enum(["yes", "no"]),
     stake: z.string().regex(/^\d+(\.\d{1,6})?$/),
     replay: z.boolean(),
+    rehearsal: z.literal("grail").optional(),
     targetMint: z.string().max(160).optional(),
     minimumContracts: z.string().regex(/^\d+(\.\d{1,6})?$/),
   }),
@@ -70,9 +73,15 @@ const bodySchema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("refresh") }),
   z.object({ action: z.literal("recover-reward"), id }),
-  z.object({ action: z.literal("sell-quote"), id }),
+  z.object({ action: z.literal("cash-reward"), id }),
+  z.object({
+    action: z.literal("sell-quote"),
+    id,
+    quantity: z.string().regex(/^\d+(\.\d{1,6})?$/),
+  }),
   z.object({
     action: z.literal("sell"),
+    quantity: z.string().regex(/^\d+(\.\d{1,6})?$/),
     id,
     key: id,
     minimumProceeds: z.string().regex(/^\d+(\.\d{1,6})?$/),
@@ -148,7 +157,11 @@ export async function POST(request: Request) {
     if (b.action === "topup") await demoTopUp(user.id, b.key);
     if (b.action === "buy") {
       if (b.replay) {
-        if (b.symbol !== DEMO_REPLAY.book.symbol)
+        const scenario =
+          b.rehearsal === "grail" ? DEMO_GRAIL_REPLAY : DEMO_REPLAY;
+        if (b.rehearsal && b.targetMint)
+          throw new ApiError(400, "Grail rehearsal has no slab target.");
+        if (b.symbol !== scenario.book.symbol)
           throw new ApiError(400, "Open the replay market from Settings.");
         const selected = b.targetMint
           ? b.targetMint === DEMO_REPLAY_CARD.mint
@@ -156,8 +169,8 @@ export async function POST(request: Request) {
             : (
                 await listRewardCards(
                   positionRewardMarket({
-                    ...DEMO_REPLAY,
-                    symbol: DEMO_REPLAY.book.symbol,
+                    ...scenario,
+                    symbol: scenario.book.symbol,
                   }),
                 )
               ).find((c) => c.mint === b.targetMint)
@@ -171,14 +184,15 @@ export async function POST(request: Request) {
           user.id,
           b.key,
           {
-            ...DEMO_REPLAY,
+            ...scenario,
             ...(selected ? { shareTarget: slabFromListing(selected) } : {}),
             side: b.side,
             stake: b.stake,
             replay: true,
+            rehearsal: b.rehearsal,
             minimumContracts: b.minimumContracts,
           },
-          DEMO_REPLAY.book,
+          scenario.book,
         );
       } else {
         const [market, depth] = await Promise.all([
@@ -236,16 +250,23 @@ export async function POST(request: Request) {
     }
     if (b.action === "replay")
       await settleDemoPosition(user.id, b.id, b.result, "replay");
+    if (b.action === "cash-reward") await cashDemoReward(user.id, b.id);
     if (b.action === "refresh") await reconcileDemoPositions(user.id);
     if (b.action === "recover-reward") await recoverDemoReward(user.id, b.id);
     if (b.action === "sell" || b.action === "sell-quote") {
       const position = (await demoAccount(user.id)).positions.find(
         (p) => p.id === b.id,
       );
-      if (!position || position.state !== "open")
+      if (!position || (b.action === "sell-quote" && position.state !== "open"))
         throw new ApiError(409, "Open position not found.");
       const depth = position.replay
-        ? { book: DEMO_REPLAY.book, observedAt: new Date().toISOString() }
+        ? {
+            book:
+              position.rehearsal === "grail"
+                ? DEMO_GRAIL_REPLAY.book
+                : DEMO_REPLAY.book,
+            observedAt: new Date().toISOString(),
+          }
         : await workerRead<{ book: Book | null; observedAt?: string }>(
             `/book?symbol=${encodeURIComponent(position.symbol)}`,
           );
@@ -261,12 +282,21 @@ export async function POST(request: Request) {
             Date.now() - Date.parse(observedAt) > 20000))
       )
         throw new ApiError(409, "Waiting for fresh bids.");
+      if (
+        b.action === "sell-quote" &&
+        (units(b.quantity) <= 0n ||
+          units(b.quantity) > units(position.quantity))
+      )
+        throw new ApiError(409, "Choose shares within your available holding.");
       if (b.action === "sell-quote") {
         try {
           return Response.json(
             {
-              proceeds: demoSaleQuote(position, depth.book),
-              quantity: position.quantity,
+              proceeds: demoSaleQuote(
+                { ...position, quantity: b.quantity },
+                depth.book,
+              ),
+              quantity: b.quantity,
             },
             { headers: { "Cache-Control": "no-store" } },
           );
@@ -281,6 +311,7 @@ export async function POST(request: Request) {
         depth.book,
         b.minimumProceeds,
         depth.observedAt,
+        b.quantity,
       );
     }
     if (b.action === "claim-reward") {
@@ -294,12 +325,21 @@ export async function POST(request: Request) {
       const catalogResult = b.items.some((i) => i.source === "collectorcrypt")
         ? await providerRead(() => listRewardCards(subject), [])
         : { data: [], error: null };
-      if (catalogResult.error)
+      if (catalogResult.error && !position.replay)
         throw new ApiError(
           503,
           "Card listings are temporarily unavailable. Your reward is still available; try again shortly.",
         );
-      const catalog = await attachCachedValuations(catalogResult.data);
+      const catalog = await attachCachedValuations(
+        position.replay && !position.rehearsal
+          ? [
+              DEMO_REPLAY_CARD,
+              ...catalogResult.data.filter(
+                (c) => c.mint !== DEMO_REPLAY_CARD.mint,
+              ),
+            ]
+          : catalogResult.data,
+      );
       const grail = b.items.some((i) => i.source === "grail")
         ? await listGrailTokens()
         : [];

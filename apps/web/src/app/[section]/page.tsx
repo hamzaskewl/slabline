@@ -15,8 +15,10 @@ const sections = [
 ];
 export default async function Page({
   params,
+  searchParams,
 }: {
   params: Promise<{ section: string }>;
+  searchParams: Promise<{ scenario?: string; stake?: string }>;
 }) {
   const { section } = await params;
   if (section === "cart" || section === "collection") redirect("/portfolio");
@@ -44,5 +46,21 @@ export default async function Page({
       </main>
     );
   }
-  return <MarketApp section={section} />;
+  const query = await searchParams;
+  return (
+    <MarketApp
+      section={section}
+      rehearsal={
+        section === "demo" && query.scenario === "grail" ? "grail" : undefined
+      }
+      initialStake={
+        section === "demo" &&
+        query.stake &&
+        /^\d+(\.\d{1,2})?$/.test(query.stake) &&
+        Number(query.stake) <= 1000000
+          ? query.stake
+          : "25"
+      }
+    />
+  );
 }

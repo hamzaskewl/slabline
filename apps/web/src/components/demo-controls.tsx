@@ -13,6 +13,7 @@ import {
   type DemoPosition,
   activeDemoPosition,
   demoCollectibleValue,
+  DEMO_GRAIL,
 } from "@collectible/domain";
 import { ArrowUpRight } from "lucide-react";
 import { MarketArtwork } from "./market-artwork";
@@ -101,6 +102,8 @@ export function DemoOrder({
   stake,
   shares,
   replay,
+  rehearsal,
+  onFilled,
 }: {
   targetMint?: string;
   eventTicker: string;
@@ -109,6 +112,8 @@ export function DemoOrder({
   stake: string;
   shares: string | null;
   replay: boolean;
+  rehearsal?: "grail";
+  onFilled?: () => void;
 }) {
   const a = useDemoAction(),
     [review, setReview] = useState(false),
@@ -118,7 +123,16 @@ export function DemoOrder({
     setReview(false);
     setReceipt("");
     key.current = crypto.randomUUID();
-  }, [symbol, side, stake, shares, targetMint, a.user?.id, a.network]);
+  }, [
+    symbol,
+    side,
+    stake,
+    shares,
+    targetMint,
+    rehearsal,
+    a.user?.id,
+    a.network,
+  ]);
   if (a.network !== "devnet") return null;
   return (
     <div className="demo-order">
@@ -146,20 +160,24 @@ export function DemoOrder({
                   side,
                   stake,
                   replay,
+                  rehearsal,
                   minimumContracts: shares,
                 });
                 const position = result.positions.find(
                   (p) =>
                     p.symbol === symbol &&
                     p.side === side &&
-                    p.state === "open",
+                    p.state === "open" &&
+                    p.replay === replay &&
+                    p.rehearsal === rehearsal,
                 );
                 setReceipt(
                   position
-                    ? `${Number(position.quantity).toLocaleString()} shares added · ${usd(position.cost)}`
+                    ? `${Number(position.quantity).toLocaleString()} shares held · ${usd(position.cost)}`
                     : "Trade saved",
                 );
                 setReview(false);
+                onFilled?.();
                 key.current = crypto.randomUUID();
               });
             }}
@@ -225,7 +243,10 @@ export function DemoPortfolio({
   const openCost = positions
     .filter((p) => p.state === "open")
     .reduce((sum, p) => sum + units(p.cost), 0n);
-  const cardCost = cards.reduce((sum, c) => sum + demoCollectibleValue(c), 0n);
+  const grailHoldings = positions.filter((p) => p.grailHolding);
+  const cardCost =
+    cards.reduce((sum, c) => sum + demoCollectibleValue(c), 0n) +
+    grailHoldings.reduce((sum, p) => sum + units(p.grailHolding!.cost), 0n);
   const rewardValue = wins.reduce(
     (sum, p) =>
       sum +
@@ -307,6 +328,39 @@ export function DemoPortfolio({
                 </p>
               </div>
               <PositionRewards position={p} />
+            </div>
+          ))}
+        </section>
+      )}
+      {!compact && grailHoldings.length > 0 && (
+        <section
+          className="portfolio-holdings panel"
+          aria-label="Grail holdings"
+        >
+          <h2>Grail holdings</h2>
+          {grailHoldings.map((p) => (
+            <div className="collection-row" key={p.id}>
+              <CardImage src={DEMO_GRAIL.image} alt={DEMO_GRAIL.name} />
+              <div className="collection-copy">
+                <h3>
+                  {Number(p.grailHolding!.quantity).toLocaleString("en-US", {
+                    maximumFractionDigits: 6,
+                  })}{" "}
+                  {p.grailHolding!.symbol}
+                </h3>
+                <p>Devnet rehearsal · saved in your account</p>
+              </div>
+              <div className="collection-value">
+                <strong>{usd(p.grailHolding!.cost)}</strong>
+              </div>
+              <a
+                className="button button-outline button-pill"
+                href={DEMO_GRAIL.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View Grail <ArrowUpRight size={15} />
+              </a>
             </div>
           ))}
         </section>
@@ -487,7 +541,7 @@ export function PositionRow({
         <Link
           href={
             p.replay
-              ? "/demo"
+              ? `/demo${p.rehearsal === "grail" ? "?scenario=grail" : ""}`
               : `/markets/${p.eventTicker}?contract=${p.symbol}&side=${p.side}`
           }
         >
@@ -536,42 +590,85 @@ export function PositionRow({
   );
 }
 function SellPosition({ position }: { position: DemoPosition }) {
-  const a = useDemoAction(),
-    [quote, setQuote] = useState<{ proceeds: string; at: number } | null>(null),
-    key = useRef(crypto.randomUUID());
+  const a = useDemoAction();
+  const [quantity, setQuantity] = useState(position.quantity);
+  const [quote, setQuote] = useState<{
+    proceeds: string;
+    quantity: string;
+    at: number;
+  } | null>(null);
+  const key = useRef(crypto.randomUUID());
   useEffect(() => {
+    setQuantity(position.quantity);
     setQuote(null);
     key.current = crypto.randomUUID();
-  }, [position.id, a.user?.id, a.network]);
+  }, [position.id, position.quantity, position.cost, a.user?.id, a.network]);
+  const valid =
+    /^\d+(\.\d{1,6})?$/.test(quantity) &&
+    Number(quantity) > 0 &&
+    Number(quantity) <= Number(position.quantity);
   return (
     <div className="sell-position">
+      <label className="sell-quantity">
+        Shares to sell
+        <span>
+          <input
+            aria-label="Shares to sell"
+            inputMode="decimal"
+            value={quantity}
+            disabled={a.busy}
+            onChange={(e) => {
+              setQuantity(e.target.value);
+              setQuote(null);
+              key.current = crypto.randomUUID();
+            }}
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={a.busy}
+            onClick={() => {
+              setQuantity(position.quantity);
+              setQuote(null);
+            }}
+          >
+            Max
+          </Button>
+        </span>
+      </label>
       <Button
         size="sm"
         variant="outline"
-        disabled={a.busy}
+        disabled={a.busy || !valid}
         onClick={() =>
           void a.run(async () => {
             if (!quote || Date.now() - quote.at > 15000) {
-              const result = await a.request<{ proceeds: string }>({
-                action: "sell-quote",
-                id: position.id,
-              });
-              setQuote({ proceeds: result.proceeds, at: Date.now() });
+              const result = await a.request<{
+                proceeds: string;
+                quantity: string;
+              }>({ action: "sell-quote", id: position.id, quantity });
+              setQuote({ ...result, at: Date.now() });
               return;
             }
             await a.request({
               action: "sell",
               id: position.id,
+              quantity: quote.quantity,
               key: key.current,
               minimumProceeds: quote.proceeds,
             });
             setQuote(null);
+            key.current = crypto.randomUUID();
           })
         }
       >
-        {a.busy ? "Please wait…" : quote ? "Confirm sale" : "Sell"}
+        {a.busy
+          ? "Please wait…"
+          : quote
+            ? `Sell for ${usd(quote.proceeds)}`
+            : "Review sale"}
       </Button>
-      {quote && <span>{usd(quote.proceeds)} estimated</span>}
+      {quote && <span>Proceeds go to your cash balance.</span>}
       {a.error && <p role="alert">{a.error}</p>}
     </div>
   );
@@ -632,20 +729,34 @@ export function DemoReplayControls() {
   );
 }
 
-export function MarketPositionStatus({ symbol }: { symbol: string }) {
+export function MarketPositionStatus({
+  symbol,
+  side,
+  replay,
+  rehearsal,
+}: {
+  symbol: string;
+  side: "yes" | "no";
+  replay: boolean;
+  rehearsal?: "grail";
+}) {
   const { network } = useNetwork(),
     snapshot = usePrivateRead<DemoAccountView>(
       "/api/demo",
       network === "devnet",
     );
+  const matches =
+    snapshot.data?.positions.filter(
+      (p) =>
+        p.symbol === symbol &&
+        p.side === side &&
+        p.replay === replay &&
+        p.rehearsal === rehearsal,
+    ) ?? [];
   const position =
-    snapshot.data?.positions.find(
-      (p) => p.symbol === symbol && p.reward && p.reward.state !== "claimed",
-    ) ??
-    snapshot.data?.positions.find(
-      (p) => p.symbol === symbol && p.state === "open",
-    ) ??
-    snapshot.data?.positions.find((p) => p.symbol === symbol);
+    matches.find((p) => p.state === "open") ??
+    matches.find((p) => p.reward?.state === "available") ??
+    matches[0];
   if (network !== "devnet" || !position) return null;
   return (
     <div className="ticket-position">
@@ -668,7 +779,14 @@ export function MarketPositionStatus({ symbol }: { symbol: string }) {
           revision={JSON.stringify(position)}
         />
       </div>
-      {position.reward ? (
+      {position.grailHolding ? (
+        <p>
+          {Number(position.grailHolding.quantity).toLocaleString("en-US", {
+            maximumFractionDigits: 6,
+          })}{" "}
+          {position.grailHolding.symbol} received · devnet rehearsal
+        </p>
+      ) : position.reward ? (
         <PositionRewards position={position} />
       ) : position.state === "open" ? (
         <SellPosition position={position} />
@@ -851,4 +969,38 @@ export function DemoMintActions({
       {a.error && <p role="alert">{a.error}</p>}
     </div>
   );
+}
+
+export function PositionHoldings({
+  symbol,
+  side,
+  replay,
+  rehearsal,
+  children,
+}: {
+  symbol?: string;
+  side: "yes" | "no";
+  replay: boolean;
+  rehearsal?: "grail";
+  children: (quantity: string) => ReactNode;
+}) {
+  const { network } = useNetwork();
+  const account = usePrivateRead<DemoAccountView>(
+    "/api/demo",
+    network === "devnet",
+  );
+  const held =
+    network === "devnet"
+      ? (account.data?.positions
+          .filter(
+            (p) =>
+              p.symbol === symbol &&
+              p.side === side &&
+              p.state === "open" &&
+              p.replay === replay &&
+              p.rehearsal === rehearsal,
+          )
+          .reduce((sum, p) => sum + units(p.quantity), 0n) ?? 0n)
+      : 0n;
+  return children(money(held));
 }

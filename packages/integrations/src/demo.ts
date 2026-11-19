@@ -13,6 +13,9 @@ import {
 } from "@collectible/db";
 import {
   demoPayout,
+  DEMO_GRAIL,
+  DEMO_GRAIL_REPLAY,
+  demoGrailQuantity,
   explicitResolution,
   quoteDepth,
   asksForSide,
@@ -114,6 +117,7 @@ export async function demoAccount(userId: string): Promise<DemoAccountView> {
       view.positions.reduce(
         (sum, p) =>
           sum +
+          units(p.grailHolding?.cost ?? "0") +
           (p.state === "open"
             ? units(p.cost)
             : p.reward && p.reward.state !== "claimed"
@@ -256,6 +260,7 @@ export async function demoBuy(
     side: "yes" | "no";
     stake: string;
     replay: boolean;
+    rehearsal?: "grail";
     minimumContracts?: string;
     rewardMarket?: DemoPosition["rewardMarket"];
     artwork?: DemoPosition["artwork"];
@@ -264,6 +269,11 @@ export async function demoBuy(
   book: Book,
   observedAt = book.updatedAt,
 ) {
+  if (
+    input.rehearsal &&
+    (!input.replay || book.symbol !== DEMO_GRAIL_REPLAY.book.symbol)
+  )
+    throw new DemoError("Open the Grail rehearsal to use this scenario.");
   if (units(input.stake) <= 0n || units(input.stake) > units("1000000"))
     throw new DemoError("Enter a stake between 0 and 1,000,000.");
   if (
@@ -305,27 +315,73 @@ export async function demoBuy(
       .from(positions)
       .where(eq(positions.idempotencyKey, idempotencyKey));
     if (existing) return existing.id;
+    const fillKey = `demo:buy:${userId}:${key}`;
+    const [receipt] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.idempotencyKey, fillKey));
+    if (receipt) return (receipt.data as { positionId: string }).positionId;
     if (units(account.amount) < units(quote.cost))
       throw new DemoError(
         "Insufficient balance. Add funds in your wallet.",
         409,
       );
-    const [position] = await tx
-      .insert(positions)
-      .values({
-        userId,
-        idempotencyKey,
-        state: "open",
-        data: {
-          network: "devnet",
-          ...input,
-          symbol: book.symbol,
-          quantity: quote.contracts,
-          cost: quote.cost,
-          averagePrice: quote.averagePrice,
-        },
-      })
-      .returning();
+    // The account lock serializes buys, sells, settlement and reward claims.
+    const open = await tx
+      .select()
+      .from(positions)
+      .where(
+        and(
+          eq(positions.userId, userId),
+          eq(positions.state, "open"),
+          sql`${positions.idempotencyKey} like 'demo:position:%'`,
+        ),
+      )
+      .for("update");
+    const current = open.find((row) => {
+      const p = row.data as DemoPosition;
+      return (
+        p.symbol === book.symbol &&
+        p.side === input.side &&
+        p.replay === input.replay &&
+        p.rehearsal === input.rehearsal
+      );
+    });
+    const old = current?.data as DemoPosition | undefined;
+    const quantity = units(old?.quantity ?? "0") + units(quote.contracts);
+    const cost = units(old?.cost ?? "0") + units(quote.cost);
+    const data = {
+      ...old,
+      network: "devnet",
+      ...input,
+      symbol: book.symbol,
+      quantity: money(quantity),
+      cost: money(cost),
+      averagePrice: money((cost * 1000000n) / quantity),
+    };
+    const [position] = current
+      ? await tx
+          .update(positions)
+          .set({ data })
+          .where(eq(positions.id, current.id))
+          .returning()
+      : await tx
+          .insert(positions)
+          .values({ userId, idempotencyKey, state: "open", data })
+          .returning();
+    await tx.insert(orders).values({
+      userId,
+      idempotencyKey: fillKey,
+      state: "filled",
+      data: {
+        positionId: position!.id,
+        symbol: book.symbol,
+        side: input.side,
+        quantity: quote.contracts,
+        cost: quote.cost,
+        network: "devnet",
+      },
+    });
     await tx
       .update(fundingIntents)
       .set({
@@ -398,13 +454,27 @@ export async function settleDemoPosition(
           payout,
           settledAt: new Date().toISOString(),
           settlementSource: source,
+          ...(data.replay &&
+          data.rehearsal === "grail" &&
+          resolution === data.side
+            ? {
+                grailHolding: {
+                  symbol: DEMO_GRAIL.symbol,
+                  quantity: demoGrailQuantity(payout),
+                  cost: payout,
+                  priceUsd: DEMO_GRAIL.priceUsd,
+                  purchasedAt: new Date().toISOString(),
+                },
+              }
+            : {}),
           ...(resolution !== "void" && resolution === data.side
             ? {
                 reward: {
                   budget: payout,
-                  state: "available",
+                  state: data.rehearsal === "grail" ? "claimed" : "available",
+                  ...(data.rehearsal === "grail" ? { delivery: "grail" } : {}),
                   cardSpend: "0.000000",
-                  remainder: payout,
+                  remainder: data.rehearsal === "grail" ? "0.000000" : payout,
                 },
               }
             : {}),
@@ -889,6 +959,7 @@ export async function sellDemoPosition(
   book: Book,
   minimumProceeds: string,
   observedAt = book.updatedAt,
+  quantity?: string,
 ) {
   return getDb().transaction(async (tx) => {
     const account = await lockedAccount(tx, userId);
@@ -910,7 +981,11 @@ export async function sellDemoPosition(
       .select()
       .from(settlements)
       .where(eq(settlements.idempotencyKey, saleKey));
-    if (existing) return;
+    if (existing) {
+      if ((existing.data as { positionId: string }).positionId !== id)
+        throw new DemoError("This sale key belongs to another position.", 409);
+      return;
+    }
     if (position.state !== "open")
       throw new DemoError("Only open positions can be sold.", 409);
     if (
@@ -923,9 +998,23 @@ export async function sellDemoPosition(
           Date.parse(observedAt) > Date.now() + 5000))
     )
       throw new DemoError("Waiting for fresh bids.", 409);
+    const sold = units(quantity ?? data.quantity),
+      held = units(data.quantity);
+    if (sold <= 0n || sold > held)
+      throw new DemoError(
+        "Choose shares between zero and your available holding.",
+        409,
+      );
+    const basis = (units(data.cost) * sold) / held;
+    const remaining = held - sold;
+    const totalSold = units(data.soldQuantity ?? "0") + sold;
+    const totalBasis = units(data.realizedCost ?? "0") + basis;
     let proceeds: string;
     try {
-      proceeds = demoSaleQuote(data, book);
+      proceeds = demoSaleQuote(
+        { ...data, quantity: quantity ?? data.quantity },
+        book,
+      );
     } catch (e) {
       throw new DemoError((e as Error).message, 409);
     }
@@ -938,7 +1027,13 @@ export async function sellDemoPosition(
       userId,
       idempotencyKey: saleKey,
       state: "sold",
-      data: { positionId: id, amount: proceeds, network: "devnet" },
+      data: {
+        positionId: id,
+        amount: proceeds,
+        quantity: money(sold),
+        cost: money(basis),
+        network: "devnet",
+      },
     });
     await tx
       .update(fundingIntents)
@@ -950,11 +1045,75 @@ export async function sellDemoPosition(
     await tx
       .update(positions)
       .set({
-        state: "sold",
+        state: remaining > 0n ? "open" : "sold",
         data: {
           ...data,
+          quantity: money(remaining > 0n ? remaining : totalSold),
+          cost: money(remaining > 0n ? units(data.cost) - basis : totalBasis),
+          averagePrice: money(
+            ((remaining > 0n ? units(data.cost) - basis : totalBasis) *
+              1000000n) /
+              (remaining > 0n ? remaining : totalSold),
+          ),
+          soldQuantity: money(totalSold),
+          realizedCost: money(totalBasis),
           soldAt: new Date().toISOString(),
-          saleProceeds: proceeds,
+          saleProceeds: money(
+            units(data.saleProceeds ?? "0") + units(proceeds),
+          ),
+        },
+      })
+      .where(eq(positions.id, id));
+  });
+}
+
+/** A winning budget is optional: release it to spendable cash exactly once. */
+export async function cashDemoReward(userId: string, id: string) {
+  return getDb().transaction(async (tx) => {
+    const account = await lockedAccount(tx, userId);
+    const [position] = await tx
+      .select()
+      .from(positions)
+      .where(
+        and(
+          eq(positions.id, id),
+          eq(positions.userId, userId),
+          sql`${positions.idempotencyKey} like 'demo:position:%'`,
+        ),
+      )
+      .for("update");
+    if (!position) throw new DemoError("Position not found.", 404);
+    const data = position.data as DemoPosition;
+    if (data.reward?.delivery === "cash") return;
+    if (position.state !== "won" || data.reward?.state !== "available")
+      throw new DemoError(
+        "Cash is available before selecting a reward. Cancel pending card transfers first.",
+        409,
+      );
+    await tx.insert(settlements).values({
+      userId,
+      idempotencyKey: `demo:cash:${id}`,
+      state: "claimed",
+      data: { positionId: id, amount: data.reward.budget, network: "devnet" },
+    });
+    await tx
+      .update(fundingIntents)
+      .set({
+        amount: money(units(account.amount) + units(data.reward.budget)),
+        version: account.version + 1,
+      })
+      .where(eq(fundingIntents.id, account.id));
+    await tx
+      .update(positions)
+      .set({
+        data: {
+          ...data,
+          reward: {
+            ...data.reward,
+            state: "claimed",
+            delivery: "cash",
+            remainder: data.reward.budget,
+          },
         },
       })
       .where(eq(positions.id, id));

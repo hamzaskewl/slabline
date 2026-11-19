@@ -46,6 +46,10 @@ export function PositionRewards({
       : position.reward?.state === "allocated"
         ? "Finish claim"
         : "Claim";
+  if (position.reward?.delivery === "cash")
+    return <span role="status">Cash received</span>;
+  if (position.reward?.delivery === "grail")
+    return <span role="status">Grail received</span>;
   return (
     <PositionRewardsFrame
       open={open}
@@ -188,7 +192,12 @@ function PositionRewardsContent({
   return (
     <>
       <div className="position-rewards-scroll">
-        {allocated ? (
+        {position.reward?.delivery === "cash" ? (
+          <div className="claim-delivery">
+            <h3>Cash received</h3>
+            <p>{usd(position.reward.budget)} is available in your balance.</p>
+          </div>
+        ) : allocated ? (
           <div className="claim-delivery">
             <h3>
               {position.reward?.state === "claimed"
@@ -234,6 +243,32 @@ function PositionRewardsContent({
                   {a.busy
                     ? "Moving reward…"
                     : `Use ${usd(position.payout ?? "0")} for rewards`}
+                </Button>
+                {a.error && <p role="alert">{a.error}</p>}
+              </div>
+            )}
+            {!preview && position.reward?.state === "available" && (
+              <div className="claim-cash-option">
+                <div>
+                  <h3>Keep it in cash</h3>
+                  <p>
+                    {usd(position.reward.budget)} goes to your available
+                    balance.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  disabled={a.busy}
+                  onClick={() =>
+                    void a.run(async () => {
+                      await a.request({
+                        action: "cash-reward",
+                        id: position.id,
+                      });
+                    })
+                  }
+                >
+                  {a.busy ? "Claiming…" : "Claim cash"}
                 </Button>
                 {a.error && <p role="alert">{a.error}</p>}
               </div>
