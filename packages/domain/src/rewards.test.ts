@@ -10,6 +10,7 @@ import {
   teamRewardMatch,
   rewardForPayout,
   indicativeTokens,
+  rewardCategories,
   type Market,
   type Listing,
   type GrailToken,
@@ -70,6 +71,19 @@ const cards = [
   card("Pikachu", "Pokemon"),
   card("Lionel Messi", "Soccer"),
 ];
+
+test("settled rewards retain their category without expanding live discovery", () => {
+  const settled = market("Pokemon prices this year", "", "settled");
+  expect(rewardCategories([settled])).not.toContain("Pokemon");
+  expect(rewardCategories([settled], { includeInactive: true })).toContain(
+    "Pokemon",
+  );
+  expect(
+    rewardCategories([market("Tesla quarterly revenue", "", "settled")], {
+      includeInactive: true,
+    }),
+  ).toContain("Non-Sport");
+});
 
 test("dynamic rewards select the highest covered card and the next threshold exactly", () => {
   const options = [

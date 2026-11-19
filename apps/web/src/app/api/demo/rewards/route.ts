@@ -2,14 +2,14 @@ import { z } from "zod";
 import { apiRoute, authenticate, ApiError } from "@/server/auth";
 import {
   demoAccount,
-  listCards,
+  listRewardCards,
+  providerRead,
   listGrailTokens,
   attachCachedValuations,
   withSolanaNetwork,
 } from "@collectible/integrations";
 import {
   positionRewardMarket,
-  matchingCards,
   matchingTokens,
   selectedRewardTeam,
 } from "@collectible/domain";
@@ -29,12 +29,17 @@ export async function GET(request: Request) {
       if (!position) throw new ApiError(404, "Position not found.");
       const subject = positionRewardMarket(position);
       const [cards, tokens] = await Promise.all([
-        listCards("", [], "mainnet"),
+        providerRead(() => listRewardCards(subject), []),
         listGrailTokens().catch(() => []),
       ]);
+      if (cards.error)
+        throw new ApiError(
+          503,
+          "Card listings are temporarily unavailable. Try again shortly.",
+        );
       return Response.json(
         {
-          cards: await attachCachedValuations(matchingCards(subject, cards)),
+          cards: await attachCachedValuations(cards.data),
           tokens: matchingTokens(subject, tokens),
           subject: selectedRewardTeam(subject)?.name ?? position.label,
         },

@@ -1,6 +1,15 @@
 import { z } from "zod";
-import type { Listing, Pack, ProviderResult } from "@collectible/domain";
-import { sportCategories } from "@collectible/domain";
+import type {
+  Listing,
+  Pack,
+  ProviderResult,
+  Market,
+} from "@collectible/domain";
+import {
+  sportCategories,
+  rewardCategories,
+  matchingCards,
+} from "@collectible/domain";
 import { safeImage } from "./gemini";
 import { getDb, providerCache, eq } from "@collectible/db";
 import { publicProviderError } from "./provider-error";
@@ -108,11 +117,11 @@ const rawCard = z.object({
   backImage: z.string().nullable().optional(),
   images: z
     .object({
-      frontM: z.string().optional(),
-      frontS: z.string().optional(),
-      backS: z.string().optional(),
+      frontM: z.string().nullish(),
+      frontS: z.string().nullish(),
+      backS: z.string().nullish(),
     })
-    .optional(),
+    .nullish(),
   year: z.union([z.string(), z.number()]).nullable().optional(),
   set: z.string().nullable().optional(),
   listing: z
@@ -200,6 +209,17 @@ export async function listCards(
           valuation: null,
         }));
     },
+  );
+}
+/** Claims keep settled subjects eligible without scanning unrelated categories. */
+export async function listRewardCards(subject: Market): Promise<Listing[]> {
+  return matchingCards(
+    subject,
+    await listCards(
+      "",
+      rewardCategories([subject], { includeInactive: true }),
+      "mainnet",
+    ),
   );
 }
 export async function listPacks(): Promise<Pack[]> {
