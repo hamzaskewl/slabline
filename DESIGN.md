@@ -134,7 +134,7 @@ The share trigger sits immediately right of the position value with a 44px squar
 
 At widths of 639px and below, the dialog becomes a full-width bottom sheet with 20px padding, rounded upper corners, internal scrolling, and top/bottom safe-area allowance. At the reviewed 390px phone width, the full preview remains visible without cropping. Actions use two columns and at least 48px height; desktop share actions use at least 44px height.
 
-The exported card is a fixed 1200 × 630 composition: event artwork/title above identity, a large amount and profit block at left, exact trade facts in the middle, and the selected slab at right. The lower strip contains Slabline identity, capture/environment context, and conditional/fee wording. With no slab, the facts region expands. Public snapshot pages display this same landscape asset responsively.
+The exported card is a fixed 1200 × 630 composition: event artwork/title above identity, a large amount and profit block at left, trade facts in the middle, and the selected slab at right. The lower strip contains only Slabline identity. With no slab, the facts region expands. Public snapshot pages display this same landscape asset responsively.
 
 ## Elevation & Depth
 
@@ -164,9 +164,9 @@ A labeled share icon opens a modal with an accessible title, description, close 
 
 ### Position PNG and immutable snapshot
 
-The server template combines the approved background with actual snapshot fields and provider-supplied subject/slab artwork. Slab photos use contain sizing; missing artwork gets a truthful unavailable state. A target is labeled TARGET SLAB; confirmed ownership uses COLLECTED only when the snapshot records that state. A won position alone does not mean a collectible was received.
+The server template combines the approved background with actual snapshot fields and provider-supplied subject/slab artwork. Slab photos use contain sizing; missing artwork gets a truthful unavailable state. A selection is labeled SLAB; confirmed ownership uses COLLECTED only when the snapshot records that state. A won position alone does not mean a collectible was received.
 
-Open shares say payout if correct; finalized states use their own labels. The main amount identifies its currency and gross basis, while profit/return and the footer expose the appropriate fee basis. Environment and capture time stay visible. Financial figures, costs, average entry and shares come from the snapshot rather than the reference image.
+Open shares say payout if correct; finalized states use their own labels. Per the final user direction, exports omit currency/environment qualifiers, fee notes, capture time and receipt footnotes. Amounts retain the dollar symbol; average entry rounds to exactly two decimals using exact arithmetic. Snapshot data retains its original precision, environment and fee semantics. Financial figures, costs, average entry and shares come from the snapshot rather than the reference image.
 
 **The One Snapshot Rule.** Preview, copy, download, and public presentation reuse the prepared PNG. Publication is explicit; the published bytes and chosen profile visibility remain immutable rather than changing with a later catalog or account update.
 
@@ -177,7 +177,7 @@ Open shares say payout if correct; finalized states use their own labels. The ma
 - **Do** preserve the canonical split-slab proportions and the header, footer, and watermark roles.
 - **Do** use Inter, tabular figures, graphite surfaces, and ice-blue interaction accents.
 - **Do** contain the full share preview and selected slab photo without cropping.
-- **Do** keep conditional payout, gross/fee basis, environment, and target/collected distinctions visible.
+- **Do** keep state labels accurate, use SLAB for selections, and reserve COLLECTED for confirmed receipts. Keep export copy concise.
 - **Do** preserve provider truth, practice/test labels, and concise recoverable errors.
 
 ### Don't:
