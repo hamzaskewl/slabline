@@ -2,7 +2,7 @@
 import { Select } from "./ui/select";
 import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
-import { useState } from "react";
+import { useWalletPreference } from "./wallet-preferences";
 import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -24,7 +24,7 @@ export function WalletCollection({
   const { network } = useNetwork();
   const { ready, authenticated, user, login, getAccessToken } = usePrivy();
   const links = usePrivateRead<Links>("/api/wallet/links");
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useWalletPreference(user?.id, network);
   const wallet =
     links.data?.wallets.find((w) => w.address === selected)?.address ??
     links.data?.wallets[0]?.address ??
@@ -53,6 +53,14 @@ export function WalletCollection({
     ).values(),
   ].filter((a) => !excludeMints.includes(a.mint));
   if (embedded && (!authenticated || !wallet)) return null;
+  if (
+    embedded &&
+    !assets.length &&
+    !collection.hasNextPage &&
+    !collection.isPending &&
+    !collection.error
+  )
+    return null;
   return (
     <section
       className={
@@ -61,12 +69,14 @@ export function WalletCollection({
           : "panel funding-panel account-panel"
       }
     >
-      <div className="section-heading">
-        <h2>{embedded ? "Wallet collectibles" : "Your collectibles"}</h2>
-        {links.data?.network === "devnet" ? (
-          <span className="mode-badge">DEVNET</span>
-        ) : null}
-      </div>
+      {!embedded && (
+        <div className="section-heading">
+          <h2>Your collectibles</h2>
+          {links.data?.network === "devnet" ? (
+            <span className="mode-badge">DEVNET</span>
+          ) : null}
+        </div>
+      )}
       {!ready ? (
         <p role="status">Loading account…</p>
       ) : !authenticated ? (
@@ -94,46 +104,50 @@ export function WalletCollection({
           ) : null}
           {wallet ? (
             <>
-              <label
-                className="account-wallet-label"
-                htmlFor="collection-wallet"
-              >
-                Solana wallet
-              </label>
-              <Select
-                id="collection-wallet"
-                className="account-wallet-select"
-                value={wallet}
-                onChange={(e) => setSelected(e.target.value)}
-              >
-                {links.data?.wallets.map((w) => (
-                  <option key={w.address} value={w.address}>
-                    {w.address.slice(0, 8)}…{w.address.slice(-6)}
-                  </option>
-                ))}
-              </Select>
-              <div className="wallet-actions">
-                <Button
-                  variant="outline"
-                  disabled={collection.isFetching}
-                  onClick={() => void collection.refetch()}
-                >
-                  {collection.isFetching ? "Refreshing…" : "Refresh collection"}
-                </Button>
-              </div>
+              {!embedded && (
+                <>
+                  <label
+                    className="account-wallet-label"
+                    htmlFor="collection-wallet"
+                  >
+                    Solana wallet
+                  </label>
+                  <Select
+                    id="collection-wallet"
+                    className="account-wallet-select"
+                    value={wallet}
+                    onChange={(e) => setSelected(e.target.value)}
+                  >
+                    {links.data?.wallets.map((w) => (
+                      <option key={w.address} value={w.address}>
+                        {w.address.slice(0, 8)}…{w.address.slice(-6)}
+                      </option>
+                    ))}
+                  </Select>
+                  <div className="wallet-actions">
+                    <Button
+                      variant="outline"
+                      disabled={collection.isFetching}
+                      onClick={() => void collection.refetch()}
+                    >
+                      {collection.isFetching
+                        ? "Refreshing…"
+                        : "Refresh collection"}
+                    </Button>
+                  </div>
+                </>
+              )}
               {collection.error ? (
                 <p role="alert">{collection.error.message}</p>
               ) : null}
               {collection.isPending ? (
                 <p role="status">Reading wallet collectibles…</p>
               ) : null}
-              {pages && !assets.length ? (
+              {pages && !assets.length && !embedded ? (
                 <p>
                   {collection.hasNextPage
                     ? "No collectibles on this page."
-                    : embedded
-                      ? "No additional collectibles in this wallet."
-                      : "No collectibles in this wallet."}
+                    : "No collectibles in this wallet."}
                 </p>
               ) : null}
               <div className="wallet-collection-grid">
@@ -166,6 +180,42 @@ export function WalletCollection({
           ) : null}
         </>
       )}
+    </section>
+  );
+}
+
+export function WalletInventorySettings() {
+  const { network } = useNetwork(),
+    { user, authenticated } = usePrivy();
+  const links = usePrivateRead<Links>("/api/wallet/links");
+  const [selected, choose] = useWalletPreference(user?.id, network);
+  const wallets = links.data?.wallets ?? [];
+  if (!authenticated) return null;
+  return (
+    <section className="settings-wallets">
+      <h3>Wallet & profile</h3>
+      {wallets.length > 0 && (
+        <>
+          <label htmlFor="portfolio-wallet">Collectibles wallet</label>
+          <Select
+            id="portfolio-wallet"
+            value={
+              wallets.find((w) => w.address === selected)?.address ??
+              wallets[0]!.address
+            }
+            onChange={(e) => choose(e.target.value)}
+          >
+            {wallets.map((w) => (
+              <option key={w.address} value={w.address}>
+                {w.address.slice(0, 8)}…{w.address.slice(-6)}
+              </option>
+            ))}
+          </Select>
+        </>
+      )}
+      <Link className="button button-outline button-pill" href="/wallet">
+        Manage wallets
+      </Link>
     </section>
   );
 }

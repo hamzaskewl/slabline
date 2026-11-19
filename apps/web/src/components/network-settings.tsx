@@ -12,6 +12,10 @@ const DemoReplayControls = dynamic(
   () => import("./demo-controls").then((m) => m.DemoReplayControls),
   { ssr: false },
 );
+const WalletInventorySettings = dynamic(
+  () => import("./wallet-collection").then((m) => m.WalletInventorySettings),
+  { ssr: false },
+);
 import { Dialog } from "radix-ui";
 import { Settings2, X } from "lucide-react";
 const NetworkContext = createContext<{
@@ -95,6 +99,9 @@ export function NetworkSettings() {
               <DemoReplayControls />
             )}
           </div>
+          {open && process.env.NEXT_PUBLIC_PRIVY_APP_ID && (
+            <WalletInventorySettings />
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

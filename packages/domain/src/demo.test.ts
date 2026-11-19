@@ -1,5 +1,14 @@
 import { expect, test } from "bun:test";
-import { rewardAllocation, demoSaleQuote, DEMO_REPLAY } from "./demo";
+import {
+  rewardAllocation,
+  demoSaleQuote,
+  DEMO_REPLAY,
+  DEMO_REPLAY_CARD,
+  activeDemoPosition,
+  demoPositionContext,
+  positionRewardMarket,
+} from "./demo";
+import { matchingCards, type Market } from "./index";
 test("reward selections enforce 80–100% including sub-cent rounding", () => {
   expect(rewardAllocation("100", ["50", "30"]).valid).toBe(true);
   expect(rewardAllocation("100", ["79.999999"]).valid).toBe(false);
@@ -19,4 +28,121 @@ test("sales use bids for the selected side and reject unavailable depth", () => 
   expect(() =>
     demoSaleQuote({ side: "yes", quantity: "100000" }, DEMO_REPLAY.book),
   ).toThrow("Not enough buyers");
+});
+
+test("winning positions stay active until their reward is fully claimed", () => {
+  const reward = {
+    budget: "100",
+    cardSpend: "80",
+    remainder: "20",
+    state: "available" as const,
+  };
+  expect(activeDemoPosition({ state: "open" })).toBe(true);
+  expect(activeDemoPosition({ state: "won" })).toBe(true);
+  expect(activeDemoPosition({ state: "won", reward })).toBe(true);
+  expect(
+    activeDemoPosition({
+      state: "won",
+      reward: { ...reward, state: "allocated" },
+    }),
+  ).toBe(true);
+  expect(
+    activeDemoPosition({
+      state: "won",
+      reward: { ...reward, state: "claimed" },
+    }),
+  ).toBe(false);
+  for (const state of ["sold", "lost", "refunded"])
+    expect(activeDemoPosition({ state })).toBe(false);
+});
+
+test("saved and legacy rewards match the settled selected team, never sibling outcomes", () => {
+  const contract = {
+    symbol: DEMO_REPLAY.book.symbol,
+    label: DEMO_REPLAY.label,
+    status: "settled",
+    imageUrl: DEMO_REPLAY.artwork[0]!.src,
+    lastPrice: "1",
+    quantityIncrement: "1",
+    priceIncrement: "0.01",
+  };
+  const other = {
+    ...contract,
+    symbol: "GEMI-NBAF-2627CHAMP-PHI",
+    label: "Philadelphia",
+    imageUrl: "https://example.com/phi.png",
+  };
+  const market: Market = {
+    id: DEMO_REPLAY.eventTicker,
+    title: "San Antonio or Philadelphia champion",
+    category: "Sports",
+    status: "settled",
+    description: "Philadelphia",
+    searchText: "Philadelphia",
+    imageUrl: null,
+    closesAt: null,
+    contracts: [contract, other],
+    children: [],
+  };
+  market.children = [
+    { ...market, title: "Philadelphia", contracts: [other], children: [] },
+  ];
+  const saved = demoPositionContext(market, contract);
+  expect(saved.artwork).toEqual(DEMO_REPLAY.artwork);
+  expect(saved.rewardMarket.contracts).toEqual([contract]);
+  expect(saved.rewardMarket.children).toEqual([]);
+  const inventory = [
+    DEMO_REPLAY_CARD,
+    {
+      ...DEMO_REPLAY_CARD,
+      mint: "opponent",
+      name: "2003 Allen Iverson",
+      player: "Allen Iverson",
+      team: "Philadelphia 76ers",
+    },
+  ];
+  const position = {
+    eventTicker: market.id,
+    eventTitle: market.title,
+    symbol: contract.symbol,
+    label: contract.label,
+  };
+  expect(
+    matchingCards(positionRewardMarket({ ...position, ...saved }), inventory),
+  ).toEqual([DEMO_REPLAY_CARD]);
+  expect(matchingCards(positionRewardMarket(position), inventory)).toEqual([
+    DEMO_REPLAY_CARD,
+  ]);
+  expect(
+    matchingCards(positionRewardMarket(position), inventory.slice(1)),
+  ).toEqual([]);
+});
+
+test("binary positions retain their event subject and supplied artwork", () => {
+  const contract = {
+    symbol: "GEMI-WEMBY-YES",
+    label: "Yes",
+    status: "active",
+    lastPrice: null,
+    quantityIncrement: "1",
+    priceIncrement: "0.01",
+  };
+  const market: Market = {
+    id: "wemby",
+    title: "Will Victor Wembanyama win MVP?",
+    category: "Sports",
+    status: "active",
+    description: "",
+    imageUrl: "https://example.com/wemby.png",
+    closesAt: null,
+    contracts: [contract],
+    children: [],
+  };
+  const context = demoPositionContext(market, contract);
+  expect(context.artwork).toEqual([
+    { src: market.imageUrl!, label: market.title },
+  ]);
+  expect(matchingCards(context.rewardMarket, [DEMO_REPLAY_CARD])).toEqual([
+    DEMO_REPLAY_CARD,
+  ]);
 });

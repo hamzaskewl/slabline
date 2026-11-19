@@ -7,9 +7,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import Link from "next/link";
+import { useConnectWallet } from "@privy-io/react-auth";
 import { useWallets, useSignMessage } from "@privy-io/react-auth/solana";
-import { Gift, X, ArrowRight } from "lucide-react";
+import { X } from "lucide-react";
 import {
   rewardAllocation,
   units,
@@ -36,15 +36,23 @@ export type RewardPick = {
 const pickId = (item: RewardPick) =>
   `${item.source}:${item.sourceId}:${item.reserveId ?? ""}`;
 const Context = createContext<{
+  claiming: boolean;
   data?: DemoAccountView;
   position?: DemoPosition;
-  choose: (id: string) => void;
   picks: RewardPick[];
   toggle: (item: RewardPick) => void;
   clear: () => void;
 } | null>(null);
 export const useRewardSelection = () => useContext(Context);
-export function RewardSelectionProvider({ children }: { children: ReactNode }) {
+export function RewardSelectionProvider({
+  children,
+  positionId,
+  initialPosition,
+}: {
+  children: ReactNode;
+  positionId?: string;
+  initialPosition?: DemoPosition;
+}) {
   const a = useDemoAction();
   const account = usePrivateRead<DemoAccountView>(
     "/api/demo",
@@ -57,25 +65,20 @@ export function RewardSelectionProvider({ children }: { children: ReactNode }) {
   }>({ positionId: "", picks: [] });
   const active = a.network === "devnet" && selection.owner === a.user?.id;
   const data = a.network === "devnet" ? account.data : undefined;
-  const position =
-    data?.positions.find(
-      (p) => p.id === selection.positionId && p.reward?.state === "available",
-    ) ?? data?.positions.find((p) => p.reward?.state === "available");
+  const position = positionId
+    ? (data?.positions.find((p) => p.id === positionId) ?? initialPosition)
+    : (data?.positions.find(
+        (p) => p.id === selection.positionId && p.reward?.state === "available",
+      ) ?? data?.positions.find((p) => p.reward?.state === "available"));
   const picks =
     active && position?.id === selection.positionId ? selection.picks : [];
-  const choose = (id: string) =>
-    setSelection((s) =>
-      s.owner === a.user?.id && s.positionId === id
-        ? s
-        : { owner: a.user?.id, positionId: id, picks: [] },
-    );
   return (
     <Context.Provider
       value={{
+        claiming: !!positionId,
         data,
         position,
         picks,
-        choose,
         clear: () =>
           setSelection({
             owner: a.user?.id,
@@ -101,12 +104,7 @@ export function RewardSelectionProvider({ children }: { children: ReactNode }) {
 }
 export function AddReward({ item }: { item: RewardPick }) {
   const c = useContext(Context);
-  if (!c?.position?.reward)
-    return (
-      <Link className="reward-browse-button" href="/portfolio">
-        View winning rewards <ArrowRight size={15} />
-      </Link>
-    );
+  if (!c?.claiming || !c.position?.reward) return null;
   const selected = c.picks.some((p) => pickId(p) === pickId(item));
   const committed =
     c.data?.collectibles.filter(
@@ -128,7 +126,12 @@ export function AddReward({ item }: { item: RewardPick }) {
     <button
       className="reward-browse-button"
       aria-pressed={selected}
-      disabled={tooMuch || already || (!selected && c.picks.length >= 20)}
+      disabled={
+        c.position.reward.state !== "available" ||
+        tooMuch ||
+        already ||
+        (!selected && c.picks.length >= 20)
+      }
       onClick={() => c.toggle(item)}
     >
       {already
@@ -144,6 +147,7 @@ export function AddReward({ item }: { item: RewardPick }) {
 export function RewardCheckout() {
   const c = useContext(Context),
     a = useDemoAction(),
+    { connectWallet } = useConnectWallet(),
     { wallets } = useWallets(),
     { signMessage } = useSignMessage();
   const links = usePrivateRead<{ wallets: { address: string }[] }>(
@@ -157,61 +161,19 @@ export function RewardCheckout() {
   const wallet = wallets.find((w) => w.address === walletAddress) ?? wallets[0];
   const positionId = c?.position?.id;
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("win");
-    if (id) c?.choose(id);
-  }, []);
-  useEffect(() => {
     key.current = crypto.randomUUID();
     setVerified("");
   }, [positionId, a.user?.id, a.network]);
   useEffect(() => {
     setComplete(false);
   }, [a.user?.id, a.network]);
-  if (a.network !== "devnet") return null;
-  if (!a.authenticated)
-    return (
-      <div className="reward-budget-banner">
-        <Gift size={24} />
-        <div>
-          <h2>Your winning cards start here</h2>
-          <p>Log in to see rewards from your predictions.</p>
-        </div>
-        <Button onClick={a.login}>Log in</Button>
-      </div>
-    );
-  if (complete)
-    return (
-      <div className="reward-budget-banner" role="status">
-        <Gift size={24} />
-        <div>
-          <h2>Rewards selected</h2>
-          <p>Your cards are saved. Complete their transfers in Collection.</p>
-        </div>
-        <Link className="button button-primary" href="/collection">
-          View collection
-        </Link>
-        {c?.position && (
-          <button className="text-button" onClick={() => setComplete(false)}>
-            Choose rewards for another win
-          </button>
-        )}
-      </div>
-    );
-  if (!c?.position?.reward)
-    return (
-      <div className="reward-budget-banner">
-        <Gift size={24} />
-        <div>
-          <h2>Explore potential rewards</h2>
-          <p>
-            Win a prediction, then choose cards worth 80–100% of your reward.
-          </p>
-        </div>
-        <Link className="text-link" href="/portfolio">
-          View portfolio <ArrowRight size={16} />
-        </Link>
-      </div>
-    );
+  if (
+    a.network !== "devnet" ||
+    !a.authenticated ||
+    complete ||
+    c?.position?.reward?.state !== "available"
+  )
+    return null;
   const { position, picks, data } = c,
     reward = position.reward!;
   const committed =
@@ -228,28 +190,10 @@ export function RewardCheckout() {
     (verified === `${a.user?.id}:${wallet.address}` ||
       links.data?.wallets.some((w) => w.address === wallet.address));
   return (
-    <section className="reward-checkout" aria-label="Select winning rewards">
-      <div className="reward-budget-heading">
-        <div>
-          <h2>You won {usd(reward.budget)}</h2>
-          <p>
-            {position.label} · {position.side.toUpperCase()}
-          </p>
-        </div>
-        <Select
-          aria-label="Winning result"
-          value={position.id}
-          onChange={(e) => c.choose(e.target.value)}
-        >
-          {data?.positions
-            .filter((p) => p.reward?.state === "available")
-            .map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label} · {usd(p.reward!.budget)}
-              </option>
-            ))}
-        </Select>
-      </div>
+    <section
+      className="reward-checkout embedded-checkout"
+      aria-label="Select winning rewards"
+    >
       <dl className="reward-budget-totals">
         <div>
           <dt>Cards selected</dt>
@@ -271,30 +215,32 @@ export function RewardCheckout() {
           </dd>
         </div>
       </dl>
-      <p>
-        Choose cards totaling {usd(allocation.minimum)}–{usd(reward.budget)}. Up
-        to 20% returns as demo credit after your cards arrive.
-      </p>
       {picks.length > 0 && (
-        <div className="reward-basket">
-          {picks.map((p) => (
-            <div className="reward-basket-row" key={pickId(p)}>
-              <CardImage src={p.image} alt={p.name} />
-              <div>
-                <strong>{p.name}</strong>
-                <CardValue valuation={p.valuation} />
+        <details className="reward-basket">
+          <summary>
+            {picks.length} {picks.length === 1 ? "card" : "cards"} selected ·
+            Review
+          </summary>
+          <div className="reward-basket-items">
+            {picks.map((p) => (
+              <div className="reward-basket-row" key={pickId(p)}>
+                <CardImage src={p.image} alt={p.name} />
+                <div>
+                  <strong>{p.name}</strong>
+                  <CardValue valuation={p.valuation} />
+                </div>
+                <b>{usd(p.cost)}</b>
+                <button
+                  className="icon-button"
+                  aria-label={`Remove ${p.name}`}
+                  onClick={() => c.toggle(p)}
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <b>{usd(p.cost)}</b>
-              <button
-                className="icon-button"
-                aria-label={`Remove ${p.name}`}
-                onClick={() => c.toggle(p)}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </details>
       )}
       <div className="reward-checkout-actions">
         {wallet ? (
@@ -310,9 +256,12 @@ export function RewardCheckout() {
             ))}
           </Select>
         ) : (
-          <Link className="text-link" href="/wallet">
+          <Button
+            variant="outline"
+            onClick={() => connectWallet({ walletChainType: "solana-only" })}
+          >
             Connect a wallet
-          </Link>
+          </Button>
         )}
         <Button
           disabled={a.busy || !wallet || !allocation.valid || !picks.length}

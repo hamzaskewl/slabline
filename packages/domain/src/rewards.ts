@@ -180,7 +180,7 @@ export function outcomeRewardMarket(
   // Parent events contain many players. The selected outcome is the reward subject.
   return {
     ...market,
-    title: contract.label,
+    title: /^(yes|no)$/i.test(contract.label) ? market.title : contract.label,
     searchText: "",
     description: "",
     contracts: [contract],

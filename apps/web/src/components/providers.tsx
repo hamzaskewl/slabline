@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpLink } from "@trpc/client";
 import { api } from "@/lib/trpc";
 import { NetworkProvider } from "./network-settings";
+import { WalletPreferencesProvider } from "./wallet-preferences";
 import dynamic from "next/dynamic";
 const AuthProvider = dynamic(() => import("./auth-provider"), { ssr: false });
 const RewardSelectionProvider = dynamic(
@@ -36,7 +37,9 @@ export function Providers({ children }: { children: ReactNode }) {
   );
   return (
     <NetworkProvider>
-      {appId ? <AuthProvider appId={appId}>{content}</AuthProvider> : content}
+      <WalletPreferencesProvider>
+        {appId ? <AuthProvider appId={appId}>{content}</AuthProvider> : content}
+      </WalletPreferencesProvider>
     </NetworkProvider>
   );
 }

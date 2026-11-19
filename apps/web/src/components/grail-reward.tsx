@@ -81,10 +81,12 @@ export function GrailReward({
   token,
   payout = null,
   side,
+  claimable = true,
 }: {
   token: GrailToken;
   payout?: string | null;
   side?: "yes" | "no";
+  claimable?: boolean;
 }) {
   const { network } = useNetwork();
   const query = api.grailReward.useQuery(
@@ -161,7 +163,8 @@ export function GrailReward({
                     {r.vaulted} vaulted · {r.available} available
                   </span>
                   <CardValue valuation={r.valuation} />
-                  {network === "devnet" &&
+                  {claimable &&
+                    network === "devnet" &&
                     process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
                     r.available > 0 &&
                     data.priceUsd && (
