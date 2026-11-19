@@ -1,9 +1,9 @@
-Collectible Markets — Codex Handoff
+Slabline — Codex Handoff
 Version: 2026-11-12 · Goal: Build during the UBC 2026 hackathon (submission Nov 20, noon CST). Status: specification, not evidence of working production integrations.
 Product
 A consumer-first prediction-market application using Gemini's actual market catalog, live order books, and authorized user trading, with a distinctive reward preview: as a user enters a USD prediction size, show real, currently listed graded cards in their slab images whose purchase prices could fit the estimated full winning payout. At settlement, winners can select multiple cards/packs, review fair-market-value estimates and recent comps, then explicitly authorize funding their own Solana wallet and purchasing collectibles. No guaranteed collectible or funds are reserved simply because a preview was shown.
 
-Name: Collectible Markets. Avoid imitating Gemini's exact copyrighted visual design or claiming the product is operated by Gemini.
+Name: Slabline. Avoid imitating Gemini's exact copyrighted visual design or claiming the product is operated by Gemini.
 
 Mobile is the primary web experience. The same URLs serve the desktop website, mobile browser and installed home-screen app. Use a compact market feed, horizontal category filters and bottom navigation on phones. Keep controls clear of the home indicator and cutouts. Bottom tabs navigate within the current app on tap and suppress link previews on long press. Keep ordinary links, text selection and pinch zoom available elsewhere.
 

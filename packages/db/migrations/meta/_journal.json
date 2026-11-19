@@ -29,6 +29,13 @@
       "when": 1794879032906,
       "tag": "0003_exotic_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795063539626,
+      "tag": "0004_omniscient_blazing_skull",
+      "breakpoints": true
     }
   ]
 }

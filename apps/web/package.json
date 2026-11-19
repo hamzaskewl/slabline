@@ -31,6 +31,7 @@
     "radix-ui": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "sharp": "0.35.5",
     "tailwind-merge": "latest",
     "viem": "^2.57.19",
     "zod": "latest"

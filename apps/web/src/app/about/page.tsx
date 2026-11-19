@@ -6,7 +6,7 @@ export default function About() {
   return (
     <main className="about-page">
       <Link href="/">‹ Markets</Link>
-      <h1>About Collectible Markets</h1>
+      <h1>About Slabline</h1>
       <section>
         <h2>Data sources</h2>
         <p>
@@ -48,9 +48,8 @@ export default function About() {
           . Copyright © 2025 TradingView, Inc.
         </p>
         <p>
-          Provider images belong to their respective owners. Collectible Markets
-          is an independent UBC 2026 prototype and is not endorsed by these
-          providers.
+          Provider images belong to their respective owners. Slabline is an
+          independent UBC 2026 prototype and is not endorsed by these providers.
         </p>
       </section>
       <details>

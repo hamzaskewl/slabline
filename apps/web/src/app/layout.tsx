@@ -10,26 +10,38 @@ import "./market-artwork.css";
 import "./discovery.css";
 import "./demo.css";
 import "./account.css";
+import "./slabline.css";
 import { Providers } from "@/components/providers";
 export const metadata: Metadata = {
-  applicationName: "Collectible Markets",
+  applicationName: "Slabline",
   appleWebApp: {
     capable: true,
-    title: "Collectible Markets",
+    title: "Slabline",
     statusBarStyle: "black-translucent",
   },
   icons: {
     apple: "/icons/apple-touch-icon.png",
-    icon: "/icons/markets-192.png",
+    icon: "/brand/slabline-favicon.svg",
   },
-  title: "Collectible Markets",
+  title: "Slabline",
   description: "Prediction markets, sports cards and collectible tokens.",
+  openGraph: {
+    title: "Slabline",
+    images: [
+      {
+        url: "/brand/slabline-square-background.png",
+        width: 1254,
+        height: 1254,
+      },
+    ],
+  },
+  metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3000"),
 };
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#010304",
+  themeColor: "#0B1118",
 };
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

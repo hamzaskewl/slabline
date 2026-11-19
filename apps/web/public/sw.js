@@ -14,7 +14,7 @@ self.addEventListener("fetch", (event) => {
     fetch(request).catch(
       () =>
         new Response(
-          '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Collectible Markets · Offline</title><style>html{color-scheme:dark;background:#010304;color:#fff;font:16px system-ui}main{max-width:28rem;margin:22vh auto;padding:1rem}p{color:#b4bec7}a{color:#68caff}</style><main><p>Collectible Markets</p><h1>You’re offline</h1><p>Reconnect to load markets and your account.</p><a href="">Try again</a></main></html>',
+          '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Slabline · Offline</title><style>html{color-scheme:dark;background:#0b1118;color:#fff;font:16px system-ui}main{max-width:28rem;margin:22vh auto;padding:1rem}p{color:#b4bec7}a{color:#68caff}</style><main><p>Slabline</p><h1>You’re offline</h1><p>Reconnect to load markets and your account.</p><a href="">Try again</a></main></html>',
           {
             status: 503,
             headers: {

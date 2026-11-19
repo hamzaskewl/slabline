@@ -39,7 +39,7 @@ export default function PriceChart({
   onRangeChange,
   latestTrade,
   compact = false,
-  background = "#010304",
+  background = "#0B1118",
 }: {
   outcomes: Outcome[];
   volume?: string | null;
@@ -239,6 +239,14 @@ export default function PriceChart({
         data-point-count={count}
       >
         <div ref={host} className="chart-canvas" />
+        <img
+          className="slabline-chart-watermark"
+          src="/brand/slabline-chart-watermark.svg"
+          width={40}
+          height={56}
+          alt=""
+          aria-hidden="true"
+        />
         {hover && count > 0 && (
           <time className="chart-tooltip">
             {new Date(hover.time * 1000).toLocaleString("en-US", {

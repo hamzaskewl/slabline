@@ -52,7 +52,7 @@ export function PortfolioChart({
     const chart = createChart(host.current, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: "#15181b" },
+        background: { type: ColorType.Solid, color: "#151E28" },
         textColor: "#a7adb3",
         fontFamily: "Inter Variable, sans-serif",
         attributionLogo: false,
@@ -131,6 +131,14 @@ export function PortfolioChart({
         </span>
       </div>
       <div className="portfolio-chart-plot">
+        <img
+          className="slabline-chart-watermark"
+          src="/brand/slabline-chart-watermark.svg"
+          width={40}
+          height={56}
+          alt=""
+          aria-hidden="true"
+        />
         <div
           className="portfolio-chart-canvas"
           ref={host}

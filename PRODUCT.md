@@ -1,4 +1,4 @@
-# Collectible Markets
+# Slabline
 
 <!-- impeccable:product-schema 1 -->
 
@@ -20,7 +20,7 @@ ARCHITECTURE.md is authoritative. Never fabricate execution, prices, ownership, 
 
 ## Brand commitments
 
-Original exchange interface under the name Collectible Markets. No implication of Gemini ownership or endorsement.
+Original exchange interface under the name Slabline. The approved text-free split-slab symbol, dark graphite surfaces, ice-blue accents and Inter typography are the durable identity. Position shares show actual selected slab imagery and truthful conditional or finalized amounts; demo and devnet remain visibly labeled. No implication of Gemini ownership or endorsement.
 
 ## Evidence on hand
 

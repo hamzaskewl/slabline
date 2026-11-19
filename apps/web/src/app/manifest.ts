@@ -3,13 +3,13 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "Collectible Markets",
-    short_name: "Markets",
+    name: "Slabline",
+    short_name: "Slabline",
     start_url: "/",
     scope: "/",
     display: "standalone",
-    background_color: "#010304",
-    theme_color: "#010304",
+    background_color: "#0B1118",
+    theme_color: "#0B1118",
     icons: [
       {
         src: "/icons/markets-192.png",

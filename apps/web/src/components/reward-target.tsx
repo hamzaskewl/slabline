@@ -33,6 +33,7 @@ export function RewardTarget({
   stakeRevision,
   replay = false,
   onStake,
+  onTargetSelect,
   loading,
   error,
 }: {
@@ -47,6 +48,7 @@ export function RewardTarget({
   stakeRevision: number;
   replay?: boolean;
   onStake: (value: string) => void;
+  onTargetSelect?: (mint: string) => void;
   loading?: boolean;
   error?: string | null;
 }) {
@@ -151,7 +153,10 @@ export function RewardTarget({
         selected={card}
         team={selectedTeam?.name}
         payout={payout}
-        onSelect={(mint) => setChoice({ mint, revision: stakeRevision })}
+        onSelect={(mint) => {
+          setChoice({ mint, revision: stakeRevision });
+          onTargetSelect?.(mint);
+        }}
       />
       <dl className="reward-target-stats">
         <div>
@@ -174,7 +179,12 @@ export function RewardTarget({
       <button
         className="reward-set-stake"
         disabled={!target?.stake || stakeMatchesTarget}
-        onClick={() => target?.stake && onStake(target.stake)}
+        onClick={() => {
+          if (target?.stake) {
+            onStake(target.stake);
+            onTargetSelect?.(card.mint);
+          }
+        }}
       >
         {target?.stake
           ? stakeMatchesTarget
