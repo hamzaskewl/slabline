@@ -150,15 +150,17 @@ export async function listMarkets(
   const status: ("active" | "settled")[] =
     state === "resolved" ? ["settled"] : ["active"];
   // Provider title search finds events omitted by the general category feed.
-  if (search)
-    return collectMarketPages((offset, limit) =>
-      client.predictions.listEvents({
-        status,
-        search,
-        limit,
-        offset,
-        ...(category ? { category: [category] } : {}),
-      }),
+  if (search || state === "resolved")
+    return collectMarketPages(
+      (offset, limit) =>
+        client.predictions.listEvents({
+          status,
+          ...(search ? { search } : {}),
+          limit,
+          offset,
+          ...(category ? { category: [category] } : {}),
+        }),
+      state === "resolved" ? 25 : 100,
     );
   // Unfiltered reads currently omit older active categories such as Business.
   // Page every provider category and deduplicate overlapping category views.
@@ -224,6 +226,7 @@ export async function collectMarketCategories(
 // Never publish the first page as the complete catalog. Failure of any page fails the read.
 export async function collectMarketPages(
   load: (offset: number, limit: number) => PromiseLike<unknown>,
+  initialLimit = 100,
 ): Promise<Market[]> {
   const result = new Map<string, Market>();
   const pageSchema = z.object({
@@ -232,7 +235,7 @@ export async function collectMarketPages(
   });
   // Nested sports events vary in size. Keep the SDK's response limit and
   // shrink an oversized/slow page at the same offset instead of losing the scan.
-  let limit = 100;
+  let limit = initialLimit;
   for (let offset = 0; ;) {
     let raw: unknown;
     try {
