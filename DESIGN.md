@@ -215,6 +215,8 @@ Desktop navigation is horizontal with an active underline; the phone layout uses
 
 ### Search and discovery
 
+Live is a separate category beside All markets on desktop and in the phone category strip. Its label pairs a seven-pixel red dot with the word Live; use the existing red token, never color alone. Live cards keep that label visible in their footer at every breakpoint, and featured live games use it in place of their scheduled start. The All markets carousel keeps arrow, dot, pause and horizontal-touch controls, showing current upcoming/live matchups only. Preserve the compact inherited composition and reduced-motion behavior. An empty Live view says "No games live right now" and offers All markets. Provider flags and freshness guards govern eligibility; the badge is not a score feed or a settlement claim.
+
 Markets and Profiles tabs sit above search results. Markets show up to six provider-artwork suggestions with title, category, and right-aligned volume; queries rank by relevance with volume as a tie-breaker, and empty queries rank by volume. Keep the bordered See all results arrow pill outside the scrolling suggestions. Arrow keys move through results, left/right keys change tabs, and Escape closes the dropdown and returns focus to the input. Loading copy stays neutral (`Searching…`).
 
 Sort and status use compact bordered selects beside the Filters pill. Trending weights volume by market age; Liquidity is visibly disabled when provider values are unavailable. Status offers Active, Resolved, and All statuses. The filter panel groups category/topic fields, player-prop and favorites switches, then Reset filters and Done. Search includes player props and disables that switch while a query is present.
