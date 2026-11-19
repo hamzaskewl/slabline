@@ -1,10 +1,11 @@
 import { ChainInspector } from "@/components/chain-inspector";
+import { SiteFrame } from "@/components/site-navigation";
 import Link from "next/link";
 import { CollectorCryptTest } from "@/components/collector-crypt-test";
 
 export default function About() {
   return (
-    <main className="about-page">
+    <SiteFrame contentClass="about-page">
       <Link href="/">‹ Markets</Link>
       <h1>About Collectible Markets</h1>
       <section>
@@ -14,9 +15,9 @@ export default function About() {
           images from Collector Crypt. Token metadata and images from Grail.
         </p>
         <p>
-          Markets appear when a listed collectible or Grail token relates to
-          their subject or sport. Non-sports rewards appear only when a related
-          active market exists.
+          Reward previews match listed collectibles and Grail tokens to a
+          prediction's subject. Non-sports rewards in the catalog appear only
+          when a related active market exists.
         </p>
       </section>
       <section>
@@ -26,9 +27,8 @@ export default function About() {
           Practice orders are simulated and saved on this device.
         </p>
         <p>
-          Grail purchases use your connected EVM wallet and direct Uniswap
-          pools. Each approval and purchase requires a wallet signature and ETH
-          for gas. Gas sponsorship is off; physical redemption remains on Grail.
+          Grail pages show token prices and vault information. In-app token
+          purchases are unavailable; physical redemption remains on Grail.
           Owning a fraction of a token does not by itself qualify for a physical
           card.
         </p>
@@ -64,6 +64,6 @@ export default function About() {
         <Link href="/rewards">Rewards</Link> ·{" "}
         <Link href="/wallet">Wallet</Link>
       </nav>
-    </main>
+    </SiteFrame>
   );
 }

@@ -1,0 +1,455 @@
+/* Demo navigation, readable state labels, and mobile-first action placement. */
+.detail-title {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-width: 0;
+}
+.detail-title .event-identity {
+  margin-bottom: 0;
+}
+.detail-jumps {
+  display: none;
+}
+.prediction-surface .exchange-grid:has(.prediction-panels) > .market-detail {
+  grid-column: 1;
+  grid-row: 2;
+}
+.prediction-surface .exchange-grid > .prediction-panels {
+  grid-column: 2;
+  grid-row: 2;
+}
+#market-activity,
+#prediction-ticket {
+  scroll-margin-top: 90px;
+}
+.ticket-explanation {
+  margin: 12px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #b7c1ca;
+}
+.prediction-panels .stake-presets button,
+.phone-categories button,
+.reward-browser-close,
+.reward-browser-filters > button,
+.reward-card-arrows button,
+.chart-ranges button,
+.filter-reset,
+.category-tabs button,
+.market-select-trigger,
+.filter-toggle,
+.button {
+  min-height: 44px;
+}
+.reward-browser-close {
+  min-width: 44px;
+}
+.market-rules summary,
+.reward-filter-panel summary,
+.install-help summary {
+  min-height: 44px;
+  padding-block: 12px;
+  cursor: pointer;
+}
+.prediction-surface .board-side.yes {
+  color: #79e7ac;
+}
+.prediction-surface .board-side.no {
+  color: #ffb1b1;
+}
+.prediction-surface .board-side[aria-pressed="true"] {
+  color: #15251b;
+}
+.prediction-surface .side-toggle .yes.selected {
+  color: #a4f2c0;
+}
+.prediction-surface .side-toggle .no.selected {
+  color: #ffe1e1;
+}
+.reward-scope button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.collectible-grid > .collectible-tile:nth-child(n) {
+  display: flex;
+  flex-direction: column;
+}
+.collectible-tile .card-information {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.collectible-tile .card-information h3 {
+  font-size: 14px;
+  line-height: 1.45;
+}
+.collectible-tile .card-information > p,
+.collectible-tile .card-category {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.collectible-tile .card-price {
+  margin-top: auto;
+  padding-top: 14px;
+}
+.collectible-tile .flip-card {
+  width: 44px;
+  height: 44px;
+  background: #161c25;
+  color: var(--ink);
+}
+.card-detail-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 0 0;
+  margin-top: 12px;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.card-detail-trigger:hover {
+  color: #8ccfff;
+}
+.reward-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.reward-scope button,
+.card-image-tabs button {
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  min-height: 44px;
+  padding: 10px 15px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.reward-scope button[aria-pressed="true"],
+.card-image-tabs button[aria-pressed="true"] {
+  border-color: #6381e8;
+  background: #1c2b51;
+  color: #e3eaff;
+}
+.reward-scope p {
+  font-size: 12px;
+  margin: 0 0 0 6px;
+}
+.card-inspector {
+  position: fixed;
+  z-index: 140;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  background: #141a20;
+  color: var(--ink);
+  padding: 24px;
+  box-shadow: 0 20px 60px #0008;
+}
+.card-inspector > header {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.card-inspector h2 {
+  font-size: 22px;
+  line-height: 1.3;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.card-inspector-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--ink);
+  background: #2a333d;
+  cursor: pointer;
+}
+.card-inspector > p {
+  font-size: 12px;
+  margin: 8px 0 24px;
+}
+.card-inspector-body {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  gap: 28px;
+}
+.card-inspector-image {
+  height: 350px;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: #090d11;
+  border-radius: 10px;
+}
+.card-inspector-image img {
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  min-height: 0;
+}
+.card-image-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.card-image-tabs button {
+  flex: 1;
+}
+.card-inspector-copy > p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+.card-inspector-copy .card-inspector-price {
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 650;
+  margin-bottom: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.card-inspector-price span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 450;
+}
+.card-inspector dl {
+  margin: 20px 0;
+}
+.card-inspector dl > div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+}
+.card-inspector dt {
+  color: var(--muted);
+}
+.card-inspector dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.card-inspector-copy > a {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.card-inspector-copy > .text-link {
+  min-height: 44px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.practice-empty {
+  text-align: center;
+  padding-bottom: 32px;
+}
+.practice-empty .empty-state {
+  padding-bottom: 20px;
+}
+.wallet-welcome {
+  max-width: 880px;
+  padding: 24px 0 32px;
+}
+.wallet-welcome > svg {
+  color: #8ebeff;
+  margin-bottom: 12px;
+}
+.wallet-welcome h2 {
+  font-size: 28px;
+  line-height: 1.2;
+  margin-bottom: 12px;
+}
+.wallet-welcome > p {
+  max-width: 580px;
+  line-height: 1.65;
+  margin: 0 0 24px;
+}
+.account-capabilities {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin: 32px 0 24px;
+  border-top: 1px solid var(--rule);
+  padding-top: 24px;
+}
+.account-capabilities h3 {
+  margin: 0 0 8px;
+}
+.account-capabilities p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+.wallet-account-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.wallet-account-grid .panel {
+  margin: 0;
+  padding: 24px;
+}
+.wallet-session-actions {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.wallet-session-actions p {
+  font-size: 13px;
+}
+.wallet-install {
+  margin-top: 28px;
+  max-width: 680px;
+}
+.wallet-install p {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.supporting-navigation {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-left: auto;
+}
+.supporting-navigation a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.supporting-navigation a:hover {
+  color: var(--ink);
+}
+.supporting-practice {
+  margin-left: auto;
+  min-height: 44px;
+}
+.supporting-shell .about-page {
+  padding-top: 32px;
+  padding-bottom: 40px;
+}
+@media (max-width: 1099px) {
+  .prediction-surface .exchange-grid > .prediction-panels {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .prediction-surface .exchange-grid:has(.prediction-panels) > .market-detail {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .detail-jumps {
+    display: flex;
+    gap: 20px;
+    border-bottom: 1px solid var(--rule);
+    margin-top: 16px;
+  }
+  .detail-jumps a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: #b7dfff;
+    font-size: 12px;
+  }
+  .supporting-navigation {
+    gap: 14px;
+  }
+}
+@media (max-width: 760px),
+  (pointer: coarse) and (max-height: 540px) and (max-width: 1000px) {
+  .supporting-navigation {
+    display: none;
+  }
+  .supporting-practice {
+    font-size: 12px;
+  }
+  .wallet-account-grid,
+  .account-capabilities {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .account-capabilities {
+    gap: 20px;
+  }
+  .wallet-session-actions {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .wallet-session-actions p {
+    margin: 0;
+  }
+  .wallet-welcome {
+    padding-top: 8px;
+  }
+  .wallet-welcome h2 {
+    font-size: 24px;
+  }
+  .reward-scope {
+    gap: 6px;
+  }
+  .reward-scope p {
+    flex-basis: 100%;
+    margin: 6px 0 0;
+    line-height: 1.5;
+  }
+  .phone-tabs button {
+    font-size: 11px;
+  }
+  #market-activity,
+  #prediction-ticket {
+    scroll-margin-top: 68px;
+  }
+}
+@media (max-width: 600px) {
+  .prediction-surface .exchange-grid:has(.prediction-panels) {
+    gap: 16px;
+  }
+  .detail-title .event-identity h1 {
+    font-size: 26px;
+    line-height: 1.2;
+  }
+  .prediction-surface .prediction-panels > .order-ticket {
+    border-top: 0;
+    padding-top: 0;
+  }
+  .card-inspector {
+    padding: 18px;
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 24px);
+  }
+  .card-inspector h2 {
+    font-size: 18px;
+  }
+  .card-inspector-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .card-inspector-image {
+    height: 230px;
+  }
+}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SiteFrame } from "@/components/site-navigation";
 import { notFound } from "next/navigation";
 import { evmChainId, evmAddress } from "@collectible/domain";
 import {
@@ -22,16 +23,16 @@ export default async function TokenPage({
     token = await findGrailToken(chain.data, address.data);
   } catch {
     return (
-      <main className="about-page">
+      <SiteFrame contentClass="about-page">
         <Link href="/rewards">‹ Rewards</Link>
         <h1>Token unavailable</h1>
         <p>Grail’s catalog could not be loaded. Return to Rewards and retry.</p>
-      </main>
+      </SiteFrame>
     );
   }
   const market = await grailMarket(chain.data, address.data).catch(() => null);
   return (
-    <main className="token-page">
+    <SiteFrame contentClass="token-page">
       <nav>
         <Link href="/rewards">‹ Rewards</Link>
         <Link href="/wallet">Wallet</Link>
@@ -45,6 +46,6 @@ export default async function TokenPage({
       <footer>
         <Link href="/about">About &amp; credits</Link>
       </footer>
-    </main>
+    </SiteFrame>
   );
 }

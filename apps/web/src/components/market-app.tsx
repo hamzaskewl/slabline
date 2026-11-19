@@ -33,6 +33,7 @@ import {
   outcomeRewardMarket,
   cardTeam,
   sportCategories,
+  tokenSport,
   matchingTokens,
   filterCards,
   type GrailToken,
@@ -56,6 +57,9 @@ import { useLiveBook } from "@/lib/use-live-book";
 import { retainMarketSnapshot } from "@/lib/market-snapshot";
 import { SnapshotStatus } from "./snapshot-status";
 import { MarketArt } from "./market-art";
+import { CardDetails } from "./card-details";
+import { navigation, PhoneNavigation } from "./site-navigation";
+import { useEligibleRewards } from "@/lib/use-eligible-rewards";
 const PriceChart = dynamic(() => import("./price-chart"), {
   ssr: false,
   loading: () => <div className="chart-loading">Loading chart…</div>,
@@ -72,18 +76,9 @@ const WalletCollection = dynamic(
   () => import("./wallet-collection").then((m) => m.WalletCollection),
   { ssr: false },
 );
-const ConnectedWalletPanel = dynamic(
-  () => import("./auth-controls").then((m) => m.ConnectedWalletPanel),
-  { ssr: false },
-);
-const RelayFunding = dynamic(() => import("./relay-funding"), { ssr: false });
-const navigation = [
-  { label: "Markets", href: "/", icon: Compass },
-  { label: "Rewards", href: "/rewards", icon: Gift },
-  { label: "Portfolio", href: "/portfolio", icon: BarChart3 },
-  { label: "Wallet", href: "/wallet", icon: Wallet },
-  { label: "Collection", href: "/collection", icon: Layers3 },
-];
+const WalletOverview = dynamic(() => import("./wallet-overview"), {
+  ssr: false,
+});
 type PracticeOrder = {
   id: string;
   symbol: string;
@@ -102,6 +97,7 @@ export function MarketApp({
   initialOutcome = 0,
   initialSymbol,
   initialStake = "25",
+  initialPractice = false,
 }: {
   section?: string;
   selectedId?: string;
@@ -109,6 +105,7 @@ export function MarketApp({
   initialOutcome?: number;
   initialSymbol?: string;
   initialStake?: string;
+  initialPractice?: boolean;
 }) {
   const router = useRouter();
   useEffect(() => {
@@ -120,7 +117,7 @@ export function MarketApp({
   }, []);
   const [search, setSearch] = useState(""),
     [category, setCategory] = useState("All markets"),
-    [practice, setPractice] = useState(false),
+    [practice, setPractice] = useState(initialPractice),
     [menuOpen, setMenuOpen] = useState(false);
   const [orders, setOrders] = useState<PracticeOrder[]>([]),
     [notice, setNotice] = useState("");
@@ -144,7 +141,10 @@ export function MarketApp({
           previous as ProviderResult<Market[]> | undefined,
           incoming as ProviderResult<Market[]>,
         ),
-      enabled: section === "markets" && !selectedId && !practice,
+      enabled:
+        (section === "markets" || section === "rewards") &&
+        !selectedId &&
+        !practice,
     },
   );
   const searchQuery = api.markets.useQuery(
@@ -178,11 +178,13 @@ export function MarketApp({
       const o = JSON.parse(localStorage.getItem("cm-practice-v1") ?? "[]");
       if (Array.isArray(o)) setOrders(o.slice(0, 50));
     } catch {
-      localStorage.removeItem("cm-practice-v1");
+      // Browsers may deny storage entirely. Practice can still run in memory.
     }
   }, []);
   const detailView = section === "markets" && (!!selectedId || practice);
-  const markets = practice ? [PRACTICE_MARKET] : (marketQuery.data?.data ?? []);
+  const catalog = marketQuery.data?.data ?? [];
+  const inventory = rewardQuery.data?.data;
+  const markets = practice ? [PRACTICE_MARKET] : catalog;
   const visible = markets.filter(
     (m) =>
       (category === "All markets" || m.category === category || practice) &&
@@ -196,8 +198,12 @@ export function MarketApp({
           (m) => m.id === selectedId || m.ticker === selectedId,
         ))
       : visible[0];
-  const cards = rewardQuery.data?.data.cards ?? [];
-  const tokens = rewardQuery.data?.data.tokens ?? [];
+  const eligibleRewards = useEligibleRewards(
+    inventory,
+    marketQuery.data?.data,
+    section === "rewards",
+  );
+  const { cards, tokens } = eligibleRewards;
   const simulate = (order: Omit<PracticeOrder, "id" | "createdAt">) => {
     const updated = [
       {
@@ -208,7 +214,14 @@ export function MarketApp({
       ...orders,
     ].slice(0, 50);
     setOrders(updated);
-    localStorage.setItem("cm-practice-v1", JSON.stringify(updated));
+    try {
+      localStorage.setItem("cm-practice-v1", JSON.stringify(updated));
+    } catch {
+      setNotice(
+        "Simulation complete. Browser storage is unavailable, so this position lasts for this visit only. No funds moved.",
+      );
+      return;
+    }
     setNotice(
       "SIMULATED position saved on this device. No order was sent to Gemini.",
     );
@@ -270,7 +283,9 @@ export function MarketApp({
               </form>
             )}
             <div className="topbar-actions">
-              <span className="mode-badge">SIMULATED</span>
+              <span className="mode-badge">
+                {practice ? "PRACTICE" : "PREVIEW"}
+              </span>
               <div className="header-account">
                 <WalletEntry configured={!!status.data?.privyConfigured} />
               </div>
@@ -302,7 +317,11 @@ export function MarketApp({
             >
               <Zap size={14} /> All markets
             </Link>
-            {[...new Set(markets.map((m) => m.category))]
+            {[
+              ...new Set(
+                (section === "markets" ? markets : []).map((m) => m.category),
+              ),
+            ]
               .sort((a, b) =>
                 a === "Sports" ? -1 : b === "Sports" ? 1 : a.localeCompare(b),
               )
@@ -330,16 +349,9 @@ export function MarketApp({
                 {n.label}
               </Link>
             ))}
-            <button
-              className="practice-link"
-              onClick={() => {
-                setPractice(!practice);
-                setCategory("All markets");
-                setSearch("");
-              }}
-            >
+            <Link className="practice-link" href={practice ? "/" : "/practice"}>
               {practice ? "Live catalog" : "Practice"} <ChevronDown size={12} />
-            </button>
+            </Link>
           </nav>
         </header>
         <main id="main">
@@ -382,7 +394,7 @@ export function MarketApp({
             <>
               {!selectedId && !practice ? (
                 <Discovery
-                  onPractice={() => setPractice(true)}
+                  onPractice={() => router.push("/practice")}
                   search={search}
                   query={debouncedSearch}
                   setSearch={(value) => {
@@ -415,7 +427,10 @@ export function MarketApp({
                         (searchQuery.isError
                           ? "Search is unavailable. Please retry."
                           : null))
-                      : marketQuery.data?.error
+                      : (marketQuery.data?.error ??
+                        (marketQuery.isError
+                          ? "Catalog is unavailable. Please retry."
+                          : null))
                   }
                   retry={() => {
                     void marketQuery.refetch();
@@ -436,7 +451,7 @@ export function MarketApp({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setPractice(false)}
+                        onClick={() => router.push("/")}
                       >
                         Exit practice
                       </Button>
@@ -454,8 +469,8 @@ export function MarketApp({
                         ].join(":")}
                         market={selected}
                         practice={practice}
-                        cards={cards}
-                        tokens={tokens}
+                        cards={inventory?.cards ?? []}
+                        tokens={inventory?.tokens ?? []}
                         rewardsLoading={rewardQuery.isLoading}
                         rewardsError={
                           rewardQuery.data?.error ??
@@ -488,7 +503,7 @@ export function MarketApp({
                         </p>
                         <Button
                           variant="outline"
-                          onClick={() => setPractice(true)}
+                          onClick={() => router.push("/practice")}
                         >
                           Open practice market
                         </Button>
@@ -503,9 +518,20 @@ export function MarketApp({
               <RewardCatalog
                 cards={cards}
                 tokens={tokens}
-                loading={rewardQuery.isLoading}
-                error={rewardQuery.data?.error}
-                retry={() => void rewardQuery.refetch()}
+                matching={eligibleRewards.pending}
+                loading={rewardQuery.isLoading || marketQuery.isLoading}
+                error={
+                  eligibleRewards.error ??
+                  rewardQuery.data?.error ??
+                  marketQuery.data?.error ??
+                  (rewardQuery.isError || marketQuery.isError
+                    ? "Catalog is unavailable. Please retry."
+                    : null)
+                }
+                retry={() => {
+                  void rewardQuery.refetch();
+                  void marketQuery.refetch();
+                }}
               />
             </>
           ) : section === "portfolio" ? (
@@ -544,16 +570,32 @@ export function MarketApp({
                   </table>
                 </div>
               ) : (
-                <Empty
-                  title="No practice positions yet"
-                  detail="Choose the practice market to try a simulated fill."
-                />
+                <div className="practice-empty">
+                  <Empty
+                    title="No practice positions yet"
+                    detail="Choose the practice market to try a simulated fill."
+                  />
+                  <Button asChild>
+                    <Link href="/practice">
+                      Try a practice prediction <ArrowRight size={16} />
+                    </Link>
+                  </Button>
+                </div>
               )}
             </>
           ) : section === "wallet" ? (
             <>
-              <div className="mobile-wallet-actions">
-                {status.data?.privyConfigured && <AuthButton />}
+              {status.isPending ? (
+                <p role="status">Loading account options…</p>
+              ) : status.data?.privyConfigured ? (
+                <WalletOverview />
+              ) : (
+                <Empty
+                  title="Account connection unavailable"
+                  detail="Account sign-in is not configured on this environment. You can still explore live markets and practice predictions."
+                />
+              )}
+              <div className="wallet-install">
                 <details className="install-help">
                   <summary>Add to Home Screen</summary>
                   <p>
@@ -564,9 +606,6 @@ export function MarketApp({
                   </p>
                 </details>
               </div>
-              {status.data?.privyConfigured ? <PrivateAccount compact /> : null}
-              {status.data?.privyConfigured ? <ConnectedWalletPanel /> : null}
-              {status.data?.privyConfigured ? <RelayFunding /> : null}
             </>
           ) : section === "collection" ? (
             status.isPending ? (
@@ -598,32 +637,15 @@ export function MarketApp({
             <Link href="/about">About &amp; credits</Link>
           </footer>
         </main>
-        <nav
-          className="phone-tabs"
-          aria-label="App navigation"
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          {navigation.map(({ label, href, icon: Icon }) => (
-            <button
-              key={href}
-              type="button"
-              aria-current={
-                section === label.toLowerCase() ? "page" : undefined
-              }
-              onClick={() => {
-                if (href === "/" && !selectedId && section === "markets") {
-                  setPractice(false);
-                  setSearch("");
-                  setCategory("All markets");
-                  window.scrollTo({ top: 0 });
-                } else router.push(href);
-              }}
-            >
-              <Icon size={20} aria-hidden="true" />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
+        <PhoneNavigation
+          onMarkets={() => {
+            if (!selectedId && section === "markets" && !initialPractice) {
+              setSearch("");
+              setCategory("All markets");
+              window.scrollTo({ top: 0 });
+            } else router.push("/");
+          }}
+        />
       </div>
     </div>
   );
@@ -765,134 +787,18 @@ function MarketDetail({
 
   return (
     <>
-      <section className="market-detail panel">
+      <div className="detail-title">
         <div className="event-identity">
           <MarketArt market={market} />
           <div>
             <h1>{market.title}</h1>
           </div>
         </div>
-        {practice ? (
-          <div className="practice-chart">
-            <BarChart3 size={35} />
-            <strong>Simulated depth, real math.</strong>
-            <span>
-              Try a larger stake to see the estimate walk the order book.
-            </span>
-          </div>
-        ) : (
-          <PriceChart
-            outcomes={charted}
-            volume={market.volume}
-            eventTime={market.startsAt ?? market.closesAt}
-            latestTrade={latestTrade}
-            range={range}
-            onRangeChange={setRange}
-          />
-        )}
-        <section className="outcomes-section" aria-label="Market outcomes">
-          <h2>
-            <span>Markets</span>
-            <small>{contracts.length}</small>
-          </h2>
-          {(expanded ? contracts : contracts.slice(0, 10)).map((c) => (
-            <div className="outcome-item" key={c.symbol}>
-              <div className="outcome-row">
-                <button
-                  className="outcome-name outcome-expand"
-                  aria-label={`${c.label} details`}
-                  aria-expanded={expandedSymbol === c.symbol}
-                  aria-controls={`outcome-${c.symbol}`}
-                  onClick={() =>
-                    setExpandedSymbol((current) =>
-                      current === c.symbol ? null : c.symbol,
-                    )
-                  }
-                >
-                  <MarketArt market={market} outcome={c} />
-                  <strong>{c.label}</strong>
-                  <ChevronDown size={16} />
-                </button>
-                {(["yes", "no"] as const).map((s) => (
-                  <button
-                    key={s}
-                    className={"board-side " + s}
-                    aria-label={
-                      s.toUpperCase() +
-                      " " +
-                      c.label +
-                      " " +
-                      buyPercent(
-                        c.symbol === symbol
-                          ? livePrice(s)
-                          : s === "yes"
-                            ? c.buyYes
-                            : c.buyNo,
-                      )
-                    }
-                    aria-pressed={c.symbol === symbol && side === s}
-                    onClick={() => {
-                      selectOutcome(c.symbol, s);
-                      if (window.matchMedia("(max-width: 840px)").matches)
-                        document
-                          .getElementById("prediction-ticket")
-                          ?.scrollIntoView({ block: "start" });
-                    }}
-                  >
-                    {s === "yes" ? "Yes" : "No"}{" "}
-                    <b>
-                      {buyPercent(
-                        c.symbol === symbol
-                          ? livePrice(s)
-                          : s === "yes"
-                            ? c.buyYes
-                            : c.buyNo,
-                      )}
-                    </b>
-                  </button>
-                ))}
-              </div>
-              {expandedSymbol === c.symbol && (
-                <OutcomeDetail
-                  id={`outcome-${c.symbol}`}
-                  outcome={c}
-                  practice={practice}
-                  shared={live}
-                />
-              )}
-            </div>
-          ))}
-          {contracts.length > 10 && (
-            <button
-              className="more-outcomes"
-              aria-expanded={expanded}
-              onClick={() => setExpanded((v) => !v)}
-            >
-              {expanded
-                ? "Show less"
-                : "Show all " + contracts.length + " markets"}{" "}
-              <ChevronDown size={15} />
-            </button>
-          )}
-        </section>
-        <details className="market-rules">
-          <summary>Market details &amp; resolution</summary>
-          <p>
-            {market.description ||
-              "See Gemini for full resolution terms and eligibility."}
-          </p>
-          {market.closesAt && (
-            <p>Closes {new Date(market.closesAt).toLocaleString("en-US")}</p>
-          )}
-          <a
-            href="https://exchange.gemini.com/predictions"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Review on Gemini <ExternalLink size={12} />
-          </a>
-        </details>
-      </section>
+        <nav className="detail-jumps" aria-label="Market sections">
+          <a href="#prediction-ticket">Prediction &amp; reward</a>
+          <a href="#market-activity">Chart &amp; outcomes</a>
+        </nav>
+      </div>
       <div className="prediction-panels">
         <aside className="order-ticket panel" id="prediction-ticket">
           <h2 className="prediction-title">
@@ -929,9 +835,11 @@ function MarketDetail({
               </button>
             ))}
           </div>
-          <p id="quote-note" className="sr-only">
-            Estimates use available depth before fees. A losing prediction pays
-            zero. Live trading is disabled.
+          <p id="quote-note" className="ticket-explanation">
+            {practice
+              ? "Practice only. No funds move."
+              : "Live prices. Estimates only; no order is placed."}{" "}
+            Estimates are before fees. A losing prediction pays zero.
           </p>
           {!practice && (!book || stale) && (
             <p className="snapshot-status" role="status">
@@ -1065,6 +973,132 @@ function MarketDetail({
           }}
         />
       </div>
+      <section
+        className="market-detail panel"
+        id="market-activity"
+        aria-label="Chart and market outcomes"
+      >
+        {practice ? (
+          <div className="practice-chart">
+            <BarChart3 size={35} />
+            <strong>Simulated depth, real math.</strong>
+            <span>
+              Try a larger stake to see the estimate walk the order book.
+            </span>
+          </div>
+        ) : (
+          <PriceChart
+            outcomes={charted}
+            volume={market.volume}
+            eventTime={market.startsAt ?? market.closesAt}
+            latestTrade={latestTrade}
+            range={range}
+            onRangeChange={setRange}
+          />
+        )}
+        <section className="outcomes-section" aria-label="Market outcomes">
+          <h2>
+            <span>Markets</span>
+            <small>{contracts.length}</small>
+          </h2>
+          {(expanded ? contracts : contracts.slice(0, 10)).map((c) => (
+            <div className="outcome-item" key={c.symbol}>
+              <div className="outcome-row">
+                <button
+                  className="outcome-name outcome-expand"
+                  aria-label={`${c.label} details`}
+                  aria-expanded={expandedSymbol === c.symbol}
+                  aria-controls={`outcome-${c.symbol}`}
+                  onClick={() =>
+                    setExpandedSymbol((current) =>
+                      current === c.symbol ? null : c.symbol,
+                    )
+                  }
+                >
+                  <MarketArt market={market} outcome={c} />
+                  <strong>{c.label}</strong>
+                  <ChevronDown size={16} />
+                </button>
+                {(["yes", "no"] as const).map((s) => (
+                  <button
+                    key={s}
+                    className={"board-side " + s}
+                    aria-label={
+                      s.toUpperCase() +
+                      " " +
+                      c.label +
+                      " " +
+                      buyPercent(
+                        c.symbol === symbol
+                          ? livePrice(s)
+                          : s === "yes"
+                            ? c.buyYes
+                            : c.buyNo,
+                      )
+                    }
+                    aria-pressed={c.symbol === symbol && side === s}
+                    onClick={() => {
+                      selectOutcome(c.symbol, s);
+                      if (window.matchMedia("(max-width: 840px)").matches)
+                        document
+                          .getElementById("prediction-ticket")
+                          ?.scrollIntoView({ block: "start" });
+                    }}
+                  >
+                    {s === "yes" ? "Yes" : "No"}{" "}
+                    <b>
+                      {buyPercent(
+                        c.symbol === symbol
+                          ? livePrice(s)
+                          : s === "yes"
+                            ? c.buyYes
+                            : c.buyNo,
+                      )}
+                    </b>
+                  </button>
+                ))}
+              </div>
+              {expandedSymbol === c.symbol && (
+                <OutcomeDetail
+                  id={`outcome-${c.symbol}`}
+                  outcome={c}
+                  practice={practice}
+                  shared={live}
+                />
+              )}
+            </div>
+          ))}
+          {contracts.length > 10 && (
+            <button
+              className="more-outcomes"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded
+                ? "Show less"
+                : "Show all " + contracts.length + " markets"}{" "}
+              <ChevronDown size={15} />
+            </button>
+          )}
+        </section>
+        <details className="market-rules">
+          <summary>Market details &amp; resolution</summary>
+          <p>
+            {market.description ||
+              "See Gemini for full resolution terms and eligibility."}
+          </p>
+          {market.closesAt && (
+            <p>Closes {new Date(market.closesAt).toLocaleString("en-US")}</p>
+          )}
+          <a
+            href="https://exchange.gemini.com/predictions"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Review on Gemini <ExternalLink size={12} />
+          </a>
+        </details>
+      </section>
     </>
   );
 }
@@ -1121,6 +1155,7 @@ function CardTile({ card }: { card: Listing }) {
             <strong>{usd(card.ask)}</strong>
           </div>
         </div>
+        <CardDetails card={card} />
       </div>
     </article>
   );
@@ -1158,12 +1193,14 @@ function RewardCatalog({
   loading,
   error,
   retry,
+  matching,
 }: {
   cards: Listing[];
   tokens: GrailToken[];
   loading: boolean;
   error?: string | null;
   retry: () => void;
+  matching: boolean;
 }) {
   const defaults: RewardFilters = {
     search: "",
@@ -1178,17 +1215,26 @@ function RewardCatalog({
   };
   const [filters, setFilters] = useState<RewardFilters>(defaults);
   const [source, setSource] = useState<"cards" | "tokens">("cards");
+  const [scope, setScope] = useState<"sports" | "all">("sports");
   const [limit, setLimit] = useState(24);
   const update = (key: keyof RewardFilters, value: string) => {
     setFilters((f) => ({ ...f, [key]: value }));
     setLimit(24);
   };
-  const visible = filterCards(cards, filters);
-  const visibleTokens = tokens.filter((t) =>
+  const scopedCards =
+    scope === "sports"
+      ? cards.filter((card) => sportCategories.includes(card.category))
+      : cards;
+  const scopedTokens =
+    scope === "sports" ? tokens.filter((token) => tokenSport(token)) : tokens;
+  const visible = filterCards(scopedCards, filters);
+  const visibleTokens = scopedTokens.filter((t) =>
     `${t.name} ${t.symbol} ${t.tags.join(" ")}`
       .toLowerCase()
       .includes(filters.search.toLowerCase()),
   );
+  const resultCount =
+    source === "cards" ? visible.length : visibleTokens.length;
   const select = (
     key: keyof RewardFilters,
     label: string,
@@ -1212,25 +1258,53 @@ function RewardCatalog({
   );
   return (
     <>
+      <div className="reward-scope" aria-label="Reward scope">
+        {(["sports", "all"] as const).map((value) => (
+          <button
+            key={value}
+            aria-pressed={scope === value}
+            disabled={value === "all" && matching}
+            onClick={() => {
+              setScope(value);
+              setFilters(defaults);
+              setLimit(24);
+            }}
+          >
+            {value === "sports" ? "Sports" : "All eligible rewards"}
+          </button>
+        ))}
+        <p>
+          {matching
+            ? "Matching other collectibles to active markets…"
+            : "Other collectibles appear when they relate to an active market."}
+        </p>
+      </div>
+      {error && (cards.length > 0 || tokens.length > 0) && (
+        <p className="snapshot-status" role="status">
+          Some rewards may be unavailable. {error}
+        </p>
+      )}
       <div className="reward-toolbar">
         <div className="category-tabs" aria-label="Reward type">
           <button
             className={source === "cards" ? "selected" : ""}
+            aria-pressed={source === "cards"}
             onClick={() => {
               setSource("cards");
               setLimit(24);
             }}
           >
-            Cards <span>{cards.length}</span>
+            Cards <span>{scopedCards.length}</span>
           </button>
           <button
             className={source === "tokens" ? "selected" : ""}
+            aria-pressed={source === "tokens"}
             onClick={() => {
               setSource("tokens");
               setLimit(24);
             }}
           >
-            Grail tokens <span>{tokens.length}</span>
+            Grail tokens <span>{scopedTokens.length}</span>
           </button>
         </div>
         <label className="search-field">
@@ -1254,7 +1328,7 @@ function RewardCatalog({
             {select(
               "category",
               "Sport / category",
-              [...new Set(cards.map((c) => c.category))].sort(),
+              [...new Set(scopedCards.map((c) => c.category))].sort(),
             )}
             {select(
               "team",
@@ -1342,7 +1416,7 @@ function RewardCatalog({
       <div className="reward-result-count" role="status">
         {loading
           ? "Loading rewards…"
-          : `${source === "cards" ? visible.length : visibleTokens.length} ${source === "cards" ? "cards" : "tokens"}`}
+          : `${resultCount} ${source === "cards" ? "card" : "token"}${resultCount === 1 ? "" : "s"}`}
       </div>
       {source === "cards" ? (
         <CatalogGrid

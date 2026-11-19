@@ -109,6 +109,7 @@ export function RewardTarget({
           {payout ? usd(payout) : "—"} <small>USD</small>
         </strong>
       </div>
+      <p className="reward-target-note">Before fees. Cards are not reserved.</p>
       <p className="reward-team-heading">
         {selectedTeam ? `${selectedTeam.name} · ` : ""}
         {cards.length} listed {cards.length === 1 ? "card" : "cards"}
