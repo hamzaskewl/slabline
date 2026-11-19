@@ -15,3 +15,5 @@ export * from "./relay-store";
 export * from "./grail";
 export * from "./evm-trading";
 export * from "./wallet-collection";
+export * from "./demo";
+export * from "./demo-nft";

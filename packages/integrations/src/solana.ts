@@ -6,13 +6,24 @@ import {
   type RpcTransport,
 } from "@solana/kit";
 import { IntegrationBlocked } from "@collectible/domain";
+import { AsyncLocalStorage } from "node:async_hooks";
+const requestNetwork = new AsyncLocalStorage<"devnet" | "mainnet">();
+export function withSolanaNetwork<T>(
+  network: "devnet" | "mainnet",
+  action: () => T,
+): T {
+  return requestNetwork.run(network, action);
+}
 import {
   isQuickNodeUrl,
   reserveQuickNodeRpc,
   quickNodeFetch,
 } from "./quicknode-budget";
 export function solanaNetwork() {
-  return process.env.SOLANA_NETWORK === "mainnet" ? "mainnet" : "devnet";
+  return (
+    requestNetwork.getStore() ??
+    (process.env.SOLANA_NETWORK === "mainnet" ? "mainnet" : "devnet")
+  );
 }
 const rpcCache = new Map<
   string,
@@ -29,12 +40,19 @@ export function solanaRpc(
 ) {
   if (network !== solanaNetwork())
     throw new Error("Requested Solana network is not active");
+  const configuredNetwork =
+    process.env.SOLANA_NETWORK === "mainnet" ? "mainnet" : "devnet";
   const fallback =
-    process.env.SOLANA_RPC_URL ||
+    (network === configuredNetwork ? process.env.SOLANA_RPC_URL : undefined) ||
     (network === "devnet"
       ? "https://api.devnet.solana.com"
       : "https://api.mainnet-beta.solana.com");
-  const url = endpoint || process.env.QUICKNODE_RPC_URL || fallback;
+  const url =
+    endpoint ||
+    (network === configuredNetwork
+      ? process.env.QUICKNODE_RPC_URL
+      : undefined) ||
+    fallback;
   const key = JSON.stringify([network, url, fallback, allowFallback]);
   const hit = rpcCache.get(key);
   if (hit && hit.expires > Date.now()) return hit.client;
@@ -117,7 +135,13 @@ export const SOLANA_USDC_MINTS = {
 } as const;
 export function solanaUsdcMint() {
   const expected = SOLANA_USDC_MINTS[solanaNetwork()];
-  if (process.env.SOLANA_USDC_MINT && process.env.SOLANA_USDC_MINT !== expected)
+  const configuredNetwork =
+    process.env.SOLANA_NETWORK === "mainnet" ? "mainnet" : "devnet";
+  if (
+    solanaNetwork() === configuredNetwork &&
+    process.env.SOLANA_USDC_MINT &&
+    process.env.SOLANA_USDC_MINT !== expected
+  )
     throw new Error(
       "Configured USDC mint does not match native USDC on the active network",
     );

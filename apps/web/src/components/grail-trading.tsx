@@ -1,5 +1,10 @@
 "use client";
 import { formatUnits } from "viem";
+import dynamic from "next/dynamic";
+import { useNetwork } from "./network-settings";
+const WalletTrade = dynamic(() => import("./grail-wallet-trade"), {
+  ssr: false,
+});
 import { GrailReward } from "./grail-reward";
 import {
   evmChains,
@@ -16,6 +21,7 @@ export type TradeProps = {
   blocker: string | null;
 };
 export function GrailTrading(props: TradeProps) {
+  const { network } = useNetwork();
   const { token } = props,
     chain = evmChains[token.chainId as EvmChainId];
   return (
@@ -37,6 +43,9 @@ export function GrailTrading(props: TradeProps) {
       </header>
       <div className="token-trade-layout">
         <GrailReward token={token} />
+        {network === "mainnet" && props.configured && (
+          <WalletTrade {...props} />
+        )}
         <section className="token-information">
           <h2>Token details</h2>
           <dl>

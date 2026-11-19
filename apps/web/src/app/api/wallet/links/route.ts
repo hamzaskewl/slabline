@@ -17,5 +17,5 @@ export async function GET(request: Request) {
       { wallets, network: solanaNetwork() },
       { headers: { "Cache-Control": "private, no-store" } },
     );
-  });
+  }, request);
 }

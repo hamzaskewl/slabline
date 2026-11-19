@@ -1,5 +1,6 @@
 import { PrivyClient } from "@privy-io/node";
 import { getDb, users, eq } from "@collectible/db";
+import { withSolanaNetwork } from "@collectible/integrations";
 let privy: PrivyClient | undefined;
 export class ApiError extends Error {
   constructor(
@@ -44,8 +45,14 @@ export async function authenticate(request: Request) {
   if (!user) throw new ApiError(503, "Cannot establish user record");
   return user;
 }
-export async function apiRoute(action: () => Promise<Response>) {
+export async function apiRoute(
+  action: () => Promise<Response>,
+  request?: Request,
+) {
   try {
+    const network = request?.headers.get("x-market-network");
+    if (network === "mainnet" || network === "devnet")
+      return await withSolanaNetwork(network, action);
     return await action();
   } catch (e) {
     if (e instanceof ApiError)

@@ -7,6 +7,7 @@ const sections = [
   "portfolio",
   "collection",
   "redeem",
+  "demo",
 ];
 export default async function Page({
   params,

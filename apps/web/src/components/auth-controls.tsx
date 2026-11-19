@@ -6,6 +6,7 @@ import { relayFormat } from "@collectible/domain";
 import { usePrivy, useConnectWallet } from "@privy-io/react-auth";
 import { useWallets, useSignMessage } from "@privy-io/react-auth/solana";
 import { Button } from "./ui/button";
+import { useNetwork } from "./network-settings";
 import { Wallet, ShieldCheck } from "lucide-react";
 
 export function AuthButton() {
@@ -21,6 +22,7 @@ export function AuthButton() {
   );
 }
 export function ConnectedWalletPanel() {
+  const { network } = useNetwork();
   const { authenticated, login, getAccessToken, user } = usePrivy();
   const { wallets } = useWallets();
   const { connectWallet } = useConnectWallet();
@@ -48,6 +50,7 @@ export function ConnectedWalletPanel() {
       if (!token) throw new Error("Sign in first");
       const headers = {
         Authorization: `Bearer ${token}`,
+        "X-Market-Network": network,
         "Content-Type": "application/json",
       };
       const challengeResponse = await fetch("/api/wallet/challenge", {
@@ -117,6 +120,24 @@ export function ConnectedWalletPanel() {
                   !!links.data?.wallets.some((l) => l.address === w.address)
                 }
               />
+              {network === "devnet" && (
+                <div className="wallet-actions">
+                  <a
+                    href="https://faucet.solana.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Get SOL ↗
+                  </a>
+                  <a
+                    href="https://faucet.circle.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Get USDC ↗
+                  </a>
+                </div>
+              )}
             </div>
           ))}
         </>
