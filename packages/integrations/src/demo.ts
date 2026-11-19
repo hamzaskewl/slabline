@@ -32,7 +32,6 @@ import {
 } from "@collectible/domain";
 import { geminiClient } from "./gemini";
 import { attachCachedValuations, attachWalletValuations } from "./valuations";
-import { rewardPaymentConfig } from "./reward-payment";
 
 export class DemoError extends Error {
   constructor(
@@ -106,7 +105,6 @@ export async function demoAccount(userId: string): Promise<DemoAccountView> {
         createdAt: p.createdAt.toISOString(),
       })),
       collectibles: collectibles.map((p) => collectibleView(p)),
-      rewardTopUpEnabled: !!rewardPaymentConfig("devnet"),
     };
     const activeCards = view.collectibles.filter(
       (c) => c.state !== "cancelled",
@@ -520,7 +518,7 @@ export async function recoverDemoReward(userId: string, id: string) {
 export function collectibleView(
   row: typeof orders.$inferSelect,
 ): DemoCollectible {
-  const d = row.data as DemoCollectible;
+  const d = row.data as DemoCollectible & { payment?: unknown };
   return {
     id: row.id,
     state: row.state,
@@ -535,12 +533,15 @@ export function collectibleView(
     signature: d.signature,
     rewardPositionId: d.rewardPositionId,
     topUp: d.topUp,
-    payment: d.payment,
     paymentConfirmedAt: d.paymentConfirmedAt,
     valuation: d.valuation,
     listing: d.listing,
     confirmedAt: d.confirmedAt,
-    ...(row.state === "prepared" ? { unsignedBase64: d.unsignedBase64 } : {}),
+    ...(row.state === "prepared" &&
+    units(d.topUp ?? "0") === 0n &&
+    d.payment == null
+      ? { unsignedBase64: d.unsignedBase64 }
+      : {}),
   };
 }
 export async function reserveDemoCollectible(
@@ -747,18 +748,9 @@ export async function allocateDemoReward(
         "Your wallet contribution changed. Review the exact extra payment and try again.",
         409,
       );
-    const payment =
-      units(allocation.additionalTopUp) > 0n
-        ? rewardPaymentConfig("devnet")
-        : null;
-    if (units(allocation.additionalTopUp) > 0n && !payment)
+    if (units(allocation.topUp) > 0n)
       throw new DemoError(
-        "Wallet top-ups are not available yet. Choose cards within your reward budget.",
-        409,
-      );
-    if (payment && items.some((item) => item.wallet === payment.recipient))
-      throw new DemoError(
-        "Use a personal wallet separate from the payment recipient.",
+        "Paid rewards require a marketplace purchase from your wallet. Demo card claims cannot spend wallet funds.",
         409,
       );
     await tx.insert(settlements).values({
@@ -785,7 +777,6 @@ export async function allocateDemoReward(
         data: {
           ...item,
           topUp: money(topUp),
-          payment: topUp > 0n ? payment : undefined,
           paymentConfirmedAt: undefined,
           rewardPositionId: positionId,
           network: "devnet",

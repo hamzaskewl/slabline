@@ -25,7 +25,6 @@ import { Select } from "./ui/select";
 import { Button } from "./ui/button";
 import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
-import { RewardWalletFunding } from "./reward-wallet-funding";
 export type RewardPick = {
   source: "collectorcrypt" | "grail";
   sourceId: string;
@@ -210,7 +209,7 @@ export function RewardCheckout() {
           <dd>{usd(allocation.total)}</dd>
         </div>
         <div>
-          <dt>From your wallet</dt>
+          <dt>Your extra funds</dt>
           <dd>
             {usdc(allocation.additionalTopUp)}
             <small>Up to {usdc(allocation.maxTopUp)} · 5%</small>
@@ -259,18 +258,12 @@ export function RewardCheckout() {
           </div>
         </details>
       )}
-      {needsTopUp && !data?.rewardTopUpEnabled && (
+      {needsTopUp && (
         <p role="status">
-          Wallet top-ups are not available yet. You can still claim cards within
-          your reward budget.
+          The full card price is paid from your wallet using your reward and
+          extra funds. Marketplace purchases are not connected to demo claims
+          yet.
         </p>
-      )}
-      {needsTopUp && wallet && data?.rewardTopUpEnabled && (
-        <RewardWalletFunding
-          wallet={wallet.address}
-          verified={!!approved}
-          amount={allocation.additionalTopUp}
-        />
       )}
       <div className="reward-checkout-actions">
         {wallet ? (
@@ -299,7 +292,7 @@ export function RewardCheckout() {
             !wallet ||
             !allocation.valid ||
             !picks.length ||
-            (needsTopUp && !data?.rewardTopUpEnabled)
+            needsTopUp
           }
           onClick={() =>
             void a.run(async () => {
@@ -343,7 +336,7 @@ export function RewardCheckout() {
           {a.busy
             ? "Saving rewards…"
             : needsTopUp
-              ? `Confirm · ${usdc(allocation.additionalTopUp)} extra`
+              ? "Purchase unavailable"
               : "Confirm rewards"}
         </Button>
       </div>
