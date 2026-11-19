@@ -8,6 +8,7 @@ const sections = [
   "rewards",
   "cart",
   "wallet",
+  "profile",
   "portfolio",
   "collection",
   "redeem",
@@ -26,6 +27,7 @@ export default async function Page({
   }>;
 }) {
   const { section } = await params;
+  if (section === "wallet") redirect("/profile");
   if (section === "cart" || section === "collection") redirect("/portfolio");
   if (!sections.includes(section)) {
     const profile = await getPublicProfile(section);

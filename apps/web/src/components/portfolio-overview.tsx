@@ -1,7 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import type { DemoAccountView } from "@collectible/domain";
-import { usd } from "@/lib/utils";
+import { UsdcAmount } from "./usdc-amount";
 import { PortfolioChart } from "./portfolio-chart";
 
 export function PortfolioOverview({
@@ -11,6 +11,7 @@ export function PortfolioOverview({
   predictionValue,
   collectibleValue,
   rewardValue,
+  packValue = "0",
   history,
   actions,
 }: {
@@ -20,6 +21,7 @@ export function PortfolioOverview({
   predictionValue: string;
   collectibleValue: string;
   rewardValue: string;
+  packValue?: string;
   history?: DemoAccountView["history"];
   actions: ReactNode;
 }) {
@@ -30,7 +32,11 @@ export function PortfolioOverview({
           <div>
             <h2>{compact ? "Available balance" : "Portfolio value"}</h2>
             <strong className="portfolio-total">
-              {balance === undefined ? "—" : usd(compact ? balance : total!)}
+              {balance === undefined ? (
+                "—"
+              ) : (
+                <UsdcAmount value={compact ? balance : total!} />
+              )}
             </strong>
           </div>
           <div className="portfolio-summary-actions">{actions}</div>
@@ -38,14 +44,17 @@ export function PortfolioOverview({
         {!compact && (
           <dl className="portfolio-breakdown">
             {[
-              ["Cash", balance],
+              ["Balance", balance],
               ["Predictions", predictionValue],
               ["Collectibles", collectibleValue],
               ["Rewards", rewardValue],
+              ["Packs", packValue],
             ].map(([label, value]) => (
               <div key={label}>
                 <dt>{label}</dt>
-                <dd>{balance === undefined ? "—" : usd(value!)}</dd>
+                <dd>
+                  {balance === undefined ? "—" : <UsdcAmount value={value!} />}
+                </dd>
               </div>
             ))}
           </dl>

@@ -74,9 +74,6 @@ export function WalletCollection({
       {!embedded && (
         <div className="section-heading">
           <h2>Your collectibles</h2>
-          {links.data?.network === "devnet" ? (
-            <span className="mode-badge">DEVNET</span>
-          ) : null}
         </div>
       )}
       {!ready ? (
@@ -99,8 +96,8 @@ export function WalletCollection({
           {links.data && !wallet ? (
             <>
               <p>Verify your Solana wallet to view its collectibles.</p>
-              <Link className="text-link" href="/wallet">
-                Open Wallet
+              <Link className="text-link" href="/profile">
+                Open profile
               </Link>
             </>
           ) : null}
@@ -186,7 +183,11 @@ export function WalletCollection({
   );
 }
 
-export function WalletInventorySettings() {
+export function WalletInventorySettings({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const { network } = useNetwork(),
     { user, authenticated } = useSlablineAuth();
   const links = usePrivateRead<Links>("/api/wallet/links");
@@ -195,7 +196,7 @@ export function WalletInventorySettings() {
   if (!authenticated) return null;
   return (
     <section className="settings-wallets">
-      <h3>Wallet & profile</h3>
+      <h3>Collectibles wallet</h3>
       {wallets.length > 0 && (
         <>
           <label htmlFor="portfolio-wallet">Collectibles wallet</label>
@@ -215,9 +216,11 @@ export function WalletInventorySettings() {
           </Select>
         </>
       )}
-      <Link className="button button-outline button-pill" href="/wallet">
-        Manage wallets
-      </Link>
+      {!embedded && (
+        <Link className="button button-outline button-pill" href="/profile">
+          Manage wallets
+        </Link>
+      )}
     </section>
   );
 }

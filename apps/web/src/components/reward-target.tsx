@@ -22,7 +22,7 @@ import { GrailReward } from "./grail-reward";
 import { RewardBrowser } from "./reward-browser";
 
 const shares = (value: string) =>
-  Number(value).toLocaleString("en-US", { maximumFractionDigits: 6 });
+  Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
 export function RewardTarget({
   cards,
   heldShares = "0",

@@ -11,6 +11,7 @@ import {
   type RelayRouteId,
   type RelayRecord,
 } from "@collectible/domain";
+import { number } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { RelayQuoteReview } from "./relay-quote-review";
 
@@ -410,7 +411,7 @@ export default function RelayFunding() {
                   }}
                 >
                   {relayRoutes[r.quote.input.routeId].name} ·{" "}
-                  {r.quote.input.amount}{" "}
+                  {number(r.quote.input.amount)}{" "}
                   {relayRoutes[r.quote.input.routeId].symbol}
                 </button>
               ),

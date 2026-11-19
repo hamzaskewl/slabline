@@ -9,12 +9,15 @@ import {
   marketMatches,
   marketStatusMatches,
   isLiveGame,
+  type Listing,
   type MarketStatusFilter,
   sortMarkets,
   type Market,
   type MarketSort,
   type ProviderResult,
 } from "@collectible/domain";
+import { CardAvailability } from "./card-availability";
+import { hasListedCards } from "@/lib/card-availability";
 import { SnapshotStatus } from "./snapshot-status";
 import { MarketArt } from "./market-art";
 import { FeaturedMarkets } from "./featured-markets";
@@ -24,6 +27,7 @@ import { useMarketClock } from "@/lib/use-market-clock";
 
 export function Discovery({
   markets,
+  cards = [],
   catalog,
   category,
   setCategory,
@@ -42,6 +46,7 @@ export function Discovery({
   status: MarketStatusFilter;
   setStatus: (status: MarketStatusFilter) => void;
   markets: Market[];
+  cards?: Listing[];
   catalog: Market[];
   category: string;
   setCategory: (c: string) => void;
@@ -196,7 +201,9 @@ export function Discovery({
           category === "All markets" &&
           !league &&
           !favoritesOnly &&
-          status === "active" && <FeaturedMarkets markets={catalog} />}
+          status === "active" && (
+            <FeaturedMarkets markets={catalog} cards={cards} />
+          )}
         <div className="discovery-heading">
           <h1>
             {search.trim() ? (
@@ -340,6 +347,7 @@ export function Discovery({
               {visible.slice(0, limit).map((m) => (
                 <PredictionCard
                   market={m}
+                  cards={cards}
                   key={m.id}
                   saved={favorites.includes(m.id)}
                   onSave={() => toggleFavorite(m.id)}
@@ -362,11 +370,13 @@ export function Discovery({
 }
 function PredictionCard({
   market,
+  cards,
   saved,
   onSave,
   now,
 }: {
   market: Market;
+  cards: Listing[];
   saved: boolean;
   onSave: () => void;
   now: number;
@@ -385,7 +395,8 @@ function PredictionCard({
           <MarketArt market={market} />
         </Link>
         <Link href={href} className="prediction-card-title">
-          {market.title}
+          {market.title}{" "}
+          <CardAvailability available={hasListedCards(market, cards)} />
         </Link>
       </div>
       <div className="prediction-outcomes">
@@ -397,6 +408,7 @@ function PredictionCard({
             >
               <MarketArt market={market} outcome={c} />
               <span>{c.label}</span>
+              <CardAvailability available={hasListedCards(market, cards, c)} />
             </Link>
             <Link
               href={`${href}?contract=${encodeURIComponent(c.symbol)}&side=yes`}

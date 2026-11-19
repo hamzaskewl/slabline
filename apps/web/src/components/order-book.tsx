@@ -15,7 +15,7 @@ import {
 } from "@collectible/domain";
 
 const shares = (value: string) =>
-  Number(value).toLocaleString("en-US", { maximumFractionDigits: 6 });
+  Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
 const dollars = (value: string) =>
   Number(value).toLocaleString("en-US", {
     style: "currency",

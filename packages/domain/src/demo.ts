@@ -70,6 +70,7 @@ export type DemoPosition = {
     cardSpend: string;
     remainder: string;
     topUp?: string;
+    remainderCredited?: boolean;
     delivery?: "cash" | "grail";
   };
 };
@@ -88,6 +89,7 @@ export type DemoCollectible = {
   unsignedBase64?: string;
   rewardPositionId?: string;
   topUp?: string;
+  topUpSource?: "balance";
   paymentConfirmedAt?: string;
   valuation?: Valuation | null;
   listing?: Listing;
@@ -95,6 +97,7 @@ export type DemoCollectible = {
 };
 export type DemoAccountView = {
   balance: string;
+  packValue?: string;
   positions: DemoPosition[];
   collectibles: DemoCollectible[];
   history?: { time: string; value: string }[];
@@ -145,47 +148,41 @@ export function positionRewardMarket(
   };
 }
 
-/** The minimum rounds UP to the smallest USDC unit, never below 80%. */
+/** Optional cards can use any part of a reward, plus an unrestricted contribution. */
 export function rewardAllocation(
   budget: string,
   costs: string[],
   committedTopUp = "0",
 ) {
-  const cap = units(budget),
-    total = costs.reduce((sum, cost) => sum + units(cost), 0n);
-  const minimum = (cap * 80n + 99n) / 100n;
-  const maxTopUp = cap / 20n,
-    maximum = cap + maxTopUp;
+  const cap = units(budget);
+  const total = costs.reduce((sum, cost) => sum + units(cost), 0n);
   const committed = units(committedTopUp);
   const needed = total > cap ? total - cap : 0n;
   const topUp = needed > committed ? needed : committed;
   const funded = total - topUp;
   return {
     total: money(total),
-    minimum: money(minimum),
-    maximum: money(maximum),
-    maxTopUp: money(maxTopUp),
     topUp: money(topUp),
     additionalTopUp: money(topUp - committed),
     remainder: money(cap > funded ? cap - funded : 0n),
     valid:
       cap > 0n &&
-      funded >= minimum &&
-      total <= maximum &&
+      costs.length > 0 &&
       committed >= 0n &&
-      topUp <= maxTopUp &&
+      funded >= 0n &&
       costs.every((c) => units(c) > 0n),
-    overBudget: total > maximum || topUp > maxTopUp,
   };
 }
 
 /** Pending wallet money is not portfolio value until its atomic transfer lands. */
 export function demoCollectibleValue(
-  card: Pick<DemoCollectible, "cost" | "topUp" | "state">,
+  card: Pick<DemoCollectible, "cost" | "topUp" | "state" | "topUpSource">,
 ) {
   return (
     units(card.cost) -
-    (card.state === "confirmed" ? 0n : units(card.topUp ?? "0"))
+    (card.state === "confirmed" || card.topUpSource === "balance"
+      ? 0n
+      : units(card.topUp ?? "0"))
   );
 }
 

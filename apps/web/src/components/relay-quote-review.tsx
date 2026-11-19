@@ -6,8 +6,9 @@ import {
   type RelayRecord,
   type RelayFee,
 } from "@collectible/domain";
+import { number } from "@/lib/utils";
 import { Button } from "./ui/button";
-const feeLabel = (fee: RelayFee) => `${fee.formatted} ${fee.symbol}`;
+const feeLabel = (fee: RelayFee) => `${number(fee.formatted)} ${fee.symbol}`;
 
 export function RelayQuoteReview({
   record,
@@ -36,19 +37,21 @@ export function RelayQuoteReview({
         <div>
           <dt>You send</dt>
           <dd>
-            {relayFormat(quote.amountIn, route.decimals)} {route.symbol}
+            {number(relayFormat(quote.amountIn, route.decimals))} {route.symbol}
           </dd>
         </div>
         <div>
           <dt>Estimated received</dt>
           <dd>
-            {relayFormat(quote.amountOut, route.decimals)} {route.symbol}
+            {number(relayFormat(quote.amountOut, route.decimals))}{" "}
+            {route.symbol}
           </dd>
         </div>
         <div>
           <dt>Minimum received · 0.5% slippage</dt>
           <dd>
-            {relayFormat(quote.minimumOut, route.decimals)} {route.symbol}
+            {number(relayFormat(quote.minimumOut, route.decimals))}{" "}
+            {route.symbol}
           </dd>
         </div>
         <div>
@@ -64,7 +67,7 @@ export function RelayQuoteReview({
           <dd>
             {quote.sourceBalance === null
               ? "Unavailable"
-              : `${relayFormat(quote.sourceBalance, route.decimals)} ${route.symbol}`}
+              : `${number(relayFormat(quote.sourceBalance, route.decimals))} ${route.symbol}`}
           </dd>
         </div>
         <div>
@@ -74,7 +77,7 @@ export function RelayQuoteReview({
               ? quote.sufficientPrincipal === false
                 ? "Insufficient balance"
                 : "Unavailable"
-              : `${relayFormat(quote.sourceBalanceAfterPrincipal, route.decimals)} ${route.symbol}`}
+              : `${number(relayFormat(quote.sourceBalanceAfterPrincipal, route.decimals))} ${route.symbol}`}
           </dd>
         </div>
         <div>

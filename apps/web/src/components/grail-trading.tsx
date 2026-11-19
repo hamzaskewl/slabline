@@ -1,4 +1,5 @@
 "use client";
+import { number as formatNumber } from "@/lib/utils";
 import { formatUnits } from "viem";
 import dynamic from "next/dynamic";
 import { useNetwork } from "./network-settings";
@@ -78,15 +79,17 @@ export function TradeQuote({ order }: { order: GrailOrderView }) {
     <dl className="token-quote">
       <dt>Pay, including quoted fees</dt>
       <dd>
-        {formatUnits(BigInt(q.sellAmount), q.paymentDecimals)} {q.paymentSymbol}
+        {formatNumber(formatUnits(BigInt(q.sellAmount), q.paymentDecimals))}{" "}
+        {q.paymentSymbol}
       </dd>
       <dt>Estimated tokens</dt>
       <dd>
-        {formatUnits(BigInt(q.buyAmount), q.decimals)} {q.symbol}
+        {formatNumber(formatUnits(BigInt(q.buyAmount), q.decimals))} {q.symbol}
       </dd>
       <dt>Minimum received</dt>
       <dd>
-        {formatUnits(BigInt(q.minBuyAmount), q.decimals)} {q.symbol}
+        {formatNumber(formatUnits(BigInt(q.minBuyAmount), q.decimals))}{" "}
+        {q.symbol}
       </dd>
       <dt>Pool fee (included)</dt>
       <dd>{q.feePips / 10000}%</dd>

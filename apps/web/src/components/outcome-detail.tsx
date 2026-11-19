@@ -55,7 +55,7 @@ export function OutcomeDetail({
           onSide={setSide}
           lastPrice={
             live.latestTrade
-              ? live.latestTrade.value.toFixed(6)
+              ? live.latestTrade.value.toFixed(2)
               : outcome.lastPrice
           }
           stale={live.stale}

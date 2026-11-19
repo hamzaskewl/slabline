@@ -53,7 +53,15 @@ import {
 } from "@collectible/integrations";
 const id = z.string().uuid();
 const bodySchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("topup"), key: id }),
+  z.object({
+    action: z.literal("topup"),
+    key: id,
+    amount: z
+      .string()
+      .max(32)
+      .regex(/^\d+(\.\d{1,2})?$/)
+      .default("100"),
+  }),
   z.object({
     action: z.literal("buy"),
     key: id,
@@ -154,7 +162,7 @@ export async function POST(request: Request) {
     const parsed = bodySchema.safeParse(await boundedJson(request));
     if (!parsed.success) throw new ApiError(400, "Invalid request.");
     const b = parsed.data;
-    if (b.action === "topup") await demoTopUp(user.id, b.key);
+    if (b.action === "topup") await demoTopUp(user.id, b.key, b.amount);
     if (b.action === "buy") {
       if (b.replay) {
         const scenario =

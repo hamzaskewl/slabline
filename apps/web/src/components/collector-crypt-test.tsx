@@ -10,6 +10,7 @@ import {
   type CcTestView,
   relayFormat,
 } from "@collectible/domain";
+import { number } from "@/lib/utils";
 import { Button } from "./ui/button";
 
 export function CollectorCryptTest() {
@@ -267,19 +268,26 @@ export function CollectorCryptTest() {
               <dl>
                 <div>
                   <dt>Test USDC payment</dt>
-                  <dd>{relayFormat(view.simulation.priceBaseUnits, 6)}</dd>
+                  <dd>
+                    {number(relayFormat(view.simulation.priceBaseUnits, 6))}
+                  </dd>
                 </div>
                 <div>
                   <dt>Simulated total SOL cost</dt>
                   <dd>
-                    {relayFormat(view.simulation.totalSolCostLamports, 9)} SOL
+                    {number(
+                      relayFormat(view.simulation.totalSolCostLamports, 9),
+                    )}{" "}
+                    SOL
                   </dd>
                 </div>
                 <div>
                   <dt>Platform fee · included in card price</dt>
                   <dd>
-                    {relayFormat(view.simulation.platformFeeBaseUnits, 6)} test
-                    USDC
+                    {number(
+                      relayFormat(view.simulation.platformFeeBaseUnits, 6),
+                    )}{" "}
+                    test USDC
                   </dd>
                 </div>
                 <div>

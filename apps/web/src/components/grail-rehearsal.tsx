@@ -34,10 +34,7 @@ export function GrailRehearsal({
           <p>Automatically added to your account when this position wins.</p>
         </div>
       </div>
-      <p>
-        Devnet rehearsal: no matching Jensen slab in the November 19 catalog
-        check. Uses a recorded Grail price; no mainnet swap.
-      </p>
+      <p>Uses a recorded Grail price.</p>
       <a
         className="button button-outline button-pill"
         href={DEMO_GRAIL.url}

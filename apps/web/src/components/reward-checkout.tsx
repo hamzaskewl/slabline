@@ -24,6 +24,8 @@ import { useDemoAction } from "./demo-controls";
 import { Select } from "./ui/select";
 import { Button } from "./ui/button";
 import { CardImage } from "./card-image";
+import { BalanceActions } from "./balance-actions";
+import { UsdcAmount } from "./usdc-amount";
 import { CardValue } from "./card-value";
 export type RewardPick = {
   source: "collectorcrypt" | "grail";
@@ -121,7 +123,6 @@ export function AddReward({ item }: { item: RewardPick }) {
     [money(total + units(item.cost))],
     money(committed.reduce((sum, card) => sum + units(card.topUp ?? "0"), 0n)),
   );
-  const tooMuch = !selected && allocation.overBudget;
   const already = committed.some(
     (p) =>
       p.sourceId ===
@@ -133,21 +134,22 @@ export function AddReward({ item }: { item: RewardPick }) {
       aria-pressed={selected}
       disabled={
         c.position.reward.state !== "available" ||
-        tooMuch ||
         already ||
         (!selected && c.picks.length >= 20)
       }
       onClick={() => c.toggle(item)}
     >
-      {already
-        ? "Selected for this win"
-        : selected
-          ? "Remove from rewards"
-          : tooMuch
-            ? "Above 5% limit"
-            : units(allocation.additionalTopUp) > 0n
-              ? `Add · ${usdc(allocation.additionalTopUp)} from wallet`
-              : "Add to rewards"}
+      {already ? (
+        "Selected for this win"
+      ) : selected ? (
+        "Remove from rewards"
+      ) : units(allocation.additionalTopUp) > 0n ? (
+        <>
+          Add · <UsdcAmount value={allocation.additionalTopUp} /> from balance
+        </>
+      ) : (
+        "Add to rewards"
+      )}
     </button>
   );
 }
@@ -193,7 +195,8 @@ export function RewardCheckout() {
     [...committed.map((p) => p.cost), ...picks.map((p) => p.cost)],
     money(committed.reduce((sum, card) => sum + units(card.topUp ?? "0"), 0n)),
   );
-  const needsTopUp = units(allocation.additionalTopUp) > 0n;
+  const needsTopUp =
+    units(allocation.additionalTopUp) > units(data?.balance ?? "0");
   const approved =
     wallet &&
     (verified === `${a.user?.id}:${wallet.address}` ||
@@ -206,30 +209,26 @@ export function RewardCheckout() {
       <dl className="reward-budget-totals">
         <div>
           <dt>Cards selected</dt>
-          <dd>{usd(allocation.total)}</dd>
-        </div>
-        <div>
-          <dt>Your extra funds</dt>
           <dd>
-            {usdc(allocation.additionalTopUp)}
-            <small>Up to {usdc(allocation.maxTopUp)} · 5%</small>
+            <UsdcAmount value={allocation.total} />
           </dd>
         </div>
         <div>
-          <dt>Cash remainder</dt>
+          <dt>From balance</dt>
           <dd>
-            {allocation.valid ? usd(allocation.remainder) : "—"}{" "}
-            <small>
-              {allocation.valid
-                ? "demo credit"
-                : "Select at least 80% in cards"}
-            </small>
+            <UsdcAmount value={allocation.additionalTopUp} />
+          </dd>
+        </div>
+        <div>
+          <dt>Back to balance</dt>
+          <dd>
+            <UsdcAmount value={allocation.remainder} />
           </dd>
         </div>
       </dl>
       <p className="reward-range">
-        Choose {usd(allocation.minimum)}–{usd(allocation.maximum)} in cards. Any
-        amount above your reward comes from your wallet.
+        Any leftover goes straight to your balance. Use your balance for any
+        difference.
       </p>
       {picks.length > 0 && (
         <details className="reward-basket">
@@ -259,11 +258,23 @@ export function RewardCheckout() {
         </details>
       )}
       {needsTopUp && (
-        <p role="status">
-          The full card price is paid from your wallet using your reward and
-          extra funds. Marketplace purchases are not connected to demo claims
-          yet.
-        </p>
+        <div className="reward-topup">
+          <p>
+            Top up{" "}
+            <UsdcAmount
+              value={money(
+                units(allocation.additionalTopUp) - units(data?.balance ?? "0"),
+              )}
+            />{" "}
+            to get these cards.
+          </p>
+          <BalanceActions
+            balance={data?.balance}
+            suggestedAmount={money(
+              units(allocation.additionalTopUp) - units(data?.balance ?? "0"),
+            )}
+          />
+        </div>
       )}
       <div className="reward-checkout-actions">
         {wallet ? (
@@ -336,7 +347,7 @@ export function RewardCheckout() {
           {a.busy
             ? "Saving rewards…"
             : needsTopUp
-              ? "Purchase unavailable"
+              ? "Top up to continue"
               : "Confirm rewards"}
         </Button>
       </div>

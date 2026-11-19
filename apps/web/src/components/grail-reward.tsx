@@ -46,10 +46,10 @@ function TokenHistory({ data }: { data: GrailRewardDetails }) {
       </figcaption>
       <div className="grail-chart-scale">
         <span>
-          High ${max.toLocaleString("en-US", { maximumFractionDigits: 6 })}
+          High ${max.toLocaleString("en-US", { maximumFractionDigits: 2 })}
         </span>
         <span>
-          Low ${min.toLocaleString("en-US", { maximumFractionDigits: 6 })}
+          Low ${min.toLocaleString("en-US", { maximumFractionDigits: 2 })}
         </span>
       </div>
       <svg
@@ -131,11 +131,7 @@ export function GrailReward({
               </>
             ) : (
               <>
-                <strong>
-                  {data.priceUsd
-                    ? `$${Number(data.priceUsd).toLocaleString("en-US", { maximumFractionDigits: 8 })}`
-                    : "—"}
-                </strong>
+                <strong>{data.priceUsd ? usd(data.priceUsd) : "—"}</strong>
                 <span>USD per {token.symbol}</span>
               </>
             )}
@@ -143,7 +139,7 @@ export function GrailReward({
           {side && (
             <p className="reward-data-note">
               {data.priceUsd
-                ? `$${Number(data.priceUsd).toLocaleString("en-US", { maximumFractionDigits: 8 })} per token`
+                ? `${usd(data.priceUsd)} per token`
                 : "Price unavailable"}
             </p>
           )}

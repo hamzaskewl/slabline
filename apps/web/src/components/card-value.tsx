@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Info } from "lucide-react";
 import { Tooltip } from "radix-ui";
 import { fmvComparison, type Valuation } from "@collectible/domain";
+import { UsdcAmount } from "./usdc-amount";
 import { usd } from "@/lib/utils";
 export function CardValue({
   valuation,
@@ -36,7 +37,7 @@ export function CardValue({
           >
             <span className="card-fmv-label">FMV</span>
             <strong>
-              {value === null ? "—" : usd(value).replace(/\.00$/, "")}
+              {value === null ? "—" : <UsdcAmount value={value} />}
             </strong>
             <Info size={13} aria-hidden="true" />
           </button>
