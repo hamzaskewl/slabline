@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "./ui/select";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LocateFixed } from "lucide-react";
@@ -135,7 +136,7 @@ export function OrderBook({
         <div className="ob-tools">
           <label>
             <span className="sr-only">Price grouping</span>
-            <select
+            <Select
               value={increment}
               onChange={(e) => setGroup(e.target.value)}
             >
@@ -144,7 +145,7 @@ export function OrderBook({
                   {cents(value, value)}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <button
             onClick={recenter}
@@ -169,14 +170,14 @@ export function OrderBook({
           <span role="columnheader">Price</span>
           <span role="columnheader">Shares</span>
           <span role="columnheader">
-            <select
+            <Select
               aria-label="Cumulative total unit"
               value={totalMode}
               onChange={(e) => setTotalMode(e.target.value)}
             >
               <option value="usd">Total (USD)</option>
               <option value="shares">Total (shares)</option>
-            </select>
+            </Select>
           </span>
         </div>
         <div className="ob-side-label ob-ask-label">

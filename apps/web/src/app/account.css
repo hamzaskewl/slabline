@@ -1,0 +1,902 @@
+/* Shared exchange surfaces: account navigation, holdings and card selection. */
+.app-shell.prediction-surface {
+  --surface: #15181b;
+  --rule: #2b3035;
+  --muted: #a7adb3;
+}
+.account-navigation {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-inline-start: auto;
+}
+.board-navigation {
+  margin-inline: auto 0;
+  gap: 24px;
+}
+.exchange-header-main .topbar-actions {
+  margin-left: 24px;
+}
+.account-navigation a {
+  position: relative;
+  padding-block: 16px;
+  white-space: nowrap;
+}
+.page-heading {
+  margin-bottom: 24px;
+  align-items: center;
+}
+.page-heading h1 {
+  font-size: 28px;
+}
+.funding-panel {
+  margin-block: 0 24px;
+  padding: 24px;
+}
+.funding-panel .section-heading {
+  margin: 0 0 20px;
+}
+.account-empty {
+  padding: 64px 24px;
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+}
+.account-empty > svg {
+  color: var(--muted);
+}
+.account-empty p {
+  max-width: 55ch;
+}
+.account-error {
+  color: #ffb6ad;
+}
+.portfolio-view {
+  display: grid;
+  gap: 24px;
+}
+.legacy-reward {
+  margin-left: auto;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  max-width: 280px;
+}
+.legacy-reward p {
+  font-size: 12px;
+  text-align: right;
+}
+.wallet-holdings {
+  margin-top: 24px;
+  border-top: 1px solid var(--rule);
+}
+.portfolio-overview {
+  padding: 28px 28px 12px;
+}
+.portfolio-summary,
+.portfolio-section-heading,
+.holdings-toolbar,
+.reward-budget-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.portfolio-summary h2 {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+.portfolio-total {
+  display: block;
+  margin-block: 8px;
+  font-size: clamp(32px, 4vw, 44px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+.portfolio-summary p {
+  font-size: 12px;
+}
+.portfolio-summary-actions {
+  display: flex;
+  gap: 12px;
+}
+.portfolio-breakdown {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin: 28px 0 12px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule);
+}
+.portfolio-breakdown dt,
+.reward-budget-totals dt {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.portfolio-breakdown dd,
+.reward-budget-totals dd {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.portfolio-chart {
+  position: relative;
+  margin-top: 24px;
+}
+.portfolio-chart-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.chart-ranges {
+  display: flex;
+  gap: 4px;
+}
+.chart-ranges button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  min-width: 40px;
+  min-height: 36px;
+}
+.chart-ranges button[aria-pressed="true"] {
+  background: #30363c;
+  color: #fff;
+}
+.chart-ranges button:hover {
+  color: #fff;
+  background: #252a2f;
+}
+.portfolio-chart-canvas {
+  height: 220px;
+  margin-top: 12px;
+}
+.portfolio-chart-empty {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  padding: 20px;
+  font-size: 13px;
+}
+.portfolio-rewards {
+  display: grid;
+  gap: 12px;
+}
+.won-reward {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: #15251e;
+  border: 1px solid #345442;
+  border-radius: 12px;
+}
+.won-reward-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: #8ee6b6;
+  flex-shrink: 0;
+}
+.won-reward h3 {
+  color: #c7f4db;
+  font-size: 17px;
+  margin-bottom: 4px;
+}
+.won-reward p {
+  color: #b9d2c4;
+  font-size: 13px;
+}
+.won-reward .button {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.portfolio-holdings {
+  padding: 0 24px;
+  overflow: hidden;
+}
+.holdings-toolbar {
+  border-bottom: 1px solid var(--rule);
+}
+.holdings-tabs {
+  display: flex;
+  gap: 24px;
+}
+.holdings-tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 20px 0 18px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.holdings-tabs button[aria-pressed="true"] {
+  border-bottom-color: #64b5f6;
+  color: #fff;
+}
+.portfolio-section {
+  padding-block: 24px;
+}
+.portfolio-section + .portfolio-section {
+  border-top: 1px solid var(--rule);
+}
+.portfolio-section-heading {
+  margin-bottom: 12px;
+}
+.portfolio-section-heading h2 {
+  font-size: 17px;
+}
+.portfolio-section-heading h2 span {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.portfolio-section-heading > .app-select {
+  width: 152px;
+}
+.position-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 130px 150px;
+  gap: 20px;
+  align-items: center;
+  padding-block: 20px;
+  border-top: 1px solid var(--rule);
+}
+.position-side {
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 650;
+}
+.position-side.yes {
+  background: #1e3c2b;
+  color: #8ae0ad;
+}
+.position-side.no {
+  background: #442a2e;
+  color: #ffabb1;
+}
+.position-identity {
+  min-width: 0;
+}
+.position-identity > a {
+  color: var(--muted);
+  font-size: 12px;
+}
+.position-identity h3 {
+  margin-block: 4px;
+  font-size: 15px;
+}
+.position-identity p,
+.position-result span,
+.collection-value span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.position-result,
+.collection-value {
+  display: grid;
+  text-align: right;
+  gap: 4px;
+}
+.position-result strong,
+.collection-value strong {
+  font-size: 16px;
+}
+.positive {
+  color: #8ae0ad;
+}
+.position-actions,
+.collection-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  text-align: right;
+}
+.position-actions > a {
+  font-size: 12px;
+  color: #a8d7ff;
+}
+.sell-position {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+.sell-position > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sell-position [role="alert"] {
+  font-size: 12px;
+  color: #ffb6ad;
+  max-width: 240px;
+}
+.holdings-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding-block: 28px;
+  color: var(--muted);
+}
+.collection-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 140px 150px;
+  align-items: center;
+  gap: 20px;
+  padding-block: 20px;
+  border-top: 1px solid var(--rule);
+}
+.collection-row > .card-media {
+  width: 72px;
+  height: 100px;
+  border-radius: 6px;
+}
+.collection-copy {
+  min-width: 0;
+}
+.collection-copy h3 {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.collection-copy > p {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.collection-actions .demo-mint-actions {
+  margin: 0;
+  font-size: 12px;
+  width: 100%;
+}
+.collection-actions .demo-mint-actions > .text-button {
+  text-align: right;
+}
+.card-media {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  background: #202428;
+  overflow: hidden;
+}
+.card-media > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  visibility: hidden;
+}
+.card-media[data-state="loaded"] > img {
+  visibility: visible;
+}
+.card-media-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: absolute;
+  inset: 0;
+  color: #a7adb3;
+  font-size: 11px;
+  text-align: center;
+  padding: 8px;
+}
+.card-image-well > .card-media {
+  height: 100%;
+  min-height: 240px;
+}
+.reward-target-image > .card-media {
+  min-height: 170px;
+}
+.reward-browser-card > .card-media {
+  width: 96px;
+  height: 136px;
+  flex-shrink: 0;
+}
+.card-fmv {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  margin-block: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.card-fmv > span,
+.card-fmv > strong {
+  display: flex;
+  flex-direction: column;
+}
+.card-fmv small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+.card-fmv > strong {
+  color: #e5e8eb;
+  text-align: right;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.reward-card-copy .card-fmv {
+  display: grid;
+  gap: 2px;
+}
+.reward-card-copy .card-fmv > strong {
+  text-align: left;
+}
+.reward-budget-banner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+.reward-budget-banner h2 {
+  font-size: 17px;
+  margin-bottom: 4px;
+}
+.reward-budget-banner > svg {
+  flex-shrink: 0;
+  color: #a8d7ff;
+}
+.reward-budget-banner > a,
+.reward-budget-banner > button {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.reward-checkout {
+  padding: 24px;
+  border: 1px solid #456353;
+  background: #151e19;
+  border-radius: 12px;
+  margin-bottom: 28px;
+}
+.reward-checkout h2 {
+  color: #c7f4db;
+}
+.reward-checkout p {
+  color: #b9d2c4;
+  font-size: 13px;
+}
+.reward-budget-heading > .app-select {
+  width: min(300px, 45%);
+}
+.reward-budget-totals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin: 24px 0 16px;
+}
+.reward-budget-totals dt,
+.reward-budget-totals small {
+  color: #b9d2c4;
+}
+.reward-budget-totals small {
+  font-size: 11px;
+  font-weight: 400;
+}
+.reward-basket {
+  margin-top: 20px;
+}
+.reward-basket-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto 36px;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid #345442;
+}
+.reward-basket-row > .card-media {
+  height: 56px;
+}
+.reward-basket-row .card-fmv {
+  margin: 2px 0;
+  max-width: 360px;
+}
+.reward-basket-row .card-fmv small {
+  display: none;
+}
+.reward-checkout-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+.reward-checkout-actions > .app-select {
+  width: 200px;
+}
+.app-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #424950;
+  border-radius: 8px;
+  background: #202428;
+  color: #f0f3f5;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 13px;
+}
+.app-select > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-select .select-chevron {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: #b4bdc4;
+}
+.app-select:hover:not(:disabled),
+.app-select[data-state="open"] {
+  border-color: #7692a7;
+  background: #282e33;
+}
+.app-select-menu {
+  z-index: 200;
+  max-height: min(360px, var(--radix-select-content-available-height));
+  min-width: var(--radix-select-trigger-width);
+  max-width: calc(100vw - 24px);
+  border: 1px solid #424950;
+  border-radius: 10px;
+  background: #202428;
+  padding: 6px;
+  color: #eff2f5;
+  overflow: hidden;
+}
+.app-select-menu .market-select-option {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+.app-select-menu .market-select-option[data-highlighted] {
+  background: #353e46;
+  color: #fff;
+}
+.app-select-menu .market-select-option[data-disabled] {
+  color: #8c9297;
+  cursor: not-allowed;
+}
+.select-scroll {
+  display: flex;
+  justify-content: center;
+  min-height: 28px;
+  color: #b4bdc4;
+}
+.ticket-outcome .app-select {
+  background: transparent;
+  border: 0;
+  font-size: 19px;
+  font-weight: 650;
+  padding-inline: 0;
+}
+.ticket-outcome svg {
+  position: static;
+  pointer-events: none;
+}
+.reward-filters .app-select {
+  width: 100%;
+}
+.ob-tools label {
+  min-width: 90px;
+}
+.ob-head .app-select {
+  min-height: 32px;
+  font-size: 11px;
+  padding: 4px 6px;
+  gap: 4px;
+  background: transparent;
+  border-color: transparent;
+}
+.ob-head .app-select svg {
+  width: 12px;
+}
+.reward-card-arrows button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  color: #e8edf0;
+}
+.reward-card-arrows button svg {
+  display: block;
+  flex-shrink: 0;
+}
+.settings-replay > .button {
+  justify-content: flex-start;
+}
+.settings-result {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 12px;
+}
+.settings-result .replay-controls {
+  margin: 0;
+  align-items: center;
+}
+.network-settings {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+.trade-confirmation {
+  min-height: 20px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.ticket-position {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+}
+.ticket-position .sell-position {
+  justify-items: stretch;
+}
+.ticket-position .sell-position .button {
+  width: 100%;
+}
+.related-grail {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--rule);
+  margin-top: 16px;
+  padding-top: 16px;
+  font-size: 12px;
+}
+.trade-submit.yes {
+  background: #26824c;
+  color: #fff;
+}
+.trade-submit.no {
+  background: #b84250;
+  color: #fff;
+}
+.trade-submit.yes:hover:not(:disabled) {
+  background: #31965b;
+}
+.trade-submit.no:hover:not(:disabled) {
+  background: #cd5260;
+}
+.grail-vault-item > .card-media {
+  width: 80px;
+  height: 112px;
+  flex-shrink: 0;
+}
+.wallet-collectible > .card-media {
+  height: 220px;
+}
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+@media (max-width: 1000px) {
+  .account-navigation,
+  .board-navigation {
+    gap: 16px;
+  }
+  .position-row {
+    grid-template-columns: 40px minmax(0, 1fr) 110px 110px;
+    gap: 12px;
+  }
+  .collection-row {
+    grid-template-columns: 64px minmax(0, 1fr) 110px;
+    gap: 16px;
+  }
+  .collection-actions {
+    grid-column: 2 / -1;
+    align-items: stretch;
+  }
+  .collection-actions .demo-mint-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+}
+@media (max-width: 760px) {
+  .account-navigation {
+    margin-left: 0;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 16px;
+  }
+  .account-navigation a {
+    padding-block: 10px;
+  }
+  .exchange-header-main .topbar-actions {
+    margin-left: auto;
+  }
+  .portfolio-overview {
+    padding: 20px 16px 8px;
+  }
+  .portfolio-summary {
+    align-items: flex-start;
+  }
+  .portfolio-summary-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .portfolio-summary-actions .button {
+    min-height: 40px;
+    padding-inline: 12px;
+  }
+  .portfolio-breakdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+  .portfolio-chart-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .portfolio-chart-canvas {
+    height: 180px;
+  }
+  .chart-ranges button {
+    min-height: 44px;
+  }
+  .portfolio-holdings {
+    padding-inline: 16px;
+  }
+  .holdings-tabs {
+    gap: 16px;
+  }
+  .holdings-tabs button {
+    font-size: 12px;
+  }
+  .holdings-toolbar {
+    gap: 12px;
+  }
+  .portfolio-section-heading {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .position-row {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: start;
+  }
+  .position-actions {
+    grid-column: 2 / -1;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .position-result {
+    max-width: 100px;
+  }
+  .collection-row {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .collection-row > .card-media {
+    width: 56px;
+    height: 80px;
+  }
+  .collection-value {
+    grid-column: 2;
+    text-align: left;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    align-items: center;
+  }
+  .collection-actions {
+    grid-column: 2;
+    text-align: left;
+  }
+  .collection-copy .card-fmv {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .won-reward {
+    flex-wrap: wrap;
+    padding: 16px;
+    gap: 12px;
+  }
+  .won-reward > div {
+    flex: 1;
+    min-width: 160px;
+  }
+  .won-reward .button {
+    margin-left: 56px;
+  }
+  .reward-budget-banner {
+    padding: 20px 16px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .reward-budget-banner > div {
+    flex: 1;
+    min-width: 200px;
+  }
+  .reward-budget-banner > a,
+  .reward-budget-banner > button {
+    margin-left: 40px;
+  }
+  .reward-checkout {
+    padding: 20px 16px;
+  }
+  .reward-budget-heading {
+    flex-wrap: wrap;
+  }
+  .reward-budget-heading > .app-select {
+    width: 100%;
+  }
+  .reward-budget-totals {
+    gap: 16px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .reward-budget-totals > div:last-child {
+    grid-column: 1 / -1;
+  }
+  .reward-checkout-actions {
+    flex-wrap: wrap;
+  }
+  .reward-checkout-actions > .app-select,
+  .reward-checkout-actions > .button {
+    width: 100%;
+  }
+  .reward-basket-row {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    gap: 12px;
+  }
+  .reward-basket-row > b {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .reward-basket-row > button {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .app-select,
+  .app-select-menu .market-select-option {
+    min-height: 44px;
+  }
+  .reward-card-arrows button {
+    width: 44px;
+    height: 44px;
+  }
+  .funding-panel {
+    padding: 20px 16px;
+  }
+}

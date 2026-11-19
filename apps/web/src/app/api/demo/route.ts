@@ -16,6 +16,9 @@ import {
   type Book,
   type Market,
   type ProviderResult,
+  type DemoCollectible,
+  demoSaleQuote,
+  units,
 } from "@collectible/domain";
 import {
   withSolanaNetwork,
@@ -29,7 +32,6 @@ import {
   listCards,
   listGrailTokens,
   getGrailRewardDetails,
-  reserveDemoCollectible,
   prepareDemoMint,
   submitDemoMint,
   checkDemoMint,
@@ -37,6 +39,10 @@ import {
   expireDemoMint,
   cancelDemoCollectible,
   retryDemoMint,
+  allocateDemoReward,
+  sellDemoPosition,
+  attachCachedValuations,
+  recoverDemoReward,
 } from "@collectible/integrations";
 const id = z.string().uuid();
 const bodySchema = z.discriminatedUnion("action", [
@@ -49,6 +55,7 @@ const bodySchema = z.discriminatedUnion("action", [
     side: z.enum(["yes", "no"]),
     stake: z.string().regex(/^\d+(\.\d{1,6})?$/),
     replay: z.boolean(),
+    minimumContracts: z.string().regex(/^\d+(\.\d{1,6})?$/),
   }),
   z.object({
     action: z.literal("replay"),
@@ -56,6 +63,31 @@ const bodySchema = z.discriminatedUnion("action", [
     result: z.enum(["yes", "no", "void"]),
   }),
   z.object({ action: z.literal("refresh") }),
+  z.object({ action: z.literal("recover-reward"), id }),
+  z.object({ action: z.literal("sell-quote"), id }),
+  z.object({
+    action: z.literal("sell"),
+    id,
+    key: id,
+    minimumProceeds: z.string().regex(/^\d+(\.\d{1,6})?$/),
+  }),
+  z.object({
+    action: z.literal("claim-reward"),
+    id,
+    key: id,
+    wallet: z.string().min(32).max(44),
+    items: z
+      .array(
+        z.object({
+          source: z.enum(["collectorcrypt", "grail"]),
+          sourceId: z.string().max(160),
+          reserveId: z.string().max(100).optional(),
+          expectedCost: z.string().regex(/^\d+(\.\d{1,6})?$/),
+        }),
+      )
+      .min(1)
+      .max(20),
+  }),
   z.object({
     action: z.literal("collect"),
     key: id,
@@ -111,7 +143,13 @@ export async function POST(request: Request) {
         await demoBuy(
           user.id,
           b.key,
-          { ...DEMO_REPLAY, side: b.side, stake: b.stake, replay: true },
+          {
+            ...DEMO_REPLAY,
+            side: b.side,
+            stake: b.stake,
+            replay: true,
+            minimumContracts: b.minimumContracts,
+          },
           DEMO_REPLAY.book,
         );
       } else {
@@ -148,6 +186,7 @@ export async function POST(request: Request) {
             side: b.side,
             stake: b.stake,
             replay: false,
+            minimumContracts: b.minimumContracts,
           },
           depth.book,
           depth.observedAt,
@@ -157,82 +196,143 @@ export async function POST(request: Request) {
     if (b.action === "replay")
       await settleDemoPosition(user.id, b.id, b.result, "replay");
     if (b.action === "refresh") await reconcileDemoPositions(user.id);
-    if (b.action === "collect") {
+    if (b.action === "recover-reward") await recoverDemoReward(user.id, b.id);
+    if (b.action === "sell" || b.action === "sell-quote") {
+      const position = (await demoAccount(user.id)).positions.find(
+        (p) => p.id === b.id,
+      );
+      if (!position || position.state !== "open")
+        throw new ApiError(409, "Open position not found.");
+      const depth = position.replay
+        ? { book: DEMO_REPLAY.book, observedAt: new Date().toISOString() }
+        : await workerRead<{ book: Book | null; observedAt?: string }>(
+            `/book?symbol=${encodeURIComponent(position.symbol)}`,
+          );
+      const observedAt = depth.observedAt ?? depth.book?.updatedAt ?? "";
+      if (
+        !depth.book ||
+        depth.book.symbol !== position.symbol ||
+        (!position.replay &&
+          (depth.book.source !== "gemini" ||
+            depth.book.stale ||
+            !Number.isFinite(Date.parse(observedAt)) ||
+            Date.parse(observedAt) > Date.now() + 5000 ||
+            Date.now() - Date.parse(observedAt) > 20000))
+      )
+        throw new ApiError(409, "Waiting for fresh bids.");
+      if (b.action === "sell-quote") {
+        try {
+          return Response.json(
+            {
+              proceeds: demoSaleQuote(position, depth.book),
+              quantity: position.quantity,
+            },
+            { headers: { "Cache-Control": "no-store" } },
+          );
+        } catch (e) {
+          throw new ApiError(409, (e as Error).message);
+        }
+      }
+      await sellDemoPosition(
+        user.id,
+        b.id,
+        b.key,
+        depth.book,
+        b.minimumProceeds,
+        depth.observedAt,
+      );
+    }
+    if (b.action === "claim-reward") {
       await requireDemoWallet(user.id, b.wallet);
-      let item: {
-        name: string;
-        image: string | null;
-        cost: string;
-        sourceUrl: string;
-      };
-      if (b.source === "collectorcrypt") {
-        const card =
-          b.sourceId === DEMO_REPLAY_CARD.mint
-            ? DEMO_REPLAY_CARD
-            : (await listCards("", [], "mainnet")).find(
-                (c) => c.mint === b.sourceId,
-              );
-        if (!card) throw new ApiError(409, "This card is no longer listed.");
-        item = {
-          name: card.name,
-          image: card.frontImage
-            ? new URL(
-                card.frontImage,
-                process.env.APP_URL ?? "http://localhost:3000",
-              ).href
-            : null,
-          cost: card.ask,
-          sourceUrl: `https://collectorcrypt.com/assets/solana/${card.mint}`,
-        };
-      } else {
-        const token = (await listGrailTokens()).find(
-          (t) => t.id === b.sourceId,
-        );
-        if (!token) throw new ApiError(404, "Grail token not found.");
-        const details = await getGrailRewardDetails(
-          token.chainId,
-          token.address,
-        );
-        const reserve = details.reserves.find(
-          (r) => r.id === b.reserveId && r.available > 0,
-        );
-        if (
-          !reserve ||
-          !details.priceUsd ||
-          !/^\d+\.\d{12}$/.test(details.priceUsd) ||
-          !/^\d+(\.\d{1,6})?$/.test(reserve.tokensPerItem)
-        )
+      const position = (await demoAccount(user.id)).positions.find(
+        (p) => p.id === b.id,
+      );
+      if (!position?.reward)
+        throw new ApiError(409, "Choose a winning reward first.");
+      const catalog = b.items.some((i) => i.source === "collectorcrypt")
+        ? await attachCachedValuations(await listCards("", [], "mainnet"))
+        : [];
+      const grail = b.items.some((i) => i.source === "grail")
+        ? await listGrailTokens()
+        : [];
+      const items: Omit<DemoCollectible, "id" | "state">[] = [];
+      for (const choice of b.items) {
+        let item: Omit<DemoCollectible, "id" | "state">;
+        if (choice.source === "collectorcrypt") {
+          const card =
+            catalog.find((c) => c.mint === choice.sourceId) ??
+            (position.replay && choice.sourceId === DEMO_REPLAY_CARD.mint
+              ? DEMO_REPLAY_CARD
+              : undefined);
+          if (!card)
+            throw new ApiError(
+              409,
+              "A selected card is no longer listed. Choose another card.",
+            );
+          item = {
+            name: card.name,
+            image: card.frontImage
+              ? new URL(
+                  card.frontImage,
+                  process.env.APP_URL ?? "http://localhost:3000",
+                ).href
+              : null,
+            cost: card.ask,
+            source: choice.source,
+            sourceId: card.mint,
+            sourceUrl: `https://collectorcrypt.com/assets/solana/${card.mint}`,
+            wallet: b.wallet,
+            valuation: card.valuation,
+            listing: card,
+          };
+        } else {
+          const token = grail.find((t) => t.id === choice.sourceId);
+          if (!token)
+            throw new ApiError(409, "Grail token is no longer available.");
+          const details = await getGrailRewardDetails(
+            token.chainId,
+            token.address,
+          );
+          const reserve = details.reserves.find(
+            (r) => r.id === choice.reserveId && r.available > 0,
+          );
+          if (
+            !reserve ||
+            !details.priceUsd ||
+            !/^\d+\.\d{12}$/.test(details.priceUsd)
+          )
+            throw new ApiError(409, "Grail card price is unavailable.");
+          const cost = money(
+            (BigInt(details.priceUsd.replace(".", "")) *
+              units(reserve.tokensPerItem) +
+              10n ** 12n -
+              1n) /
+              10n ** 12n,
+          );
+          item = {
+            name: reserve.name,
+            image: reserve.image,
+            cost,
+            source: "grail",
+            sourceId: `${token.id}:${reserve.id}`,
+            sourceUrl: token.url,
+            wallet: b.wallet,
+          };
+        }
+        if (units(item.cost) !== units(choice.expectedCost))
           throw new ApiError(
             409,
-            "This Grail reserve has no available card or current price.",
+            "A card price changed. Refresh rewards and review your selection.",
           );
-        const multiplier = BigInt(
-          reserve.tokensPerItem.replace(".", "") +
-            "0".repeat(6 - (reserve.tokensPerItem.split(".")[1]?.length ?? 0)),
-        );
-        const value =
-          (BigInt(details.priceUsd.replace(".", "")) * multiplier +
-            10n ** 12n -
-            1n) /
-          10n ** 12n;
-        item = {
-          name: reserve.name,
-          image: reserve.image,
-          cost: money(value),
-          sourceUrl: token.url,
-        };
+        items.push(item);
       }
-      if (!item.image)
-        throw new ApiError(409, "This card has no image available.");
-      const row = await reserveDemoCollectible(user.id, b.key, {
-        ...item,
-        wallet: b.wallet,
-        source: b.source,
-        sourceId: b.sourceId + (b.reserveId ? `:${b.reserveId}` : ""),
-      });
-      return Response.json(await prepareDemoMint(user.id, row.id), {
-        headers: { "Cache-Control": "no-store" },
-      });
+      await allocateDemoReward(user.id, b.id, b.key, items);
+    }
+    if (b.action === "collect") {
+      throw new ApiError(
+        409,
+        "Open a winning result in Portfolio and select your rewards.",
+      );
     }
     if (b.action === "prepare")
       return Response.json(await prepareDemoMint(user.id, b.id));

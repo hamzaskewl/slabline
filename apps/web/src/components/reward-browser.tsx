@@ -4,6 +4,8 @@ import { Dialog } from "radix-ui";
 import { ChevronLeft, ChevronRight, Layers3, X } from "lucide-react";
 import { cardPlayer, cardTeam, units, type Listing } from "@collectible/domain";
 import { MarketSelect } from "./discovery-controls";
+import { CardImage } from "./card-image";
+import { CardValue } from "./card-value";
 import { usd } from "@/lib/utils";
 
 export function RewardBrowser({
@@ -66,7 +68,7 @@ export function RewardBrowser({
       </div>
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Trigger className="reward-browse-button">
-          Browse {cards.length} {team ? "team " : ""}cards
+          View potential rewards
         </Dialog.Trigger>
         <Dialog.Portal>
           <Dialog.Overlay className="reward-browser-overlay" />
@@ -127,19 +129,11 @@ export function RewardBrowser({
                     aria-label={`Choose ${c.name}`}
                     aria-pressed={c.mint === selected.mint}
                   >
-                    {c.frontImage ? (
-                      <img
-                        src={c.frontImage}
-                        alt=""
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <Layers3 size={32} />
-                    )}
+                    <CardImage src={c.frontImage} alt={c.name} />
                     <span className="reward-browser-card-copy">
                       <strong>{c.name}</strong>
                       <span>Team on card: {cardTeam(c) ?? "Not verified"}</span>
+                      <CardValue valuation={c.valuation} />
                       <span className="reward-browser-price">
                         {usd(c.ask)} USDC
                       </span>

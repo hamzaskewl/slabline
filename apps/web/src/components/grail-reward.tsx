@@ -1,11 +1,11 @@
 "use client";
 import Link from "next/link";
+import { CardImage } from "./card-image";
+import { CardValue } from "./card-value";
+import { AddReward } from "./reward-checkout";
+import { money, units } from "@collectible/domain";
 import dynamic from "next/dynamic";
 import { useNetwork } from "./network-settings";
-const DemoClaim = dynamic(
-  () => import("./demo-controls").then((m) => m.DemoClaim),
-  { ssr: false },
-);
 import {
   indicativeTokens,
   type GrailToken,
@@ -151,14 +151,7 @@ export function GrailReward({
             <TokenHistory data={data} />
             {data.reserves.map((r) => (
               <div className="grail-vault-item" key={r.id}>
-                {r.image && (
-                  <img
-                    src={r.image}
-                    alt={r.name}
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                  />
-                )}
+                <CardImage src={r.image} alt={r.name} />
                 <div>
                   <h4>{r.name}</h4>
                   <strong>
@@ -167,15 +160,27 @@ export function GrailReward({
                   <span>
                     {r.vaulted} vaulted · {r.available} available
                   </span>
+                  <CardValue valuation={r.valuation} />
                   {network === "devnet" &&
                     process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
                     r.available > 0 &&
                     data.priceUsd && (
-                      <DemoClaim
-                        source="grail"
-                        sourceId={token.id}
-                        reserveId={r.id}
-                        name={r.name}
+                      <AddReward
+                        item={{
+                          source: "grail",
+                          sourceId: token.id,
+                          reserveId: r.id,
+                          name: r.name,
+                          image: r.image,
+                          cost: money(
+                            (BigInt(data.priceUsd.replace(".", "")) *
+                              units(r.tokensPerItem) +
+                              10n ** 12n -
+                              1n) /
+                              10n ** 12n,
+                          ),
+                          valuation: r.valuation,
+                        }}
                       />
                     )}
                 </div>

@@ -34,5 +34,6 @@ export function usePrivateRead<T>(url: string, enabled = true) {
     gcTime: 0,
     retry: false,
     refetchOnWindowFocus: false,
+    refetchInterval: url === "/api/demo" && enabled ? 15000 : false,
   });
 }

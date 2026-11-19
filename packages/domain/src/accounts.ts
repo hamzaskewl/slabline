@@ -39,6 +39,7 @@ export type WalletCollectible = {
   name: string;
   imageUrl: string | null;
   interface: string;
+  valuation?: import("./index").Valuation | null;
 };
 export type WalletCollection = {
   wallet: string;

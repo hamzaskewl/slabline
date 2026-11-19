@@ -7,6 +7,11 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+const DemoReplayControls = dynamic(
+  () => import("./demo-controls").then((m) => m.DemoReplayControls),
+  { ssr: false },
+);
 import { Dialog } from "radix-ui";
 import { Settings2, X } from "lucide-react";
 const NetworkContext = createContext<{
@@ -77,7 +82,7 @@ export function NetworkSettings() {
               finish.
             </p>
             <Link
-              className="button"
+              className="button button-outline"
               href="/demo"
               onClick={() => {
                 setNetwork("devnet");
@@ -86,6 +91,9 @@ export function NetworkSettings() {
             >
               Open replay
             </Link>
+            {open && process.env.NEXT_PUBLIC_PRIVY_APP_ID && (
+              <DemoReplayControls />
+            )}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

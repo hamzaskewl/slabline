@@ -6,6 +6,7 @@ import { cached } from "./catalog";
 import { safeImage } from "./gemini";
 import { solanaNetwork, solanaRpc, SOLANA_GENESIS } from "./solana";
 import { quickNodeFetch } from "./quicknode-budget";
+import { attachWalletValuations } from "./valuations";
 
 const limit = 24;
 const item = z.object({
@@ -149,12 +150,16 @@ export async function getWalletCollection(
       });
       if (!response.ok)
         throw new Error("Wallet collectible index is unavailable");
-      return normalizeWalletCollection(
+      const collection = normalizeWalletCollection(
         await response.json(),
         wallet,
         network,
         page,
       );
+      return {
+        ...collection,
+        assets: await attachWalletValuations(collection.assets, network),
+      };
     },
   );
 }

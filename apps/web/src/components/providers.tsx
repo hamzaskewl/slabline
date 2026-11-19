@@ -6,6 +6,10 @@ import { api } from "@/lib/trpc";
 import { NetworkProvider } from "./network-settings";
 import dynamic from "next/dynamic";
 const AuthProvider = dynamic(() => import("./auth-provider"), { ssr: false });
+const RewardSelectionProvider = dynamic(
+  () => import("./reward-checkout").then((m) => m.RewardSelectionProvider),
+  { ssr: false },
+);
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -21,7 +25,13 @@ export function Providers({ children }: { children: ReactNode }) {
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
   const content = (
     <api.Provider client={client} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        {appId ? (
+          <RewardSelectionProvider>{children}</RewardSelectionProvider>
+        ) : (
+          children
+        )}
+      </QueryClientProvider>
     </api.Provider>
   );
   return (

@@ -35,8 +35,16 @@ import {
   reserveDemoCollectible,
   cancelDemoCollectible,
   requireDemoNetwork,
+  allocateDemoReward,
+  finalizeDemoReward,
+  sellDemoPosition,
+  recoverDemoReward,
 } from "./demo";
-import { buildDemoMint, inspectDemoMintSignature } from "./demo-nft";
+import {
+  buildDemoMint,
+  inspectDemoMintSignature,
+  checkDemoMint,
+} from "./demo-nft";
 import {
   getDb,
   users,
@@ -127,6 +135,17 @@ test("devnet Core mint preserves the reviewed message and requires both asset an
   ).toThrow("changed");
 });
 
+async function rejects(action: Promise<unknown>, message: string) {
+  let error: unknown;
+  try {
+    await action;
+  } catch (e) {
+    error = e;
+  }
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toContain(message);
+}
+
 test.skipIf(!process.env.DATABASE_URL)(
   "demo balance, orders, settlement and card reservations survive duplicate/concurrent requests and isolate users",
   async () => {
@@ -164,12 +183,11 @@ test.skipIf(!process.env.DATABASE_URL)(
       ]);
       expect(ids[0]).toBe(ids[1]);
       expect((await demoAccount(a)).positions).toHaveLength(1);
-      await expect(
+      await rejects(
         settleDemoPosition(b, ids[0]!, "yes", "replay"),
-      ).rejects.toThrow("not found");
-      await expect(
-        settleDemoPosition(a, ids[0]!, "yes", "gemini"),
-      ).rejects.toThrow("source");
+        "not found",
+      );
+      await rejects(settleDemoPosition(a, ids[0]!, "yes", "gemini"), "source");
       const before = await demoAccount(a),
         p = before.positions[0]!;
       await Promise.all([
@@ -177,10 +195,9 @@ test.skipIf(!process.env.DATABASE_URL)(
         settleDemoPosition(a, p.id, "yes", "replay"),
       ]);
       const after = await demoAccount(a);
-      expect(Number(after.balance)).toBeCloseTo(
-        Number(before.balance) + Number(p.quantity),
-        6,
-      );
+      expect(after.balance).toBe(before.balance);
+      expect(after.positions[0]!.reward?.budget).toBe(p.quantity);
+      expect(after.positions[0]!.reward?.state).toBe("available");
       expect(after.positions[0]!.state).toBe("won");
       expect((await demoAccount(b)).balance).toBe("100.000000");
       const overspend = await Promise.allSettled([
@@ -226,6 +243,146 @@ test.skipIf(!process.env.DATABASE_URL)(
       ]);
       expect(repeatedRefund[0]!.status).toBe("rejected");
       expect((await demoAccount(a)).balance).toBe(after.balance);
+
+      const rewardKey = crypto.randomUUID();
+      const budget = Number(p.quantity);
+      const card = {
+        ...item,
+        sourceId: "reward-1",
+        cost: (budget * 0.8).toFixed(6),
+      };
+      await rejects(
+        allocateDemoReward(b, p.id, rewardKey, [card]),
+        "winning reward",
+      );
+      await rejects(
+        allocateDemoReward(a, p.id, rewardKey, [
+          { ...card, cost: (budget * 0.79).toFixed(6) },
+        ]),
+        "80%",
+      );
+      await rejects(
+        allocateDemoReward(a, p.id, rewardKey, [
+          { ...card, cost: String(budget + 1) },
+        ]),
+        "exceed",
+      );
+      await rejects(
+        allocateDemoReward(a, p.id, rewardKey, [card, card]),
+        "once",
+      );
+      await Promise.all([
+        allocateDemoReward(a, p.id, rewardKey, [card]),
+        allocateDemoReward(a, p.id, rewardKey, [card]),
+      ]);
+      const allocated = await demoAccount(a);
+      const rewardCards = allocated.collectibles.filter(
+        (c) => c.rewardPositionId === p.id,
+      );
+      expect(rewardCards).toHaveLength(1);
+      expect(allocated.balance).toBe(after.balance);
+      await finalizeDemoReward(a, rewardCards[0]!.id);
+      expect((await demoAccount(a)).balance).toBe(after.balance);
+      await cancelDemoCollectible(a, rewardCards[0]!.id);
+      expect((await demoAccount(a)).balance).toBe(after.balance);
+      expect((await demoAccount(a)).positions[0]!.reward?.state).toBe(
+        "available",
+      );
+      await allocateDemoReward(a, p.id, crypto.randomUUID(), [
+        { ...card, sourceId: "reward-2" },
+      ]);
+      const second = (await demoAccount(a)).collectibles.find(
+        (c) => c.sourceId === "reward-2",
+      )!;
+      await db
+        .update(orders)
+        .set({ state: "confirmed" })
+        .where(eq(orders.id, second.id));
+      await Promise.all([checkDemoMint(a, second.id), demoAccount(a)]);
+      expect(Number((await demoAccount(a)).balance)).toBeCloseTo(
+        Number(after.balance) + budget * 0.2,
+        6,
+      );
+      expect((await demoAccount(a)).positions[0]!.reward?.state).toBe(
+        "claimed",
+      );
+      const saleId = await demoBuy(
+        a,
+        crypto.randomUUID(),
+        { ...input, stake: "10" },
+        DEMO_REPLAY.book,
+      );
+      const saleBefore = await demoAccount(a);
+      await rejects(
+        sellDemoPosition(b, saleId, crypto.randomUUID(), DEMO_REPLAY.book, "0"),
+        "not found",
+      );
+      await rejects(
+        sellDemoPosition(
+          a,
+          saleId,
+          crypto.randomUUID(),
+          DEMO_REPLAY.book,
+          "10000",
+        ),
+        "price changed",
+      );
+      const saleKey = crypto.randomUUID();
+      await Promise.all([
+        sellDemoPosition(a, saleId, saleKey, DEMO_REPLAY.book, "0"),
+        sellDemoPosition(a, saleId, saleKey, DEMO_REPLAY.book, "0"),
+      ]);
+      const sold = (await demoAccount(a)).positions.find(
+        (r) => r.id === saleId,
+      )!;
+      expect(sold.state).toBe("sold");
+      expect(Number((await demoAccount(a)).balance)).toBeCloseTo(
+        Number(saleBefore.balance) + Number(sold.saleProceeds),
+        6,
+      );
+      // Reconstruct a pre-reward-policy win: its payout already sits in cash.
+      const legacyId = await demoBuy(
+        a,
+        crypto.randomUUID(),
+        { ...input, stake: "10" },
+        DEMO_REPLAY.book,
+      );
+      await settleDemoPosition(a, legacyId, "yes", "replay");
+      const legacyAccount = await demoAccount(a);
+      const legacy = legacyAccount.positions.find((p) => p.id === legacyId)!;
+      const { reward: _reward, ...legacyData } = legacy;
+      await db
+        .update(positions)
+        .set({ data: legacyData })
+        .where(eq(positions.id, legacyId));
+      const [balanceRow] = await db
+        .select()
+        .from(fundingIntents)
+        .where(eq(fundingIntents.userId, a));
+      await db
+        .update(fundingIntents)
+        .set({
+          amount: (
+            Number(legacyAccount.balance) + Number(legacy.payout)
+          ).toFixed(6),
+        })
+        .where(eq(fundingIntents.id, balanceRow!.id));
+      await rejects(recoverDemoReward(b, legacyId), "not found");
+      await Promise.all([
+        recoverDemoReward(a, legacyId),
+        recoverDemoReward(a, legacyId),
+      ]);
+      const recovered = await demoAccount(a);
+      expect(recovered.balance).toBe(legacyAccount.balance);
+      expect(
+        recovered.positions.find((p) => p.id === legacyId)!.reward?.budget,
+      ).toBe(legacy.payout);
+      await db
+        .update(positions)
+        .set({ data: { ...legacyData, payout: "1000000.000000" } })
+        .where(eq(positions.id, legacyId));
+      await rejects(recoverDemoReward(a, legacyId), "already been spent");
+      expect((await demoAccount(a)).balance).toBe(recovered.balance);
     } finally {
       for (const userId of [a, b]) {
         for (const table of [settlements, positions, orders, fundingIntents])

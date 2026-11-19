@@ -9,6 +9,7 @@ import "./reward-target.css";
 import "./market-artwork.css";
 import "./discovery.css";
 import "./demo.css";
+import "./account.css";
 import { Providers } from "@/components/providers";
 export const metadata: Metadata = {
   applicationName: "Collectible Markets",

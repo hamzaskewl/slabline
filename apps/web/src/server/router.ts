@@ -90,10 +90,13 @@ export const appRouter = t.router({
       safe<Listing[]>(`/cards?search=${encodeURIComponent(input.search)}`, []),
     ),
   rewards: t.procedure.query(() =>
-    safe<{ cards: Listing[]; tokens: GrailToken[] }>("/rewards", {
-      cards: [],
-      tokens: [],
-    }),
+    safe<{ cards: Listing[]; tokens: GrailToken[]; replayCard?: Listing }>(
+      "/rewards",
+      {
+        cards: [],
+        tokens: [],
+      },
+    ),
   ),
   packs: t.procedure.query(() => safe<Pack[]>("/packs", [])),
   status: t.procedure.query(() => ({

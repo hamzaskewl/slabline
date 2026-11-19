@@ -10,6 +10,7 @@ import {
   enqueueValuations,
   processValuationJob,
   recoverValuationJobs,
+  cacheCardIdentities,
   getPriceHistory,
 } from "@collectible/integrations";
 import {
@@ -20,6 +21,7 @@ import {
   type Market,
   type PricePoint,
   type ChartRange,
+  DEMO_REPLAY_CARD,
 } from "@collectible/domain";
 import { getDb, marketSnapshots } from "@collectible/db";
 import { processWebhookDelivery } from "./reconciliation";
@@ -46,7 +48,8 @@ async function rewardInventory(data: Market[]) {
     providerRead(listGrailTokens, []),
   ]);
   return {
-    cards: cards.data,
+    cards: await attachCachedValuations(cards.data),
+    replayCard: (await attachCachedValuations([DEMO_REPLAY_CARD]))[0],
     tokens: tokens.data,
     error:
       [
@@ -196,7 +199,9 @@ setInterval(async () => {
     return;
   try {
     await recoverValuationJobs();
-    await enqueueValuations(await listCards());
+    const cards = await listCards();
+    await cacheCardIdentities([DEMO_REPLAY_CARD, ...cards]);
+    await enqueueValuations([DEMO_REPLAY_CARD, ...cards]);
   } catch {
     console.warn("Valuation queue unavailable");
   }
@@ -306,6 +311,7 @@ const server = Bun.serve({
             : {
                 cards,
                 tokens: inventory.tokens,
+                replayCard: inventory.replayCard,
               },
         source:
           inventory.error && !cards.length && !inventory.tokens.length
