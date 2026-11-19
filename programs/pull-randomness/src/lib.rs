@@ -22,6 +22,8 @@ const CALLBACK: &[u8; 8] = b"PULLRES1";
 const RECEIPT_TAG: &[u8; 8] = b"PULLVRF1";
 const RECEIPT_SEED: &[u8] = b"pull-receipt";
 const RECEIPT_SIZE: usize = 105;
+const MAX_ORACLE_FEE_LAMPORTS: u64 = 500_000;
+const ORACLE_FEE_EXCEEDS_LIMIT: u32 = 1;
 const PAYER: std::ops::Range<usize> = 8..40;
 const SEED: std::ops::Range<usize> = 40..72;
 const STATE: usize = 72;
@@ -114,6 +116,7 @@ fn request(program_id: &Pubkey, accounts: &[AccountInfo<'_>], seed: &[u8; 32]) -
     }
 
     let instruction = scoped_vrf_request(program_id, payer.key, identity.key, receipt.key, seed);
+    let balance_before_oracle = payer.lamports();
     invoke_signed(
         &instruction,
         &[
@@ -125,7 +128,11 @@ fn request(program_id: &Pubkey, accounts: &[AccountInfo<'_>], seed: &[u8; 32]) -
             vrf.clone(),
         ],
         &[&[IDENTITY, &[identity_bump]]],
-    )
+    )?;
+    if balance_before_oracle.saturating_sub(payer.lamports()) > MAX_ORACLE_FEE_LAMPORTS {
+        return Err(ProgramError::Custom(ORACLE_FEE_EXCEEDS_LIMIT));
+    }
+    Ok(())
 }
 
 fn scoped_vrf_request(
@@ -198,6 +205,59 @@ fn complete(
 mod tests {
     use super::*;
 
+    // Reference wire types from MagicBlock's RequestRandomness and
+    // SerializableAccountMeta. Pubkeys serialize as their 32 raw bytes.
+    #[derive(borsh::BorshSerialize)]
+    struct VrfRequestFixture {
+        caller_seed: [u8; 32],
+        callback_program_id: [u8; 32],
+        callback_discriminator: Vec<u8>,
+        callback_accounts_metas: Vec<VrfAccountMetaFixture>,
+        callback_args: Vec<u8>,
+    }
+
+    #[derive(borsh::BorshSerialize)]
+    struct VrfAccountMetaFixture {
+        pubkey: [u8; 32],
+        is_signer: bool,
+        is_writable: bool,
+    }
+
+    #[test]
+    fn scoped_request_matches_magicblock_borsh_payload_and_account_order() {
+        let program = Pubkey::new_unique();
+        let payer = Pubkey::new_unique();
+        let identity = Pubkey::new_unique();
+        let receipt = Pubkey::new_unique();
+        let seed = [9; 32];
+        let request = scoped_vrf_request(&program, &payer, &identity, &receipt, &seed);
+        let decoded_fixture = VrfRequestFixture {
+            caller_seed: seed,
+            callback_program_id: program.to_bytes(),
+            callback_discriminator: b"PULLRES1".to_vec(),
+            callback_accounts_metas: vec![VrfAccountMetaFixture {
+                pubkey: receipt.to_bytes(),
+                is_signer: false,
+                is_writable: true,
+            }],
+            callback_args: seed.to_vec(),
+        };
+
+        assert_eq!(request.program_id, VRF_PROGRAM_ID);
+        assert_eq!(
+            request.accounts,
+            [
+                AccountMeta::new(payer, true),
+                AccountMeta::new_readonly(identity, true),
+                AccountMeta::new(DEFAULT_QUEUE, false),
+                AccountMeta::new_readonly(system_program::ID, false),
+                AccountMeta::new_readonly(slot_hashes::ID, false),
+            ]
+        );
+        assert_eq!(&request.data[..8], &[10, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(&request.data[8..], borsh::to_vec(&decoded_fixture).unwrap());
+    }
+
     #[test]
     fn callback_is_scoped_to_the_correct_receipt_and_only_completes_once() {
         let program = Pubkey::new_unique();
@@ -268,8 +328,20 @@ mod tests {
             Err(ProgramError::InvalidSeeds),
         );
         receipt.try_borrow_mut_data().unwrap()[PAYER].copy_from_slice(payer.as_ref());
+        // MagicBlock sends callback discriminator, output, then callback args.
+        let mut callback = b"PULLRES1".to_vec();
+        callback.extend_from_slice(&random);
+        callback.extend_from_slice(&seed);
         assert_eq!(
-            complete(&program, &[signer.clone(), receipt.clone()], &random, &seed),
+            process_instruction(
+                &program,
+                &[signer.clone(), receipt.clone()],
+                &callback[..71]
+            ),
+            Err(ProgramError::InvalidInstructionData),
+        );
+        assert_eq!(
+            process_instruction(&program, &[signer.clone(), receipt.clone()], &callback),
             Ok(()),
         );
         assert_eq!(

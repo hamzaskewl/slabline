@@ -8,7 +8,7 @@ Pull & Predict's MagicBlock mode requests randomness on Solana devnet. MagicBloc
 | MagicBlock base-layer queue | `Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh`         |
 | Pull receipt program        | App deployment address in `PULL_MAGICBLOCK_PROGRAM_ID` |
 
-The receipt program invokes MagicBlock's scoped, regular-fee VRF request. Only the MagicBlock PDA scoped to this program may sign the callback. Each receipt is derived from the wallet and a 32-byte seed, and can accept a result once. The receipt includes the payer, seed, fulfillment state and random bytes. The request pays a 500,000 devnet lamport VRF fee plus receipt rent and Solana transaction fees. [Scoped VRF wire format](https://github.com/magicblock-labs/solana-vrf/blob/692f98912cf028a95b28fd7879c310cde559fdb2/api/src/instruction.rs) · [MagicBlock fee constants](https://github.com/magicblock-labs/solana-vrf/blob/692f98912cf028a95b28fd7879c310cde559fdb2/api/src/consts.rs)
+The receipt program invokes MagicBlock's scoped, regular-fee VRF request. Only the MagicBlock PDA scoped to this program may sign the callback. Each receipt is derived from the wallet and a 32-byte seed, and can accept a result once. The receipt includes the payer, seed, fulfillment state and random bytes. The request pays up to 500,000 devnet lamports in VRF fees plus receipt rent and Solana transaction fees. The receipt program rolls back any request that exceeds that VRF fee cap. [Scoped VRF wire format](https://github.com/magicblock-labs/solana-vrf/blob/692f98912cf028a95b28fd7879c310cde559fdb2/api/src/instruction.rs) · [MagicBlock fee constants](https://github.com/magicblock-labs/solana-vrf/blob/692f98912cf028a95b28fd7879c310cde559fdb2/api/src/consts.rs)
 
 ## Build and deploy the receipt program
 

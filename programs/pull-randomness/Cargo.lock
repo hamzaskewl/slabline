@@ -705,6 +705,7 @@ dependencies = [
 name = "pull-randomness"
 version = "0.1.0"
 dependencies = [
+ "borsh",
  "solana-program",
  "solana-system-interface 3.2.0",
 ]

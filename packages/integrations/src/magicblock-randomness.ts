@@ -22,6 +22,11 @@ const DEVNET_RPC = "https://api.devnet.solana.com";
 const SYSTEM_PROGRAM = address("11111111111111111111111111111111");
 const SLOT_HASHES = address("SysvarS1otHashes111111111111111111111111111");
 const COMPUTE_BUDGET = address("ComputeBudget111111111111111111111111111111");
+const SBF_LOADERS = new Set<string>([
+  "BPFLoader2111111111111111111111111111111111",
+  "BPFLoaderUpgradeab1e11111111111111111111111",
+  "LoaderV411111111111111111111111111111111111",
+]);
 const ACCOUNT_READ = { encoding: "base64", commitment: "finalized" } as const;
 const TRANSACTION_READ = {
   encoding: "jsonParsed",
@@ -32,6 +37,10 @@ const timeout = () => ({ abortSignal: AbortSignal.timeout(15000) });
 const REQUEST_TAG = Buffer.from("PULLREQ1");
 const RECEIPT_TAG = Buffer.from("PULLVRF1");
 const RECEIPT_SIZE = 105;
+// MagicBlock's Queue discriminator and repr(C) header in the scoped VRF ABI.
+const QUEUE_TAG = Buffer.from([3, 0, 0, 0, 0, 0, 0, 0]);
+const QUEUE_HEADER_SIZE = 20;
+const QUEUE_PAUSED_OFFSET = 17;
 
 type DrawRequest = { seedHex: string; payer: string };
 
@@ -141,11 +150,13 @@ function readReceipt(account: RequestAccount, request: BuiltRequest) {
     account.owner !== request.instruction.programAddress ||
     account.executable ||
     account.data[1] !== "base64" ||
+    data.toString("base64") !== account.data[0] ||
     data.length !== RECEIPT_SIZE ||
     !data.subarray(0, 8).equals(RECEIPT_TAG) ||
     !data.subarray(8, 40).equals(request.payerBytes) ||
     !data.subarray(40, 72).equals(request.seed) ||
-    (data[72] !== 0 && data[72] !== 1)
+    (data[72] !== 0 && data[72] !== 1) ||
+    (data[72] === 0 && data.subarray(73).some((byte) => byte !== 0))
   ) {
     throw new Error("Invalid MagicBlock draw receipt");
   }
@@ -160,6 +171,9 @@ export function createMagicBlockDevnetRandomness({
   rpcUrl?: string;
 }) {
   const program = address(programId);
+  if (program === MAGICBLOCK_VRF_PROGRAM) {
+    throw new Error("Configure the deployed Pull receipt program address");
+  }
   const rpc = () => solanaRpc("devnet", rpcUrl, false);
   const getTransaction = (
     client: ReturnType<typeof rpc>,
@@ -178,16 +192,34 @@ export function createMagicBlockDevnetRandomness({
         } = await rpc()
           .getMultipleAccounts(
             [program, MAGICBLOCK_VRF_PROGRAM, MAGICBLOCK_VRF_QUEUE],
-            { ...ACCOUNT_READ, dataSlice: { offset: 0, length: 0 } },
+            {
+              ...ACCOUNT_READ,
+              dataSlice: { offset: 0, length: QUEUE_HEADER_SIZE },
+            },
           )
           .send(timeout());
         if (
           !application?.executable ||
+          !SBF_LOADERS.has(application.owner) ||
           !vrf?.executable ||
-          queue?.owner !== MAGICBLOCK_VRF_PROGRAM
+          !queue ||
+          queue.executable ||
+          queue.owner !== MAGICBLOCK_VRF_PROGRAM ||
+          queue.data[1] !== "base64"
         ) {
           throw new Error(
             "MagicBlock draw program or oracle queue unavailable on devnet",
+          );
+        }
+
+        const queueHeader = Buffer.from(queue.data[0], "base64");
+        if (
+          queueHeader.length !== QUEUE_HEADER_SIZE ||
+          !queueHeader.subarray(0, QUEUE_TAG.length).equals(QUEUE_TAG) ||
+          queueHeader[QUEUE_PAUSED_OFFSET] !== 0
+        ) {
+          throw new Error(
+            "MagicBlock devnet oracle queue cannot accept requests",
           );
         }
 
@@ -254,13 +286,13 @@ export function createMagicBlockDevnetRandomness({
             );
           }
 
-          const { value: account } = await client
+          const { context, value: account } = await client
             .getAccountInfo(request.requestAddress, {
               ...ACCOUNT_READ,
               minContextSlot: transaction.slot,
             })
             .send(timeout());
-          if (!account)
+          if (!account || context.slot < transaction.slot)
             throw new Error("Finalized MagicBlock draw receipt unavailable");
 
           const randomnessHex = readReceipt(account, request);

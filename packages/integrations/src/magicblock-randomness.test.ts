@@ -9,7 +9,8 @@ import { SOLANA_GENESIS } from "./solana";
 
 test("MagicBlock prepares a devnet draw and verifies a single finalized request and matching receipt", async () => {
   const payer = address("Vote111111111111111111111111111111111111111");
-  const app = address("BPFLoaderUpgradeab1e11111111111111111111111");
+  const app = address("GqWqMEubSHgrqJCZ9zPfMHq6uQPZkr6EbiBy78j7engt");
+  const loader = address("BPFLoaderUpgradeab1e11111111111111111111111");
   const systemProgram = address("11111111111111111111111111111111");
   const seedHex = "c3".repeat(32);
   const seed = Buffer.from(seedHex, "hex");
@@ -25,12 +26,18 @@ test("MagicBlock prepares a devnet draw and verifies a single finalized request 
     randomness,
   ]);
   let state:
+    | "native-program"
+    | "paused-queue"
     | "missing-tx"
     | "bad-tx"
     | "batched"
     | "pending"
     | "wrong-owner"
     | "wrong-seed"
+    | "wrong-payer"
+    | "invalid-state"
+    | "dirty-pending"
+    | "stale-receipt"
     | "prefunded"
     | "fulfilled" = "fulfilled";
   let requestAddress = "";
@@ -46,21 +53,35 @@ test("MagicBlock prepares a devnet draw and verifies a single finalized request 
       case "getGenesisHash":
         result = SOLANA_GENESIS.devnet;
         break;
-      case "getMultipleAccounts":
+      case "getMultipleAccounts": {
         expect(params[0]).toEqual([
           app,
           MAGICBLOCK_VRF_PROGRAM,
           MAGICBLOCK_VRF_QUEUE,
         ]);
+        const queueHeader = Buffer.alloc(20);
+        queueHeader[0] = 3;
+        if (state === "paused-queue") queueHeader[17] = 1;
         result = {
           context: { slot: 500 },
           value: [
+            {
+              executable: true,
+              owner:
+                state === "native-program"
+                  ? "NativeLoader1111111111111111111111111111111"
+                  : loader,
+            },
             { executable: true },
-            { executable: true },
-            { owner: MAGICBLOCK_VRF_PROGRAM, executable: false },
+            {
+              owner: MAGICBLOCK_VRF_PROGRAM,
+              executable: false,
+              data: [queueHeader.toString("base64"), "base64"],
+            },
           ],
         };
         break;
+      }
       case "getTransaction": {
         expect(params[0]).toBe(requestSignature);
         expect(params[1].commitment ?? "finalized").toBe("finalized");
@@ -103,11 +124,14 @@ test("MagicBlock prepares a devnet draw and verifies a single finalized request 
         expect(params[1].commitment ?? "finalized").toBe("finalized");
         expect(params[0]).toBe(requestAddress);
         const bytes = Buffer.from(fulfillment);
-        if (state === "pending") bytes[72] = 0;
+        if (state === "pending") bytes.fill(0, 72);
         if (state === "wrong-seed") bytes[40] = 0;
+        if (state === "wrong-payer") bytes[8] = bytes[8] === 0 ? 1 : 0;
+        if (state === "invalid-state") bytes[72] = 2;
+        if (state === "dirty-pending") bytes[72] = 0;
         const prefunded = state === "prefunded";
         result = {
-          context: { slot: 503 },
+          context: { slot: state === "stale-receipt" ? 499 : 503 },
           value: {
             owner: state === "wrong-owner" || prefunded ? systemProgram : app,
             executable: false,
@@ -127,6 +151,15 @@ test("MagicBlock prepares a devnet draw and verifies a single finalized request 
       programId: app,
       rpcUrl: `https://rpc-fixture.invalid/${crypto.randomUUID()}`,
     });
+    state = "native-program";
+    await expect(adapter.prepare({ seedHex, payer })).rejects.toThrow(
+      "unavailable on devnet",
+    );
+    state = "paused-queue";
+    await expect(adapter.prepare({ seedHex, payer })).rejects.toThrow(
+      "cannot accept requests",
+    );
+    state = "fulfilled";
     const prepared = await adapter.prepare({ seedHex, payer });
     expect(prepared.requestFeeLamports).toBe("500000");
     expect(prepared.instruction.programAddress).toBe(app);
@@ -149,10 +182,20 @@ test("MagicBlock prepares a devnet draw and verifies a single finalized request 
     await expect(verify()).rejects.toThrow("transaction does not match");
     state = "batched";
     await expect(verify()).rejects.toThrow("transaction does not match");
-    state = "wrong-owner";
-    await expect(verify()).rejects.toThrow("Invalid MagicBlock draw receipt");
-    state = "wrong-seed";
-    await expect(verify()).rejects.toThrow("Invalid MagicBlock draw receipt");
+    for (const invalid of [
+      "wrong-owner",
+      "wrong-seed",
+      "wrong-payer",
+      "invalid-state",
+      "dirty-pending",
+    ] as const) {
+      state = invalid;
+      await expect(verify()).rejects.toThrow("Invalid MagicBlock draw receipt");
+    }
+    state = "stale-receipt";
+    await expect(verify()).rejects.toThrow(
+      "Finalized MagicBlock draw receipt unavailable",
+    );
     state = "prefunded";
     expect(
       await adapter.recoverRequestSignature({ seedHex, payer }),
