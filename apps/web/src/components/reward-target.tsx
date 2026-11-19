@@ -135,17 +135,19 @@ export function RewardTarget({
         </div>
         <div className="reward-card-copy">
           <h3>{card.name}</h3>
-          <p className="reward-card-team">
-            Team on card: {cardTeam(card) ?? "Not verified"}
-          </p>
-          <div className="reward-ask">
-            {Number(card.ask).toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}{" "}
-            <span>USDC</span>
+          {cardTeam(card) && (
+            <p className="reward-card-team">Team on card: {cardTeam(card)}</p>
+          )}
+          <div className="card-price-row">
+            <div className="reward-ask">
+              {Number(card.ask).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              <span>USDC</span>
+            </div>
+            <CardValue valuation={card.valuation} ask={card.ask} />
           </div>
-          <CardValue valuation={card.valuation} ask={card.ask} />
           <span className={`reward-fit ${covered ? "covered" : ""}`}>
             {covered
               ? "Within estimated payout"

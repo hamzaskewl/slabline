@@ -1317,16 +1317,16 @@ function CardTile({ card }: { card: Listing }) {
         </span>
         <h3>{card.name}</h3>
         {card.set ? <p>{card.set}</p> : null}
-        {sportCategories.includes(card.category) && (
-          <p>Team on card: {cardTeam(card) ?? "Not verified"}</p>
+        {sportCategories.includes(card.category) && cardTeam(card) && (
+          <p>Team on card: {cardTeam(card)}</p>
         )}
-        <div className="card-price">
+        <div className="card-price card-price-row">
           <div>
             <small>Listing ask · USDC</small>
             <strong>{usd(card.ask)}</strong>
           </div>
+          <CardValue valuation={card.valuation} ask={card.ask} />
         </div>
-        <CardValue valuation={card.valuation} ask={card.ask} />
         {network === "devnet" && process.env.NEXT_PUBLIC_PRIVY_APP_ID && (
           <AddReward
             item={{

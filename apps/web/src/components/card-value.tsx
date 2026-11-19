@@ -35,7 +35,9 @@ export function CardValue({
             }}
           >
             <span className="card-fmv-label">FMV</span>
-            <strong>{value === null ? "Unavailable" : usd(value)}</strong>
+            <strong>
+              {value === null ? "—" : usd(value).replace(/\.00$/, "")}
+            </strong>
             <Info size={13} aria-hidden="true" />
           </button>
         </Tooltip.Trigger>
@@ -48,8 +50,8 @@ export function CardValue({
           >
             <strong>Fair market value</strong>
             <p>
-              Estimated resale value from Card Hedge, matched using the card’s
-              certificate, grader and grade. Actual sale prices vary.
+              Estimated resale value from Card Hedge, based on recent sales.
+              Actual sale prices vary.
             </p>
             {value === null ? (
               <p>No current matched estimate is available for this card.</p>
@@ -64,19 +66,6 @@ export function CardValue({
                   Green: at or below 110% of FMV. Amber: up to 125%. Red: above
                   125%.
                 </p>
-                <span className="fmv-tooltip-meta">
-                  Updated{" "}
-                  {new Date(valuation!.observedAt).toLocaleString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}{" "}
-                  ·{" "}
-                  {valuation!.confidence === "low"
-                    ? "Low-confidence match"
-                    : "Direct certificate match"}
-                </span>
               </>
             )}
             <Tooltip.Arrow className="fmv-tooltip-arrow" />

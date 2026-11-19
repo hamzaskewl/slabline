@@ -147,10 +147,12 @@ export function RewardBrowser({
                     <CardImage src={c.frontImage} alt={c.name} />
                     <span className="reward-browser-card-copy">
                       <strong>{c.name}</strong>
-                      <span>Team on card: {cardTeam(c) ?? "Not verified"}</span>
-                      <CardValue valuation={c.valuation} ask={c.ask} />
-                      <span className="reward-browser-price">
-                        {usd(c.ask)} USDC
+                      {cardTeam(c) && <span>Team on card: {cardTeam(c)}</span>}
+                      <span className="card-price-row">
+                        <span className="reward-browser-price">
+                          {usd(c.ask)} USDC
+                        </span>
+                        <CardValue valuation={c.valuation} ask={c.ask} />
                       </span>
                       <span>
                         {payout !== null && units(c.ask) <= units(payout)
