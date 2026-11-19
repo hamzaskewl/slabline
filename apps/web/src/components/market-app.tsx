@@ -1170,31 +1170,37 @@ function MarketDetail({
                 : `Buy ${side === "yes" ? "Yes" : "No"}`}
             </Button>
           )}
-          <div className="execution-estimate" aria-label="Execution estimate">
-            <div>
-              <span title="Weighted average across available orders, before fees">
-                Average price
-              </span>
-              <strong>
-                {cents(quote?.averagePrice ?? null, book?.priceIncrement, true)}
-              </strong>
+          {quote && (
+            <div className="execution-estimate" aria-label="New order estimate">
+              <div>
+                <span title="Weighted average across available orders, before fees">
+                  Order average
+                </span>
+                <strong>
+                  {cents(
+                    quote?.averagePrice ?? null,
+                    book?.priceIncrement,
+                    true,
+                  )}
+                </strong>
+              </div>
+              <div>
+                <span>
+                  New shares
+                  {quote?.exhausted && (
+                    <small className="shares-limit">max available</small>
+                  )}
+                </span>
+                <strong>
+                  {quote
+                    ? Number(quote.contracts).toLocaleString("en-US", {
+                        maximumFractionDigits: 6,
+                      })
+                    : "—"}
+                </strong>
+              </div>
             </div>
-            <div>
-              <span>
-                Shares
-                {quote?.exhausted && (
-                  <small className="shares-limit">max available</small>
-                )}
-              </span>
-              <strong>
-                {quote
-                  ? Number(quote.contracts).toLocaleString("en-US", {
-                      maximumFractionDigits: 6,
-                    })
-                  : "—"}
-              </strong>
-            </div>
-          </div>
+          )}
         </aside>
         {process.env.NEXT_PUBLIC_PRIVY_APP_ID && !practice ? (
           <PositionHoldings

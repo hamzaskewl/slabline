@@ -779,6 +779,29 @@ export function MarketPositionStatus({
           revision={JSON.stringify(position)}
         />
       </div>
+      <dl className="held-position-facts" aria-label="Saved position">
+        <div>
+          <dt>{position.state === "open" ? "Shares held" : "Shares"}</dt>
+          <dd>
+            {Number(position.quantity).toLocaleString("en-US", {
+              maximumFractionDigits: 6,
+            })}
+          </dd>
+        </div>
+        <div>
+          <dt>Avg. entry</dt>
+          <dd>
+            {units(position.quantity) > 0n
+              ? usd(
+                  money(
+                    (units(position.cost) * 1000000n) /
+                      units(position.quantity),
+                  ),
+                )
+              : "—"}
+          </dd>
+        </div>
+      </dl>
       {position.grailHolding ? (
         <p>
           {Number(position.grailHolding.quantity).toLocaleString("en-US", {
