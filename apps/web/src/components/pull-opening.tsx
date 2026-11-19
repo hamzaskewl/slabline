@@ -204,6 +204,9 @@ function PullRedemption({
           ))}
         </select>
       </label>
+      {chosen && (
+        <p className="pull-muted pull-selected-title">{chosen.title}</p>
+      )}
       {catalog.searching ? (
         <p className="pull-muted" role="status">
           Checking markets…

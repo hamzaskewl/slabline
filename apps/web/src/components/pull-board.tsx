@@ -101,6 +101,10 @@ export function PullBoard({
                 </PullRetry>
               )}
             </div>
+            <div className="pull-odds-inline">
+              <h3>Pack odds</h3>
+              <PackOdds tier={tier} />
+            </div>
             {mode && (
               <p className="pull-muted">
                 {mode === "magicblock-devnet"
@@ -112,30 +116,41 @@ export function PullBoard({
           </section>
         </div>
         <aside>
-          <section className="pull-panel" aria-labelledby="odds-title">
+          <section
+            className="pull-panel pull-odds-sidebar"
+            aria-labelledby="odds-title"
+          >
             <h2 id="odds-title">Pack odds</h2>
-            <p className="pull-muted">Budget revealed from a ${tier} pack</p>
-            <ul className="pull-odds">
-              {PULL_OUTCOMES.map(({ multiplier, multiplierBps, weightBps }) => (
-                <li key={multiplier}>
-                  <strong>{usd((tier * multiplierBps) / 10000)}</strong>
-                  <span>{multiplier}×</span>
-                  <span>{weightBps / 100}%</span>
-                </li>
-              ))}
-            </ul>
-            <p className="pull-expected">
-              <strong>{usd((tier * 98) / 100)} expected budget</strong>
-            </p>
-            <p className="pull-muted">
-              98% of pack price on average. Your prediction has its own
-              settlement risk.
-            </p>
+            <PackOdds tier={tier} />
           </section>
           {history}
         </aside>
       </div>
     </section>
+  );
+}
+
+function PackOdds({ tier }: { tier: PullTier }) {
+  return (
+    <>
+      <p className="pull-muted">Budget revealed from a ${tier} pack</p>
+      <ul className="pull-odds">
+        {PULL_OUTCOMES.map(({ multiplier, multiplierBps, weightBps }) => (
+          <li key={multiplier}>
+            <strong>{usd((tier * multiplierBps) / 10000)}</strong>
+            <span>{multiplier}×</span>
+            <span>{weightBps / 100}%</span>
+          </li>
+        ))}
+      </ul>
+      <p className="pull-expected">
+        <strong>{usd((tier * 98) / 100)} expected budget</strong>
+      </p>
+      <p className="pull-muted">
+        98% of pack price on average. Your prediction has its own settlement
+        risk.
+      </p>
+    </>
   );
 }
 

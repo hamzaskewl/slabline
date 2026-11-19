@@ -336,3 +336,25 @@
     transform: translateY(4px);
   }
 }
+
+.pull-odds-inline {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .pull-odds-inline {
+    display: block;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+  }
+
+  .pull-odds-sidebar,
+  .pull-grid > aside:has(> :only-child.pull-odds-sidebar) {
+    display: none;
+  }
+}
+
+.pull-workspace .pull-selected-title {
+  margin-top: -8px;
+  overflow-wrap: anywhere;
+}
