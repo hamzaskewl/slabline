@@ -83,8 +83,12 @@ export function MarketSearch({
             document.activeElement as HTMLAnchorElement,
           );
           links[
-            (current + (e.key === "ArrowDown" ? 1 : -1) + links.length) %
-              links.length
+            current < 0
+              ? e.key === "ArrowDown"
+                ? 0
+                : links.length - 1
+              : (current + (e.key === "ArrowDown" ? 1 : -1) + links.length) %
+                links.length
           ]?.focus();
         }
       }}

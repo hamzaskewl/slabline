@@ -628,7 +628,23 @@ input {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-@media (max-width: 639px) {
+@media (max-width: 760px) {
+  .app-shell .exchange-header-main {
+    flex-wrap: wrap;
+    padding-block: 10px;
+    gap: 10px;
+  }
+  .app-shell .exchange-header .global-search {
+    display: flex;
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
+    margin: 0;
+    min-height: 44px;
+  }
+  .app-shell .discovery-search {
+    display: none;
+  }
   .search-dropdown {
     width: calc(100vw - 32px);
   }
