@@ -957,3 +957,14 @@ input {
     font-size: 12px;
   }
 }
+
+@media (min-width: 761px) and (max-width: 1000px) {
+  .app-shell .exchange-header-main {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding-block: 10px;
+  }
+  .app-shell .exchange-header-main .topbar-actions {
+    margin-left: auto;
+  }
+}
