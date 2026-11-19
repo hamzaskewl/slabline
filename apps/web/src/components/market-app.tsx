@@ -2,11 +2,8 @@
 import { Select } from "./ui/select";
 import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
-import {
-  AddReward,
-  RewardCheckout,
-  useRewardSelection,
-} from "./reward-checkout";
+import { AddReward } from "./reward-checkout";
+import { RewardClaimEntry } from "./position-rewards";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -134,7 +131,6 @@ export function MarketApp({
   initialStake?: string;
 }) {
   const router = useRouter();
-  const rewardSelection = useRewardSelection();
   const { network } = useNetwork();
   const replay = section === "demo";
   useEffect(() => {
@@ -555,18 +551,9 @@ export function MarketApp({
             </>
           ) : section === "rewards" ? (
             <>
-              {status.data?.privyConfigured && <RewardCheckout />}
+              {status.data?.privyConfigured && <RewardClaimEntry />}
               <RewardCatalog
-                cards={
-                  network === "devnet" && rewardSelection?.position?.replay
-                    ? [
-                        replayCard,
-                        ...cards.filter(
-                          (c) => c.mint !== DEMO_REPLAY_CARD.mint,
-                        ),
-                      ]
-                    : cards
-                }
+                cards={cards}
                 tokens={tokens}
                 loading={rewardQuery.isLoading}
                 error={rewardQuery.data?.error}
@@ -581,7 +568,7 @@ export function MarketApp({
                 ) : (
                   <>
                     <PrivateAccount />
-                    <WalletCollection />
+                    <WalletCollection embedded />
                   </>
                 )
               ) : null}

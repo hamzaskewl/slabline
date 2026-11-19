@@ -7,6 +7,9 @@ import {
   eq,
   and,
   sql,
+  markets,
+  contracts,
+  inArray,
 } from "@collectible/db";
 import {
   demoPayout,
@@ -17,6 +20,10 @@ import {
   money,
   rewardAllocation,
   demoSaleQuote,
+  demoPositionContext,
+  marketOutcomes,
+  DEMO_REPLAY,
+  type Market,
   type Book,
   type DemoPosition,
   type DemoCollectible,
@@ -135,6 +142,42 @@ export async function demoAccount(userId: string): Promise<DemoAccountView> {
     }
     return { ...view, history: history.slice(-5000) };
   });
+  const missingContext = snapshot.positions.filter(
+    (p) => !p.rewardMarket || !p.artwork,
+  );
+  if (missingContext.length) {
+    const stored = await getDb()
+      .select({ symbol: contracts.symbol, market: markets.data })
+      .from(contracts)
+      .innerJoin(markets, eq(markets.id, contracts.marketId))
+      .where(
+        inArray(
+          contracts.symbol,
+          missingContext.map((p) => p.symbol),
+        ),
+      );
+    const lookup = new Map(
+      stored.map((row) => [row.symbol, row.market as Market]),
+    );
+    snapshot.positions = snapshot.positions.map((p) => {
+      const market = lookup.get(p.symbol),
+        contract =
+          market && marketOutcomes(market).find((c) => c.symbol === p.symbol);
+      const context =
+        market && contract ? demoPositionContext(market, contract) : undefined;
+      return {
+        ...p,
+        rewardMarket: p.rewardMarket ?? context?.rewardMarket,
+        artwork: p.artwork?.length
+          ? p.artwork
+          : context?.artwork.length
+            ? context.artwork
+            : p.replay && p.symbol === DEMO_REPLAY.book.symbol
+              ? DEMO_REPLAY.artwork
+              : [],
+      };
+    });
+  }
   // Recover a crash between verified delivery and the remainder transaction.
   // Run outside the account lock; only unclaimed, fully delivered baskets qualify.
   let recovered = false;
@@ -210,6 +253,8 @@ export async function demoBuy(
     stake: string;
     replay: boolean;
     minimumContracts?: string;
+    rewardMarket?: DemoPosition["rewardMarket"];
+    artwork?: DemoPosition["artwork"];
   },
   book: Book,
   observedAt = book.updatedAt,

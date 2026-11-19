@@ -1,14 +1,9 @@
 "use client";
 import { Select } from "./ui/select";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
-import {
-  useWallets,
-  useSignTransaction,
-  useSignMessage,
-} from "@privy-io/react-auth/solana";
+import { useWallets, useSignTransaction } from "@privy-io/react-auth/solana";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   units,
@@ -16,8 +11,11 @@ import {
   type DemoAccountView,
   type DemoCollectible,
   type DemoPosition,
+  activeDemoPosition,
 } from "@collectible/domain";
-import { Gift, ArrowUpRight, ChartNoAxesCombined, Layers3 } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import { MarketArtwork } from "./market-artwork";
+import { PositionRewards } from "./position-rewards";
 import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
 import { PortfolioOverview } from "./portfolio-overview";
@@ -197,13 +195,12 @@ export function DemoPortfolio({
       a.network === "devnet",
     );
   const [tab, setTab] = useState("all"),
-    [positionFilter, setPositionFilter] = useState("open");
+    [positionFilter, setPositionFilter] = useState("all");
   const key = useRef(crypto.randomUUID());
   if (a.network !== "devnet") return null;
   if (!a.authenticated)
     return (
       <section className="account-empty panel">
-        <ChartNoAxesCombined size={32} />
         <h2>
           {collection ? "Your collection" : "Your portfolio, all together"}
         </h2>
@@ -239,7 +236,9 @@ export function DemoPortfolio({
   const visiblePositions = positions.filter(
     (p) =>
       positionFilter === "all" ||
-      (positionFilter === "open" ? p.state === "open" : p.state !== "open"),
+      (positionFilter === "active"
+        ? activeDemoPosition(p)
+        : !activeDemoPosition(p)),
   );
   return (
     <div className="portfolio-view">
@@ -276,11 +275,6 @@ export function DemoPortfolio({
               >
                 Add $100
               </Button>
-              {!compact && (
-                <Link className="button button-outline" href="/wallet">
-                  Manage wallet
-                </Link>
-              )}
             </>
           }
         />
@@ -289,9 +283,7 @@ export function DemoPortfolio({
         <section className="portfolio-rewards" aria-label="Winning rewards">
           {rewardResults.map((p) => (
             <div className="won-reward" key={p.id}>
-              <span className="won-reward-icon">
-                <Gift size={23} />
-              </span>
+              <PositionArtwork position={p} />
               <div>
                 <h3>You won {usd(p.reward?.budget ?? p.payout ?? "0")}</h3>
                 <p>
@@ -303,23 +295,7 @@ export function DemoPortfolio({
                       : "Cards selected · transfer pending"}
                 </p>
               </div>
-              {!p.reward ? (
-                <RecoverReward position={p} />
-              ) : (
-                <Link
-                  className="button button-outline"
-                  href={
-                    p.reward.state === "available"
-                      ? `/rewards?win=${p.id}`
-                      : "/collection"
-                  }
-                >
-                  {p.reward.state === "available"
-                    ? "View rewards"
-                    : "View collection"}
-                  <ArrowUpRight size={15} />
-                </Link>
-              )}
+              <PositionRewards position={p} />
             </div>
           ))}
         </section>
@@ -368,97 +344,34 @@ export function DemoPortfolio({
                   value={positionFilter}
                   onChange={(e) => setPositionFilter(e.target.value)}
                 >
-                  <option value="open">Open</option>
-                  <option value="closed">Closed</option>
                   <option value="all">All positions</option>
+                  <option value="active">Active</option>
+                  <option value="closed">Closed</option>
                 </Select>
               </div>
               {visiblePositions.length ? (
                 <div className="position-list">
                   {visiblePositions.map((p) => (
-                    <div className="position-row" key={p.id}>
-                      <span className={`position-side ${p.side}`}>
-                        {p.side === "yes" ? "Yes" : "No"}
-                      </span>
-                      <div className="position-identity">
-                        <Link
-                          href={
-                            p.replay
-                              ? "/demo"
-                              : `/markets/${p.eventTicker}?contract=${p.symbol}&side=${p.side}`
-                          }
-                        >
-                          {p.eventTitle}
-                        </Link>
-                        <h3>{p.label}</h3>
-                        <p>
-                          {Number(p.quantity).toLocaleString()} shares ·{" "}
-                          {usd(p.cost)} paid{p.replay ? " · Replay" : ""}
-                        </p>
-                      </div>
-                      <div className="position-result">
-                        <strong className={p.state === "won" ? "positive" : ""}>
-                          {p.state === "open"
-                            ? usd(p.quantity)
-                            : p.state === "sold"
-                              ? usd(p.saleProceeds ?? "0")
-                              : usd(p.payout ?? "0")}
-                        </strong>
-                        <span>
-                          {p.state === "open"
-                            ? "Potential reward"
-                            : p.state === "won"
-                              ? "Won"
-                              : p.state === "sold"
-                                ? "Sold"
-                                : p.state === "refunded"
-                                  ? "Refunded"
-                                  : "Lost"}
-                        </span>
-                      </div>
-                      <div className="position-actions">
-                        {p.state === "open" ? (
-                          <>
-                            <SellPosition position={p} />
-                            <Link
-                              href={
-                                p.replay
-                                  ? "/demo"
-                                  : `/markets/${p.eventTicker}?contract=${p.symbol}&side=${p.side}`
-                              }
-                            >
-                              Potential rewards
-                            </Link>
-                          </>
-                        ) : p.reward ? (
-                          <Link
-                            className="button button-outline"
-                            href={
-                              p.reward.state === "available"
-                                ? `/rewards?win=${p.id}`
-                                : "/collection"
-                            }
-                          >
-                            {p.reward.state === "available"
-                              ? "View rewards"
-                              : "View cards"}
-                          </Link>
-                        ) : p.state === "won" ? (
-                          <RecoverReward position={p} />
-                        ) : null}
-                      </div>
-                    </div>
+                    <PositionRow position={p} key={p.id}>
+                      {p.state === "open" ? (
+                        <>
+                          <SellPosition position={p} />
+                          <PositionRewards position={p} preview />
+                        </>
+                      ) : p.state === "won" ? (
+                        <PositionRewards position={p} />
+                      ) : null}
+                    </PositionRow>
                   ))}
                 </div>
               ) : (
                 <div className="holdings-empty">
-                  <ChartNoAxesCombined size={24} />
                   <p>
                     No {positionFilter === "all" ? "" : positionFilter}{" "}
                     positions yet.
                   </p>
-                  <Link className="text-link" href="/">
-                    Explore markets <ArrowUpRight size={15} />
+                  <Link className="button button-outline button-pill" href="/">
+                    Explore markets
                   </Link>
                 </div>
               )}
@@ -471,8 +384,11 @@ export function DemoPortfolio({
                   {collection ? "Your collection" : "Collectibles"}{" "}
                   <span>{cards.length}</span>
                 </h2>
-                <Link className="text-link" href="/rewards">
-                  Browse rewards <ArrowUpRight size={15} />
+                <Link
+                  className="button button-outline button-pill"
+                  href="/rewards"
+                >
+                  Browse rewards
                 </Link>
               </div>
               {cards.length ? (
@@ -515,11 +431,7 @@ export function DemoPortfolio({
                 </div>
               ) : (
                 <div className="holdings-empty">
-                  <Layers3 size={24} />
                   <p>Your collected cards will appear here.</p>
-                  <Link className="text-link" href="/rewards">
-                    Explore rewards <ArrowUpRight size={15} />
-                  </Link>
                 </div>
               )}
               <WalletCollection
@@ -533,39 +445,77 @@ export function DemoPortfolio({
     </div>
   );
 }
-function RecoverReward({ position }: { position: DemoPosition }) {
-  const a = useDemoAction(),
-    router = useRouter();
-  const [review, setReview] = useState(false);
+export function PositionArtwork({
+  position,
+}: {
+  position: Pick<DemoPosition, "artwork" | "label">;
+}) {
   return (
-    <div className="legacy-reward">
-      <Button
-        variant="outline"
-        disabled={a.busy}
-        onClick={() => {
-          if (!review) {
-            setReview(true);
-            return;
+    <span
+      className="position-artwork"
+      data-empty={!position.artwork?.length}
+      aria-hidden="true"
+    >
+      {position.artwork?.map((image) => (
+        <MarketArtwork key={image.src} {...image} />
+      ))}
+    </span>
+  );
+}
+export function PositionRow({
+  position: p,
+  children,
+}: {
+  position: DemoPosition;
+  children: ReactNode;
+}) {
+  return (
+    <div className="position-row">
+      <PositionArtwork position={p} />
+      <div className="position-identity">
+        <Link
+          href={
+            p.replay
+              ? "/demo"
+              : `/markets/${p.eventTicker}?contract=${p.symbol}&side=${p.side}`
           }
-          void a.run(async () => {
-            await a.request({ action: "recover-reward", id: position.id });
-            router.push(`/rewards?win=${position.id}`);
-          });
-        }}
-      >
-        {a.busy
-          ? "Moving reward…"
-          : review
-            ? "Confirm reward budget"
-            : "View rewards"}
-      </Button>
-      {review && (
+        >
+          {p.eventTitle}
+        </Link>
+        <h3>{p.label}</h3>
         <p>
-          Move {usd(position.payout ?? "0")} from your earlier payout into card
-          rewards.
+          {Number(p.quantity).toLocaleString()} shares · {usd(p.cost)} paid
+          {p.replay ? " · Replay" : ""}
         </p>
-      )}
-      {a.error && <p role="alert">{a.error}</p>}
+      </div>
+      <div className="position-result">
+        <span className={`position-side ${p.side}`}>
+          {p.side === "yes" ? "Yes" : "No"}
+        </span>
+        <strong className={p.state === "won" ? "positive" : ""}>
+          {p.state === "open"
+            ? usd(p.quantity)
+            : p.state === "sold"
+              ? usd(p.saleProceeds ?? "0")
+              : usd(p.payout ?? "0")}
+        </strong>
+        <span>
+          {p.state === "open"
+            ? "Potential reward"
+            : p.state === "won"
+              ? p.reward?.state === "claimed"
+                ? "Claimed"
+                : p.reward?.state === "allocated"
+                  ? "Transfer pending"
+                  : "Won · unclaimed"
+              : p.state === "sold"
+                ? "Sold"
+                : p.state === "refunded"
+                  ? "Refunded"
+                  : "Lost"}
+        </span>
+      </div>
+      <div className="position-actions">{children}</div>
     </div>
   );
 }
@@ -688,19 +638,7 @@ export function MarketPositionStatus({ symbol }: { symbol: string }) {
           : `You own ${Number(position.quantity).toLocaleString()} ${position.side.toUpperCase()} shares`}
       </strong>
       {position.reward ? (
-        <Link
-          className="reward-browse-button"
-          href={
-            position.reward.state === "available"
-              ? `/rewards?win=${position.id}`
-              : "/collection"
-          }
-        >
-          {position.reward.state === "available"
-            ? "View rewards"
-            : "View collection"}
-          <ArrowUpRight size={15} />
-        </Link>
+        <PositionRewards position={position} />
       ) : (
         <SellPosition position={position} />
       )}
@@ -863,24 +801,5 @@ export function DemoMintActions({
       {!wallet && <Link href="/wallet">Connect destination wallet</Link>}
       {a.error && <p role="alert">{a.error}</p>}
     </div>
-  );
-}
-
-export function DemoClaim({
-  name,
-}: {
-  source: "collectorcrypt" | "grail";
-  sourceId: string;
-  reserveId?: string;
-  name: string;
-}) {
-  return (
-    <Link
-      className="reward-browse-button"
-      href="/rewards"
-      aria-label={`View rewards for ${name}`}
-    >
-      View rewards
-    </Link>
   );
 }

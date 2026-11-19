@@ -2,6 +2,10 @@ import {
   money,
   units,
   bookForSide,
+  outcomeRewardMarket,
+  outcomeImages,
+  type Market,
+  type Contract,
   type Book,
   type Listing,
   type Valuation,
@@ -42,6 +46,8 @@ export type DemoPosition = {
   cost: string;
   replay: boolean;
   createdAt: string;
+  rewardMarket?: Market;
+  artwork?: { src: string; label: string }[];
   resolution?: "yes" | "no" | "void";
   payout?: string;
   settledAt?: string;
@@ -78,6 +84,51 @@ export type DemoAccountView = {
   collectibles: DemoCollectible[];
   history?: { time: string; value: string }[];
 };
+
+export const activeDemoPosition = (p: Pick<DemoPosition, "state" | "reward">) =>
+  p.state === "open" || (p.state === "won" && p.reward?.state !== "claimed");
+
+/** Keep the selected subject when a market later settles or leaves discovery. */
+export function demoPositionContext(market: Market, contract: Contract) {
+  const artwork = outcomeImages(market, contract);
+  return {
+    rewardMarket: outcomeRewardMarket(market, contract),
+    artwork: artwork.length
+      ? artwork
+      : market.contracts.length === 1 && market.imageUrl
+        ? [{ src: market.imageUrl, label: market.title }]
+        : [],
+  };
+}
+export function positionRewardMarket(
+  p: Pick<
+    DemoPosition,
+    "rewardMarket" | "eventTicker" | "eventTitle" | "symbol" | "label"
+  >,
+): Market {
+  if (p.rewardMarket) return p.rewardMarket;
+  const label = /^(yes|no)$/i.test(p.label) ? p.eventTitle : p.label;
+  return {
+    id: p.eventTicker,
+    title: label,
+    category: "",
+    status: "settled",
+    imageUrl: null,
+    description: "",
+    closesAt: null,
+    children: [],
+    contracts: [
+      {
+        symbol: p.symbol,
+        label,
+        status: "settled",
+        lastPrice: null,
+        quantityIncrement: null,
+        priceIncrement: null,
+      },
+    ],
+  };
+}
 
 /** The minimum rounds UP to the smallest USDC unit, never below 80%. */
 export function rewardAllocation(budget: string, costs: string[]) {
@@ -137,6 +188,12 @@ export const DEMO_REPLAY = {
   eventTicker: "NBAF-2627CHAMP",
   eventTitle: "2027 Pro Basketball Champion",
   label: "San Antonio",
+  artwork: [
+    {
+      src: "https://assets.gemini.com/predictions/images/SAS_2eb39eb7-ca58-4ad8-b58d-36add7053fe6.png",
+      label: "San Antonio",
+    },
+  ],
   book: {
     symbol: "GEMI-NBAF-2627CHAMP-SAS",
     bids: [

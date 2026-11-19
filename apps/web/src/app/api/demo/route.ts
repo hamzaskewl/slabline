@@ -9,7 +9,6 @@ import {
 import { workerRead } from "@/server/router";
 import {
   DEMO_REPLAY,
-  DEMO_REPLAY_CARD,
   marketOutcomes,
   activeMarket,
   money,
@@ -19,6 +18,10 @@ import {
   type DemoCollectible,
   demoSaleQuote,
   units,
+  demoPositionContext,
+  positionRewardMarket,
+  matchingCards,
+  matchingTokens,
 } from "@collectible/domain";
 import {
   withSolanaNetwork,
@@ -186,6 +189,7 @@ export async function POST(request: Request) {
             side: b.side,
             stake: b.stake,
             replay: false,
+            ...demoPositionContext(market.data, contract),
             minimumContracts: b.minimumContracts,
           },
           depth.book,
@@ -249,6 +253,7 @@ export async function POST(request: Request) {
       );
       if (!position?.reward)
         throw new ApiError(409, "Choose a winning reward first.");
+      const subject = positionRewardMarket(position);
       const catalog = b.items.some((i) => i.source === "collectorcrypt")
         ? await attachCachedValuations(await listCards("", [], "mainnet"))
         : [];
@@ -259,15 +264,13 @@ export async function POST(request: Request) {
       for (const choice of b.items) {
         let item: Omit<DemoCollectible, "id" | "state">;
         if (choice.source === "collectorcrypt") {
-          const card =
-            catalog.find((c) => c.mint === choice.sourceId) ??
-            (position.replay && choice.sourceId === DEMO_REPLAY_CARD.mint
-              ? DEMO_REPLAY_CARD
-              : undefined);
+          const card = matchingCards(subject, catalog).find(
+            (c) => c.mint === choice.sourceId,
+          );
           if (!card)
             throw new ApiError(
               409,
-              "A selected card is no longer listed. Choose another card.",
+              "A selected card is no longer listed for this outcome. Choose a matching card.",
             );
           item = {
             name: card.name,
@@ -286,7 +289,9 @@ export async function POST(request: Request) {
             listing: card,
           };
         } else {
-          const token = grail.find((t) => t.id === choice.sourceId);
+          const token = matchingTokens(subject, grail).find(
+            (t) => t.id === choice.sourceId,
+          );
           if (!token)
             throw new ApiError(409, "Grail token is no longer available.");
           const details = await getGrailRewardDetails(
