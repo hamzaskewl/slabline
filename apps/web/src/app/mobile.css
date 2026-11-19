@@ -193,9 +193,6 @@
   }
   .app-shell .order-ticket {
     scroll-margin-top: calc(64px + env(safe-area-inset-top));
-    border-radius: 0;
-    border-width: 1px 0 0;
-    padding: 16px 0;
   }
   .mobile-wallet-actions {
     display: grid;

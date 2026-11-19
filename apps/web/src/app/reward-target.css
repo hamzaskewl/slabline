@@ -385,12 +385,6 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 20px;
   }
-  .prediction-surface .prediction-panels > .order-ticket,
-  .reward-target.panel {
-    border-radius: 0;
-    border-width: 1px 0 0;
-    padding: 20px 0 0;
-  }
   .reward-target-image {
     height: 132px;
     margin: 0;
@@ -408,9 +402,6 @@
   }
   .reward-card-copy .reward-fit {
     margin: 0;
-  }
-  .reward-target.panel {
-    padding-top: 16px;
   }
   .prediction-panels {
     gap: 16px;
