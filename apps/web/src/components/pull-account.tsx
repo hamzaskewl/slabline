@@ -5,12 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConnectWallet } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
-import {
-  units,
-  type PullOpening,
-  type PullTheme,
-  type PullTier,
-} from "@collectible/domain";
+import { units, type PullOpening, type PullTheme } from "@collectible/domain";
 import { usePrivateRead } from "@/lib/use-private-read";
 import { usdc } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -18,6 +13,8 @@ import { useDemoAction } from "./demo-controls";
 import { useNetwork } from "./network-settings";
 import { PullBoard, PullRetry } from "./pull-board";
 import { PullOpeningPanel } from "./pull-opening";
+import { PullCinematic, type PackPresentation } from "./pull-cinematic";
+import { PackageOpen } from "lucide-react";
 
 const path = "/api/pull";
 type PullAccountView = {
@@ -102,6 +99,7 @@ function SignedInPull({
   const { wallets } = useWallets();
   const { connectWallet } = useConnectWallet();
   const [activeId, setActiveId] = useState<string>();
+  const [presentation, setPresentation] = useState<PackPresentation>();
   const [focusOpening, setFocusOpening] = useState(0);
   const [selectedWallet, setSelectedWallet] = useState("");
   const [actionArea, setActionArea] = useState<"pack" | "opening">("pack");
@@ -119,8 +117,9 @@ function SignedInPull({
     openings[0];
 
   useEffect(() => {
-    if (focusOpening) document.getElementById("opening-title")?.focus();
-  }, [focusOpening]);
+    if (focusOpening && !presentation)
+      document.getElementById("opening-title")?.focus();
+  }, [focusOpening, presentation]);
 
   function selectOpening(id: string) {
     setActiveId(id);
@@ -136,7 +135,7 @@ function SignedInPull({
     }
   }
 
-  function save(opening: PullOpening, balance?: string) {
+  function update(opening: PullOpening, balance?: string) {
     query.setQueryData<PullAccountView>(
       ["private-read", owner, path, "devnet"],
       (previous) =>
@@ -149,13 +148,19 @@ function SignedInPull({
           ],
         },
     );
+  }
+
+  function save(opening: PullOpening, balance?: string) {
+    update(opening, balance);
     selectOpening(opening.id);
     void account.refetch({ cancelRefetch: true });
   }
 
-  function open(tier: PullTier, theme: PullTheme) {
+  function open(pack: PackPresentation) {
+    const { tier, theme } = pack;
     return actions.run(async () => {
       setActionArea("pack");
+      setPresentation(pack);
       const payer =
         data?.randomnessMode === "magicblock-devnet"
           ? wallet?.address
@@ -183,6 +188,9 @@ function SignedInPull({
           );
         } catch {}
       }
+      setPresentation((current) =>
+        current ? { ...current, id: response.opening.id } : current,
+      );
       save(response.opening, response.balance);
       attempts.current.delete(storageKey);
       try {
@@ -191,143 +199,174 @@ function SignedInPull({
     });
   }
 
+  const displayedOpening = openings.find(
+    (opening) => opening.id === presentation?.id,
+  );
+  const openingActions: PullActions = {
+    busy: actions.busy,
+    error: actionArea === "opening" ? actions.error : "",
+    run: (operation) =>
+      actions.run(async () => {
+        setActionArea("opening");
+        await operation();
+      }),
+    request,
+    save,
+  };
+
   return (
-    <PullBoard
-      balance={data?.balance}
-      busy={actions.busy}
-      mode={data?.randomnessMode}
-      opening={
-        active && (
-          <PullOpeningPanel
-            key={active.id}
-            opening={active}
-            actions={{
-              busy: actions.busy,
-              error: actionArea === "opening" ? actions.error : "",
-              run: (operation) =>
-                actions.run(async () => {
-                  setActionArea("opening");
-                  await operation();
-                }),
-              request,
-              save,
-            }}
-          />
-        )
-      }
-      history={
-        openings.length > 0 && (
-          <section
-            className="pull-panel pull-history"
-            aria-labelledby="pull-history-title"
-          >
-            <h2 id="pull-history-title">Opening history</h2>
-            <ul>
-              {openings.map((opening) => (
-                <li key={opening.id}>
-                  <button
-                    type="button"
-                    disabled={actions.busy}
-                    aria-pressed={opening.id === active?.id}
-                    onClick={() => selectOpening(opening.id)}
-                  >
-                    <strong>${opening.tier} pack</strong>
-                    <span>{openingState(opening)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )
-      }
-      action={(tier, theme, eligible) => {
-        if (account.error)
-          return (
-            <div>
-              <p className="pull-error" role="alert">
-                {account.error.message}
+    <>
+      <PullBoard
+        balance={data?.balance}
+        busy={actions.busy}
+        mode={data?.randomnessMode}
+        opening={
+          active && (
+            <PullOpeningPanel
+              key={active.id}
+              opening={active}
+              inPresentation={!!presentation}
+              onResume={() =>
+                setPresentation({
+                  tier: active.tier,
+                  theme: active.theme,
+                  id: active.id,
+                })
+              }
+              actions={openingActions}
+            />
+          )
+        }
+        history={
+          openings.length > 0 && (
+            <section
+              className="pull-panel pull-history"
+              aria-labelledby="pull-history-title"
+            >
+              <h2 id="pull-history-title">Opening history</h2>
+              <ul>
+                {openings.map((opening) => (
+                  <li key={opening.id}>
+                    <button
+                      type="button"
+                      disabled={actions.busy}
+                      aria-pressed={opening.id === active?.id}
+                      onClick={() => selectOpening(opening.id)}
+                    >
+                      <strong>${opening.tier} pack</strong>
+                      <span>{openingState(opening)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )
+        }
+        action={(pack, eligible) => {
+          const { tier, theme } = pack;
+          if (account.error)
+            return (
+              <div>
+                <p className="pull-error" role="alert">
+                  {account.error.message}
+                </p>
+                <PullRetry onClick={() => void account.refetch()}>
+                  Refresh account
+                </PullRetry>
+              </div>
+            );
+          if (!data)
+            return (
+              <p className="pull-muted" role="status">
+                Loading demo balance…
               </p>
-              <PullRetry onClick={() => void account.refetch()}>
-                Refresh account
-              </PullRetry>
+            );
+          const insufficient = units(data.balance) < units(String(tier));
+          const walletPaid = data.randomnessMode === "magicblock-devnet";
+          return (
+            <div className="pull-stack">
+              {walletPaid && wallets.length > 1 && (
+                <label className="pull-field">
+                  <span>Solana Devnet wallet</span>
+                  <select
+                    value={wallet?.address}
+                    onChange={(event) => setSelectedWallet(event.target.value)}
+                  >
+                    {wallets.map((entry) => (
+                      <option key={entry.address}>{entry.address}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {walletPaid && !wallet ? (
+                <PullRetry
+                  onClick={() =>
+                    void connectWallet({ walletChainType: "solana-only" })
+                  }
+                >
+                  Connect Solana wallet
+                </PullRetry>
+              ) : walletPaid && !verifiedWallet ? (
+                <div className="pull-stack">
+                  <p className="pull-muted">
+                    {links.isPending
+                      ? "Checking verified Devnet wallets…"
+                      : "Verify your connected wallet before opening an onchain pack."}
+                  </p>
+                  <Button variant="outline" asChild className="pull-action">
+                    <Link href="/wallet">Manage wallet verification</Link>
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  className="pull-action"
+                  disabled={!eligible || insufficient || actions.busy}
+                  onClick={() =>
+                    void open({
+                      ...pack,
+                      theme:
+                        theme.kind === "all"
+                          ? theme
+                          : { ...theme, label: theme.label.trim() },
+                    })
+                  }
+                >
+                  <PackageOpen size={17} aria-hidden="true" /> Open ${tier} pack
+                </Button>
+              )}
+              {insufficient && (
+                <p className="pull-muted">
+                  Your {usdc(data.balance)} demo balance is below this pack
+                  price.
+                </p>
+              )}
+              {actions.busy && (
+                <p className="pull-muted" role="status">
+                  Processing request…
+                </p>
+              )}
+              {actionArea === "pack" && actions.error && (
+                <p className="pull-error" role="alert">
+                  {actions.error}
+                </p>
+              )}
             </div>
           );
-        if (!data)
-          return (
-            <p className="pull-muted" role="status">
-              Loading demo balance…
-            </p>
-          );
-        const insufficient = units(data.balance) < units(String(tier));
-        const onchain = data.randomnessMode === "magicblock-devnet";
-        return (
-          <div className="pull-stack">
-            {onchain && wallets.length > 1 && (
-              <label className="pull-field">
-                <span>Solana Devnet wallet</span>
-                <select
-                  value={wallet?.address}
-                  onChange={(event) => setSelectedWallet(event.target.value)}
-                >
-                  {wallets.map((entry) => (
-                    <option key={entry.address}>{entry.address}</option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {onchain && !wallet ? (
-              <PullRetry
-                onClick={() =>
-                  void connectWallet({ walletChainType: "solana-only" })
-                }
-              >
-                Connect Solana wallet
-              </PullRetry>
-            ) : onchain && !verifiedWallet ? (
-              <div className="pull-stack">
-                <p className="pull-muted">
-                  {links.isPending
-                    ? "Checking verified Devnet wallets…"
-                    : "Verify your connected wallet before opening an onchain pack."}
-                </p>
-                <Button variant="outline" asChild className="pull-action">
-                  <Link href="/wallet">Manage wallet verification</Link>
-                </Button>
-              </div>
-            ) : (
-              <Button
-                className="pull-action"
-                disabled={!eligible || insufficient || actions.busy}
-                onClick={() =>
-                  void open(
-                    tier,
-                    theme.kind === "all"
-                      ? theme
-                      : { ...theme, label: theme.label.trim() },
-                  )
-                }
-              >
-                Open ${tier} pack
-              </Button>
-            )}
-            {insufficient && (
-              <p className="pull-muted">
-                Your {usdc(data.balance)} demo balance is below this pack price.
-              </p>
-            )}
-            {actions.busy && (
-              <p className="pull-muted" role="status">
-                Processing request…
-              </p>
-            )}
-            {actionArea === "pack" && actions.error && (
-              <p className="pull-error" role="alert">
-                {actions.error}
-              </p>
-            )}
-          </div>
-        );
-      }}
-    />
+        }}
+      />
+      {presentation && (
+        <PullCinematic
+          pack={presentation}
+          opening={displayedOpening}
+          waiting={actions.busy}
+          error={actionArea === "pack" ? actions.error : undefined}
+          actions={openingActions}
+          onClose={(choose) => {
+            setPresentation(undefined);
+            if (choose && displayedOpening) selectOpening(displayedOpening.id);
+          }}
+        />
+      )}
+    </>
   );
 }
