@@ -28,6 +28,8 @@ const methods = new Set([
   "isBlockhashValid",
   "simulateTransaction",
   "getSignatureStatuses",
+  "getTransaction",
+  "getSignaturesForAddress",
   "getAsset",
   "getAssetsByOwner",
   "getSlot",
