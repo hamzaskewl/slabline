@@ -7,7 +7,11 @@ import {
   sql,
 } from "@collectible/db";
 import { listMarkets, getMarketByTicker } from "@collectible/integrations";
-import type { Market, ProviderResult } from "@collectible/domain";
+import type {
+  Market,
+  ProviderResult,
+  MarketStatusFilter,
+} from "@collectible/domain";
 import { SnapshotCache, type Snapshot } from "./snapshot-cache";
 
 // Keep the existing keys so the first deployment reuses already saved data.
@@ -77,6 +81,10 @@ export function marketSnapshotStorage<T>() {
   };
 }
 const catalogs = new SnapshotCache<Market[]>(marketSnapshotStorage(), 60000);
+const archiveCatalogs = new SnapshotCache<Market[]>(
+  marketSnapshotStorage(),
+  300000,
+);
 const events = new SnapshotCache<Market>(marketSnapshotStorage(), 30000);
 let indexedCatalog: Market[] | null = null;
 function indexCatalog(data: Market[]) {
@@ -160,9 +168,37 @@ function result<T>(
     error: r.error,
   };
 }
-export async function savedMarkets(): Promise<ProviderResult<Market[]>> {
-  const r = await catalogs.read(catalogKey, loadCatalog);
-  if (r.snapshot) indexCatalog(r.snapshot.value);
+export async function savedMarkets(
+  status: MarketStatusFilter = "active",
+): Promise<ProviderResult<Market[]>> {
+  if (status === "all") {
+    const [active, resolved] = await Promise.all([
+      savedMarkets("active"),
+      savedMarkets("resolved"),
+    ]);
+    return {
+      data: [
+        ...new Map(
+          [...active.data, ...resolved.data].map((m) => [m.id, m]),
+        ).values(),
+      ],
+      source:
+        active.data.length || resolved.data.length ? "cache" : "unavailable",
+      observedAt:
+        [active.observedAt, resolved.observedAt].filter(Boolean).sort()[0] ??
+        "",
+      refreshing: active.refreshing || resolved.refreshing,
+      stale: active.stale || resolved.stale,
+      error: active.error || resolved.error,
+    };
+  }
+  const r = await (status === "active" ? catalogs : archiveCatalogs).read(
+    status === "active" ? catalogKey : `gemini:markets:v1:${status}`,
+    status === "active"
+      ? loadCatalog
+      : () => listMarkets(undefined, undefined, status),
+  );
+  if (r.snapshot && status === "active") indexCatalog(r.snapshot.value);
   return result(r, []);
 }
 export async function savedMarket(

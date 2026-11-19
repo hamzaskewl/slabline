@@ -45,7 +45,7 @@ export function PositionRewards({
       ? "View cards"
       : position.reward?.state === "allocated"
         ? "Finish claim"
-        : "Claim rewards";
+        : "Claim";
   return (
     <PositionRewardsFrame
       open={open}
@@ -116,7 +116,9 @@ export function PositionRewardsFrame({
   }, [open]);
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange} modal={false}>
-      <Dialog.Trigger className="button button-outline button-pill">
+      <Dialog.Trigger
+        className={`button button-outline button-pill ${!preview && (label === "Claim" || label === "Finish claim") ? "claim-button" : ""}`}
+      >
         {label}
       </Dialog.Trigger>
       <Dialog.Portal>

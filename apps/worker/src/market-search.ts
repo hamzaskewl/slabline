@@ -6,20 +6,26 @@ import {
   normalizeMarketSearch,
   type Market,
   type ProviderResult,
+  type MarketStatusFilter,
 } from "@collectible/domain";
 
 export async function searchCatalog(
   search: string,
   category: string,
   snapshot: ProviderResult<Market[]>,
+  status: MarketStatusFilter = "active",
 ) {
   const local = snapshot.data.filter((m) => marketMatches(m, search));
   try {
     const remote = await cached(
-      `gemini:search:v1:${search}`,
+      `gemini:search:v2:${status}:${search}`,
       30000,
       async () => ({
-        data: await listMarkets(normalizeMarketSearch(search)),
+        data: await listMarkets(
+          normalizeMarketSearch(search),
+          undefined,
+          status,
+        ),
         observedAt: new Date().toISOString(),
       }),
     );

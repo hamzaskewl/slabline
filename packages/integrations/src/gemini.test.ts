@@ -348,6 +348,8 @@ test("the outcome board preserves the two-sided spread, missing prices, provider
         id: "e",
         title: "Final",
         volume: "4403",
+        liquidity: "250.50",
+        createdAt: "2026-11-01T00:00:00Z",
         contracts: [
           {
             instrumentSymbol: "GEMI-A",
@@ -390,6 +392,8 @@ test("the outcome board preserves the two-sided spread, missing prices, provider
   ]);
   expect(buyPercent(rows[1]?.buyNo)).toBe("—");
   expect(eventVolume(m!.volume)).toBe("$4,403 vol.");
+  expect(m!.liquidity).toBe("250.50");
+  expect(marketPreview(m!).createdAt).toBe("2026-11-01T00:00:00Z");
   expect(eventVolume(null)).toBe("Volume unavailable");
   expect(eventVolume("0")).toBe("$0 vol.");
   expect(marketPreview(m!).contracts[1]?.symbol).toBe("GEMI-B");

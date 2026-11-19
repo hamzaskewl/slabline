@@ -53,12 +53,13 @@ export const appRouter = t.router({
         .object({
           search: z.string().max(100).default(""),
           category: z.string().max(50).optional(),
+          status: z.enum(["active", "resolved", "all"]).optional(),
         })
         .default({ search: "" }),
     )
     .query(({ input }) =>
       safe<Market[]>(
-        `/markets?search=${encodeURIComponent(input.search)}&category=${encodeURIComponent(input.category ?? "")}`,
+        `/markets?search=${encodeURIComponent(input.search)}&category=${encodeURIComponent(input.category ?? "")}&status=${input.status ?? "active"}`,
         [],
       ),
     ),

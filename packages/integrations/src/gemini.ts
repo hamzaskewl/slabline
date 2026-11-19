@@ -37,6 +37,8 @@ type RawEvent = {
   title: string;
   category?: string;
   volume?: string | number | null;
+  liquidity?: string | null;
+  createdAt?: string | null;
   subcategory?: { name?: string | null } | null;
   status?: string;
   imageUrl?: string | null;
@@ -54,6 +56,8 @@ const event: z.ZodType<RawEvent> = z.lazy(() =>
     title: z.string(),
     category: z.string().optional(),
     volume: z.union([z.string(), z.number()]).nullish(),
+    liquidity: z.string().nullish(),
+    createdAt: z.string().nullish(),
     subcategory: z.object({ name: z.string().nullish() }).nullish(),
     status: z.string().optional(),
     imageUrl: z.string().nullable().optional(),
@@ -77,6 +81,8 @@ export function normalizeEvent(raw: RawEvent): Market {
     ticker: raw.ticker,
     title: raw.title,
     category: raw.category ?? "Other",
+    liquidity: raw.liquidity ?? null,
+    createdAt: raw.createdAt ?? null,
     volume:
       raw.volume != null && /^\d+(?:\.\d+)?$/.test(String(raw.volume))
         ? String(raw.volume)
@@ -130,18 +136,31 @@ export function geminiClient() {
 export async function listMarkets(
   search?: string,
   category?: string,
+  state: "active" | "resolved" | "all" = "active",
 ): Promise<Market[]> {
+  if (state === "all") {
+    const groups = await Promise.all([
+      listMarkets(search, category, "active"),
+      listMarkets(search, category, "resolved"),
+    ]);
+    return [...new Map(groups.flat().map((m) => [m.id, m])).values()];
+  }
   const client = await geminiClient();
+  // Live listEvents rejects invalid despite that enum appearing in the SDK.
+  const status: ("active" | "settled")[] =
+    state === "resolved" ? ["settled"] : ["active"];
   // Provider title search finds events omitted by the general category feed.
-  if (search)
-    return collectMarketPages((offset, limit) =>
-      client.predictions.listEvents({
-        status: ["active"],
-        search,
-        limit,
-        offset,
-        ...(category ? { category: [category] } : {}),
-      }),
+  if (search || state === "resolved")
+    return collectMarketPages(
+      (offset, limit) =>
+        client.predictions.listEvents({
+          status,
+          ...(search ? { search } : {}),
+          limit,
+          offset,
+          ...(category ? { category: [category] } : {}),
+        }),
+      state === "resolved" ? 25 : 100,
     );
   // Unfiltered reads currently omit older active categories such as Business.
   // Page every provider category and deduplicate overlapping category views.
@@ -149,12 +168,11 @@ export async function listMarkets(
     ? [category]
     : z
         .object({ categories: z.array(z.string()) })
-        .parse(await client.predictions.getCategories({ status: ["active"] }))
-        .categories;
+        .parse(await client.predictions.getCategories({ status })).categories;
   return collectMarketCategories(categories, (category, offset, limit) =>
     client.predictions.listEvents(
       {
-        status: ["active"],
+        status,
         limit,
         offset,
         ...(category ? { category: [category] } : {}),
@@ -208,6 +226,7 @@ export async function collectMarketCategories(
 // Never publish the first page as the complete catalog. Failure of any page fails the read.
 export async function collectMarketPages(
   load: (offset: number, limit: number) => PromiseLike<unknown>,
+  initialLimit = 100,
 ): Promise<Market[]> {
   const result = new Map<string, Market>();
   const pageSchema = z.object({
@@ -216,7 +235,7 @@ export async function collectMarketPages(
   });
   // Nested sports events vary in size. Keep the SDK's response limit and
   // shrink an oversized/slow page at the same offset instead of losing the scan.
-  let limit = 100;
+  let limit = initialLimit;
   for (let offset = 0; ;) {
     let raw: unknown;
     try {

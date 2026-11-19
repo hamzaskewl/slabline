@@ -1,6 +1,53 @@
 import type { Contract, Market } from "./index";
 
-export type MarketSort = "volume" | "closing" | "name";
+export type MarketSort =
+  | "relevance"
+  | "trending"
+  | "liquidity"
+  | "volume"
+  | "newest"
+  | "closing"
+  | "competitive"
+  | "name";
+export type MarketStatusFilter = "active" | "resolved" | "all";
+export function marketStatusMatches(m: Market, status: MarketStatusFilter) {
+  return (
+    status === "all" ||
+    (status === "resolved"
+      ? ["settled", "invalid"].includes(m.status)
+      : m.status === "active")
+  );
+}
+const dateValue = (value?: string | null) =>
+  value && Number.isFinite(Date.parse(value)) ? Date.parse(value) : null;
+const decimalValue = (value?: string | null) =>
+  value != null &&
+  /^\d+(?:\.\d+)?$/.test(value) &&
+  Number.isFinite(Number(value))
+    ? Number(value)
+    : -1;
+export function competitiveValue(m: Market): number {
+  if (m.competition != null) return m.competition;
+  const prices = [
+    ...m.contracts,
+    ...m.children.flatMap((c) => c.contracts),
+  ].flatMap((c) => {
+    const p = decimalValue(c.buyYes ?? c.lastPrice);
+    return p >= 0 && p <= 1 ? [Math.abs(0.5 - p)] : [];
+  });
+  return Math.min(...prices, ...m.children.map(competitiveValue), Infinity);
+}
+export function marketRelevance(m: Market, query: string) {
+  const q = normalizeMarketSearch(query);
+  if (!q) return 0;
+  const title = normalizeMarketSearch(m.title);
+  const labels = m.contracts.map((c) => normalizeMarketSearch(c.label));
+  if (title === q || normalizeMarketSearch(m.ticker ?? "") === q) return 5;
+  if (title.startsWith(q)) return 4;
+  if (title.includes(q)) return 3;
+  if (labels.some((label) => label === q || label.startsWith(q))) return 2;
+  return q.split(/\s+/).every((word) => title.includes(word)) ? 1 : 0;
+}
 export function volumeValue(market: Market) {
   const value = Number(market.volume);
   return market.volume != null &&
@@ -9,16 +56,39 @@ export function volumeValue(market: Market) {
     ? value
     : -1;
 }
-export function sortMarkets(markets: Market[], sort: MarketSort = "volume") {
-  const closing = (m: Market) =>
-    m.closesAt ? Date.parse(m.closesAt) || Infinity : Infinity;
+export function sortMarkets(
+  markets: Market[],
+  sort: MarketSort = "volume",
+  query = "",
+  now = Date.now(),
+) {
+  const closing = (m: Market) => dateValue(m.closesAt) ?? Infinity;
+  // A recency-weighted activity score, not a claim of 24-hour volume.
+  const trending = (m: Market) => {
+    const created = dateValue(m.createdAt);
+    return created === null || volumeValue(m) < 0
+      ? -1
+      : volumeValue(m) / (24 + Math.max(0, now - created) / 3600000);
+  };
   return [...markets].sort(
     (a, b) =>
-      (sort === "name"
-        ? a.title.localeCompare(b.title)
-        : sort === "closing"
-          ? closing(a) - closing(b)
-          : volumeValue(b) - volumeValue(a)) ||
+      (sort === "relevance"
+        ? marketRelevance(b, query) - marketRelevance(a, query)
+        : sort === "trending"
+          ? trending(b) - trending(a)
+          : sort === "liquidity"
+            ? decimalValue(b.liquidity) - decimalValue(a.liquidity)
+            : sort === "newest"
+              ? (dateValue(b.createdAt) ?? -Infinity) -
+                (dateValue(a.createdAt) ?? -Infinity)
+              : sort === "competitive"
+                ? competitiveValue(a) - competitiveValue(b)
+                : sort === "name"
+                  ? a.title.localeCompare(b.title)
+                  : sort === "closing"
+                    ? closing(a) - closing(b)
+                    : volumeValue(b) - volumeValue(a)) ||
+      volumeValue(b) - volumeValue(a) ||
       a.title.localeCompare(b.title) ||
       a.id.localeCompare(b.id),
   );
