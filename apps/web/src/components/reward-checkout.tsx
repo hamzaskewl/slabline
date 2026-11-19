@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import Link from "next/link";
+import { useConnectWallet } from "@privy-io/react-auth";
 import { useWallets, useSignMessage } from "@privy-io/react-auth/solana";
 import { X } from "lucide-react";
 import {
@@ -147,6 +147,7 @@ export function AddReward({ item }: { item: RewardPick }) {
 export function RewardCheckout() {
   const c = useContext(Context),
     a = useDemoAction(),
+    { connectWallet } = useConnectWallet(),
     { wallets } = useWallets(),
     { signMessage } = useSignMessage();
   const links = usePrivateRead<{ wallets: { address: string }[] }>(
@@ -255,9 +256,12 @@ export function RewardCheckout() {
             ))}
           </Select>
         ) : (
-          <Link className="text-link" href="/wallet">
+          <Button
+            variant="outline"
+            onClick={() => connectWallet({ walletChainType: "solana-only" })}
+          >
             Connect a wallet
-          </Link>
+          </Button>
         )}
         <Button
           disabled={a.busy || !wallet || !allocation.valid || !picks.length}

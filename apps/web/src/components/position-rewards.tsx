@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Dialog } from "radix-ui";
 import { X } from "lucide-react";
+import { useModalStatus } from "@privy-io/react-auth";
 import {
   cardPlayer,
   units,
@@ -35,6 +36,7 @@ export function PositionRewards({
 }) {
   const [open, setOpen] = useState(false),
     a = useDemoAction();
+  const { isOpen: walletModalOpen } = useModalStatus();
   useEffect(() => setOpen(false), [a.user?.id, a.network]);
   const label = preview
     ? "Potential rewards"
@@ -50,6 +52,7 @@ export function PositionRewards({
       label={label}
       subject={position.label}
       preview={preview}
+      walletModalOpen={walletModalOpen}
     >
       {open && (
         <RewardSelectionProvider
@@ -69,6 +72,7 @@ export function PositionRewardsFrame({
   label,
   subject,
   preview = false,
+  walletModalOpen = false,
   children,
 }: {
   open: boolean;
@@ -76,16 +80,65 @@ export function PositionRewardsFrame({
   label: string;
   subject: string;
   preview?: boolean;
+  walletModalOpen?: boolean;
   children: ReactNode;
 }) {
+  const lastFocused = useRef<HTMLElement | null>(null);
+  const wasWalletOpen = useRef(false);
+  useEffect(() => {
+    if (
+      open &&
+      wasWalletOpen.current &&
+      !walletModalOpen &&
+      lastFocused.current?.isConnected
+    )
+      lastFocused.current.focus();
+    wasWalletOpen.current = walletModalOpen;
+  }, [open, walletModalOpen]);
+  // Privy portals its confirmation outside this dialog. Keep the basket mounted
+  // while allowing that dialog to own focus; only the underlying app is inert.
+  useEffect(() => {
+    if (!open) return;
+    const surfaces = [...document.querySelectorAll<HTMLElement>(".app-shell")];
+    const previous = surfaces.map((surface) => surface.inert);
+    const overflow = document.body.style.overflow;
+    surfaces.forEach((surface) => {
+      surface.inert = true;
+    });
+    document.body.style.overflow = "hidden";
+    return () => {
+      surfaces.forEach((surface, index) => {
+        surface.inert = previous[index]!;
+      });
+      document.body.style.overflow = overflow;
+    };
+  }, [open]);
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <Dialog.Trigger className="button button-outline button-pill">
         {label}
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="reward-browser-overlay" />
-        <Dialog.Content className="position-rewards-dialog">
+        <div
+          className="reward-browser-overlay"
+          aria-hidden="true"
+          onPointerDown={() => {
+            if (!walletModalOpen) onOpenChange(false);
+          }}
+        />
+        <Dialog.Content
+          className="position-rewards-dialog"
+          aria-modal={!walletModalOpen}
+          inert={walletModalOpen}
+          aria-hidden={walletModalOpen || undefined}
+          onFocusCapture={(event) => {
+            lastFocused.current = event.target as HTMLElement;
+          }}
+          onInteractOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => {
+            if (walletModalOpen) event.preventDefault();
+          }}
+        >
           <header className="position-rewards-header">
             <div>
               <Dialog.Title>

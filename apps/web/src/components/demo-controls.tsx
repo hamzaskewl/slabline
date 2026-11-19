@@ -2,7 +2,7 @@
 import { Select } from "./ui/select";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useConnectWallet } from "@privy-io/react-auth";
 import { useWallets, useSignTransaction } from "@privy-io/react-auth/solana";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -654,6 +654,7 @@ export function DemoMintActions({
   onCancel?: () => void;
 }) {
   const a = useDemoAction(),
+    { connectWallet } = useConnectWallet(),
     { wallets } = useWallets(),
     { signTransaction } = useSignTransaction();
   const [view, update] = useState(item);
@@ -707,6 +708,14 @@ export function DemoMintActions({
     );
   return (
     <div className="demo-mint-actions">
+      {!wallet && (
+        <Button
+          variant="outline"
+          onClick={() => connectWallet({ walletChainType: "solana-only" })}
+        >
+          Connect destination wallet
+        </Button>
+      )}
       {view.state === "submitted" && (
         <button
           className="text-button"
