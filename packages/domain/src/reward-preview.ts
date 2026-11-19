@@ -1,4 +1,4 @@
-import { units, money, type Listing } from "./index";
+import { units, money, type Listing, type Valuation } from "./index";
 
 /** Inputs must already be matched to the selected outcome, never the whole event. */
 export function rewardForPayout(
@@ -46,6 +46,7 @@ export type GrailRewardDetails = {
     tokensPerItem: string;
     vaulted: number;
     available: number;
+    valuation?: Valuation | null;
   }[];
 };
 

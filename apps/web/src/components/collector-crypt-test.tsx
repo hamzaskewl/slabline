@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "./ui/select";
 import { useEffect, useRef, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets, useSignTransaction } from "@privy-io/react-auth/solana";
@@ -178,7 +179,7 @@ export function CollectorCryptTest() {
           <div className="relay-form">
             <label>
               Test card
-              <select
+              <Select
                 value={card?.mint ?? ""}
                 disabled={busy}
                 onChange={(e) => setMint(e.target.value)}
@@ -188,11 +189,11 @@ export function CollectorCryptTest() {
                     {c.name} · {c.ask} test USDC
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label>
               Devnet wallet
-              <select
+              <Select
                 value={wallet?.address ?? ""}
                 disabled={busy || !wallets.length}
                 onChange={(e) => setSelected(e.target.value)}
@@ -205,7 +206,7 @@ export function CollectorCryptTest() {
                     {w.address.slice(0, 7)}…{w.address.slice(-5)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           </div>
           {card && (

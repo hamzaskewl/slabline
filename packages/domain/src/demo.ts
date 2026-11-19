@@ -1,4 +1,11 @@
-import { money, units, type Book, type Listing } from "./index";
+import {
+  money,
+  units,
+  bookForSide,
+  type Book,
+  type Listing,
+  type Valuation,
+} from "./index";
 
 export const DEMO_REPLAY_CARD: Listing = {
   id: "2026081413C224241",
@@ -37,6 +44,15 @@ export type DemoPosition = {
   createdAt: string;
   resolution?: "yes" | "no" | "void";
   payout?: string;
+  settledAt?: string;
+  soldAt?: string;
+  saleProceeds?: string;
+  reward?: {
+    budget: string;
+    state: "available" | "allocated" | "claimed";
+    cardSpend: string;
+    remainder: string;
+  };
 };
 export type DemoCollectible = {
   id: string;
@@ -51,12 +67,59 @@ export type DemoCollectible = {
   mint?: string;
   signature?: string;
   unsignedBase64?: string;
+  rewardPositionId?: string;
+  valuation?: Valuation | null;
+  listing?: Listing;
+  confirmedAt?: string;
 };
 export type DemoAccountView = {
   balance: string;
   positions: DemoPosition[];
   collectibles: DemoCollectible[];
+  history?: { time: string; value: string }[];
 };
+
+/** The minimum rounds UP to the smallest USDC unit, never below 80%. */
+export function rewardAllocation(budget: string, costs: string[]) {
+  const cap = units(budget),
+    total = costs.reduce((sum, cost) => sum + units(cost), 0n);
+  const minimum = (cap * 80n + 99n) / 100n;
+  return {
+    total: money(total),
+    minimum: money(minimum),
+    remainder: money(cap > total ? cap - total : 0n),
+    valid: cap > 0n && total >= minimum && total <= cap,
+    overBudget: total > cap,
+  };
+}
+
+/** A full-position sale uses executable bids, never the last-traded price. */
+export function demoSaleQuote(
+  position: Pick<DemoPosition, "side" | "quantity">,
+  book: Book,
+) {
+  let remaining = units(position.quantity),
+    proceeds = 0n;
+  const lot = units(book.quantityIncrement);
+  if (lot <= 0n || remaining <= 0n || remaining % lot)
+    throw new Error("Invalid share quantity.");
+  for (const level of [...bookForSide(book, position.side).bids].sort(
+    (a, b) => Number(b.price) - Number(a.price),
+  )) {
+    const available = (units(level.quantity) / lot) * lot;
+    const quantity = remaining < available ? remaining : available;
+    proceeds += (quantity * units(level.price)) / 1_000_000n;
+    remaining -= quantity;
+    if (!remaining) break;
+  }
+  if (remaining)
+    throw new Error(
+      "Not enough buyers to sell all shares. Try again when more bids are available.",
+    );
+  const precision = book.quoteAssetPrecision ?? 6;
+  const cashUnit = 10n ** BigInt(6 - precision);
+  return money((proceeds / cashUnit) * cashUnit);
+}
 export function demoPayout(
   position: Pick<DemoPosition, "quantity" | "cost" | "side">,
   resolution: "yes" | "no" | "void",

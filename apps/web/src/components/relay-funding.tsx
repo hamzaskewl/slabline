@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "./ui/select";
 import { useEffect, useRef, useState } from "react";
 import { usePrivy, useWallets, useConnectWallet } from "@privy-io/react-auth";
 import { useWallets as useSolanaWallets } from "@privy-io/react-auth/solana";
@@ -212,7 +213,7 @@ export default function RelayFunding() {
       <div className="relay-form">
         <label>
           Route
-          <select
+          <Select
             value={routeId}
             disabled={busy}
             onChange={(e) => {
@@ -237,7 +238,7 @@ export default function RelayFunding() {
               </option>
               <option value="base-solana">Base USDC → Solana USDC</option>
             </optgroup>
-          </select>
+          </Select>
         </label>
         <label>
           Amount · {route.symbol}
@@ -253,7 +254,7 @@ export default function RelayFunding() {
           <>
             <label>
               Source wallet
-              <select
+              <Select
                 value={source}
                 disabled={busy || !wallets.length}
                 onChange={(e) => setSelected(e.target.value)}
@@ -266,12 +267,12 @@ export default function RelayFunding() {
                     {short(w.address)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label>
               Destination
               {route.destinationNetwork === "solana" ? (
-                <select
+                <Select
                   value={recipient}
                   disabled={busy || !solanaWallets.length}
                   onChange={(e) => setSolana(e.target.value)}
@@ -284,7 +285,7 @@ export default function RelayFunding() {
                       {short(w.address)} · Solana mainnet
                     </option>
                   ))}
-                </select>
+                </Select>
               ) : (
                 <div className="relay-destination">
                   Same wallet on {route.destinationName}

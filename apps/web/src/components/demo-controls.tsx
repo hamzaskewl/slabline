@@ -1,6 +1,8 @@
 "use client";
+import { Select } from "./ui/select";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import {
   useWallets,
@@ -8,13 +10,24 @@ import {
   useSignMessage,
 } from "@privy-io/react-auth/solana";
 import { useQueryClient } from "@tanstack/react-query";
-import type { DemoAccountView, DemoCollectible } from "@collectible/domain";
+import {
+  units,
+  money,
+  type DemoAccountView,
+  type DemoCollectible,
+  type DemoPosition,
+} from "@collectible/domain";
+import { Gift, ArrowUpRight, ChartNoAxesCombined, Layers3 } from "lucide-react";
+import { CardImage } from "./card-image";
+import { CardValue } from "./card-value";
+import { PortfolioChart } from "./portfolio-chart";
+import { WalletCollection } from "./wallet-collection";
 import { usePrivateRead } from "@/lib/use-private-read";
 import { usd } from "@/lib/utils";
 import { useNetwork } from "./network-settings";
 import { Button } from "./ui/button";
 
-function useDemoAction() {
+export function useDemoAction() {
   const auth = usePrivy(),
     { network } = useNetwork(),
     query = useQueryClient();
@@ -103,7 +116,7 @@ export function DemoOrder({
     setReview(false);
     setReceipt("");
     key.current = crypto.randomUUID();
-  }, [symbol, side, stake, a.user?.id, a.network]);
+  }, [symbol, side, stake, shares, a.user?.id, a.network]);
   if (a.network !== "devnet") return null;
   return (
     <div className="demo-order">
@@ -114,52 +127,51 @@ export function DemoOrder({
       ) : (
         <>
           <Button
-            className="ticket-action"
+            className={`ticket-action trade-submit ${side}`}
             disabled={!shares || Number(shares) <= 0 || a.busy}
-            onClick={() => setReview(true)}
+            onClick={() => {
+              if (!review) {
+                setReview(true);
+                return;
+              }
+              void a.run(async () => {
+                const result = await a.request<DemoAccountView>({
+                  action: "buy",
+                  key: key.current,
+                  eventTicker,
+                  symbol,
+                  side,
+                  stake,
+                  replay,
+                  minimumContracts: shares,
+                });
+                const position = result.positions.find(
+                  (p) =>
+                    p.symbol === symbol &&
+                    p.side === side &&
+                    p.state === "open",
+                );
+                setReceipt(
+                  position
+                    ? `${Number(position.quantity).toLocaleString()} shares added · ${usd(position.cost)}`
+                    : "Trade saved",
+                );
+                setReview(false);
+                key.current = crypto.randomUUID();
+              });
+            }}
           >
-            Review prediction
+            {a.busy
+              ? "Submitting…"
+              : review
+                ? "Confirm trade"
+                : `Buy ${side === "yes" ? "Yes" : "No"}`}
           </Button>
-          {review && (
-            <div className="review-box">
-              <strong>
-                {side.toUpperCase()} · {Number(shares).toLocaleString()}{" "}
-                estimated shares
-              </strong>
-              <p>
-                Up to {usd(stake)} from your balance.{" "}
-                {replay
-                  ? "Recorded book · Replay"
-                  : "Current book · before fees"}
-              </p>
-              <Button
-                disabled={a.busy}
-                onClick={() =>
-                  void a.run(async () => {
-                    const result = await a.request<DemoAccountView>({
-                      action: "buy",
-                      key: key.current,
-                      eventTicker,
-                      symbol,
-                      side,
-                      stake,
-                      replay,
-                    });
-                    const position = result.positions[0];
-                    setReceipt(
-                      position
-                        ? `${Number(position.quantity).toLocaleString()} shares added · ${usd(position.cost)}`
-                        : "Prediction saved",
-                    );
-                    setReview(false);
-                    key.current = crypto.randomUUID();
-                  })
-                }
-              >
-                {a.busy ? "Saving…" : "Confirm prediction"}
-              </Button>
-            </div>
-          )}
+          <p className="trade-confirmation" aria-live="polite">
+            {review
+              ? `Up to ${usd(stake)} · ${Number(shares).toLocaleString()} estimated shares`
+              : "Demo trade · no real funds"}
+          </p>
         </>
       )}
       {a.error && <p role="alert">{a.error}</p>}
@@ -179,48 +191,60 @@ export function DemoPortfolio({
   compact?: boolean;
   collection?: boolean;
 }) {
-  const a = useDemoAction();
-  const snapshot = usePrivateRead<DemoAccountView>(
-    "/api/demo",
-    a.network === "devnet",
-  );
-  const [results, setResults] = useState<Record<string, string>>({});
+  const a = useDemoAction(),
+    snapshot = usePrivateRead<DemoAccountView>(
+      "/api/demo",
+      a.network === "devnet",
+    );
+  const [tab, setTab] = useState("all"),
+    [positionFilter, setPositionFilter] = useState("open");
   const key = useRef(crypto.randomUUID());
   if (a.network !== "devnet") return null;
   if (!a.authenticated)
     return (
-      <section className="panel funding-panel">
-        <h2>{collection ? "Your collectibles" : "Your balance"}</h2>
+      <section className="account-empty panel">
+        <ChartNoAxesCombined size={32} />
+        <h2>
+          {collection ? "Your collection" : "Your portfolio, all together"}
+        </h2>
+        <p>Track predictions, winning rewards and collected cards.</p>
         <Button onClick={a.login}>Log in</Button>
       </section>
     );
-  const data = snapshot.data;
-  const collectibles =
-    data?.collectibles.filter((c) => c.state !== "cancelled") ?? [];
+  const data = snapshot.data,
+    cards = data?.collectibles.filter((c) => c.state !== "cancelled") ?? [],
+    positions = data?.positions ?? [];
+  const wins = positions.filter(
+    (p) => p.reward && p.reward.state !== "claimed",
+  );
+  const rewardResults = positions.filter(
+    (p) => p.state === "won" && p.reward?.state !== "claimed",
+  );
+  const openCost = positions
+    .filter((p) => p.state === "open")
+    .reduce((sum, p) => sum + units(p.cost), 0n);
+  const cardCost = cards.reduce((sum, c) => sum + units(c.cost), 0n);
+  const rewardValue = wins.reduce(
+    (sum, p) =>
+      sum +
+      units(p.reward!.budget) -
+      cards
+        .filter((c) => c.rewardPositionId === p.id)
+        .reduce((v, c) => v + units(c.cost), 0n),
+    0n,
+  );
+  const total = money(
+    units(data?.balance ?? "0") + openCost + cardCost + rewardValue,
+  );
+  const visiblePositions = positions.filter(
+    (p) =>
+      positionFilter === "all" ||
+      (positionFilter === "open" ? p.state === "open" : p.state !== "open"),
+  );
   return (
-    <section className="panel funding-panel demo-portfolio">
-      {!collection && (
-        <div className="demo-balance">
-          <div>
-            <h2>Available balance</h2>
-            <strong>{data ? usd(data.balance) : "—"}</strong>
-            <span>Demo USD</span>
-          </div>
-          <Button
-            disabled={a.busy || !data}
-            onClick={() =>
-              void a.run(async () => {
-                await a.request({ action: "topup", key: key.current });
-                key.current = crypto.randomUUID();
-              })
-            }
-          >
-            Add $100
-          </Button>
-        </div>
-      )}
+    <div className="portfolio-view">
       {(a.error || snapshot.error) && (
-        <p role="alert">
+        <p className="account-error" role="alert">
           {a.error || snapshot.error?.message}{" "}
           <button
             className="text-button"
@@ -230,138 +254,488 @@ export function DemoPortfolio({
           </button>
         </p>
       )}
-      {snapshot.isPending && <p role="status">Loading account…</p>}
-      {!compact && !collection && (
-        <>
-          <div className="section-heading">
-            <h2>Your positions</h2>
-            <button
-              className="text-button"
-              disabled={a.busy}
-              onClick={() =>
-                void a.run(async () => {
-                  await a.request({ action: "refresh" });
-                })
-              }
-            >
-              Check results
-            </button>
-          </div>
-          {!data?.positions.length && !snapshot.isPending && (
-            <p>
-              No positions yet. <Link href="/demo">Open a replay</Link> or
-              choose a market.
-            </p>
-          )}
-          {data?.positions.map((p) => (
-            <article className="demo-position" key={p.id}>
-              <div>
-                <Link
-                  href={`/markets/${p.eventTicker}?contract=${p.symbol}&side=${p.side}`}
-                >
-                  {p.eventTitle}
+      {!collection && (
+        <section className="portfolio-overview panel">
+          <div className="portfolio-summary">
+            <div>
+              <h2>{compact ? "Available balance" : "Portfolio value"}</h2>
+              <strong className="portfolio-total">
+                {data ? usd(compact ? data.balance : total) : "—"}
+              </strong>
+              <p>
+                {compact
+                  ? "Demo USD · available to trade"
+                  : "Demo account · positions and collectibles at cost"}
+              </p>
+            </div>
+            <div className="portfolio-summary-actions">
+              <Button
+                disabled={a.busy || !data}
+                onClick={() =>
+                  void a.run(async () => {
+                    await a.request({ action: "topup", key: key.current });
+                    key.current = crypto.randomUUID();
+                  })
+                }
+              >
+                Add $100
+              </Button>
+              {!compact && (
+                <Link className="button button-outline" href="/wallet">
+                  Manage wallet
                 </Link>
-                <h3>
-                  {p.label} · {p.side.toUpperCase()}
-                </h3>
+              )}
+            </div>
+          </div>
+          {!compact && (
+            <>
+              <dl className="portfolio-breakdown">
+                <div>
+                  <dt>Cash</dt>
+                  <dd>{data ? usd(data.balance) : "—"}</dd>
+                </div>
+                <div>
+                  <dt>Predictions</dt>
+                  <dd>{data ? usd(money(openCost)) : "—"}</dd>
+                </div>
+                <div>
+                  <dt>Collectibles</dt>
+                  <dd>{data ? usd(money(cardCost)) : "—"}</dd>
+                </div>
+                <div>
+                  <dt>Reward balance</dt>
+                  <dd>{data ? usd(money(rewardValue)) : "—"}</dd>
+                </div>
+              </dl>
+              <PortfolioChart history={data?.history} />
+            </>
+          )}
+        </section>
+      )}
+      {rewardResults.length > 0 && (
+        <section className="portfolio-rewards" aria-label="Winning rewards">
+          {rewardResults.map((p) => (
+            <div className="won-reward" key={p.id}>
+              <span className="won-reward-icon">
+                <Gift size={23} />
+              </span>
+              <div>
+                <h3>You won {usd(p.reward?.budget ?? p.payout ?? "0")}</h3>
                 <p>
-                  {Number(p.quantity).toLocaleString()} shares · {usd(p.cost)}{" "}
-                  paid {p.replay && "· Replay"}
+                  {p.label} · {p.side.toUpperCase()} ·{" "}
+                  {!p.reward
+                    ? "Earlier payout · available in your balance"
+                    : p.reward.state === "available"
+                      ? "Choose your cards"
+                      : "Cards selected · transfer pending"}
                 </p>
               </div>
-              <div>
-                <strong>
-                  {p.state === "open"
-                    ? "Open"
-                    : `${p.state === "refunded" ? "Refunded" : p.state === "won" ? "Won" : "Lost"} · ${usd(p.payout ?? "0")}`}
-                </strong>
-                {p.replay && p.state === "open" && (
-                  <div className="replay-controls">
-                    <label>
-                      Result
-                      <select
-                        aria-label={`Replay result for ${p.label}`}
-                        value={results[p.id] ?? "yes"}
-                        onChange={(e) =>
-                          setResults({ ...results, [p.id]: e.target.value })
-                        }
-                      >
-                        <option value="yes">YES</option>
-                        <option value="no">NO</option>
-                        <option value="void">Void</option>
-                      </select>
-                    </label>
-                    <Button
-                      size="sm"
-                      disabled={a.busy}
-                      onClick={() =>
-                        void a.run(async () => {
-                          await a.request({
-                            action: "replay",
-                            id: p.id,
-                            result: results[p.id] ?? "yes",
-                          });
-                        })
-                      }
-                    >
-                      Finish replay
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </article>
+              {!p.reward ? (
+                <RecoverReward position={p} />
+              ) : (
+                <Link
+                  className="button button-outline"
+                  href={
+                    p.reward.state === "available"
+                      ? `/rewards?win=${p.id}`
+                      : "/collection"
+                  }
+                >
+                  {p.reward.state === "available"
+                    ? "View rewards"
+                    : "View collection"}
+                  <ArrowUpRight size={15} />
+                </Link>
+              )}
+            </div>
           ))}
-        </>
+        </section>
       )}
       {!compact && (
-        <>
-          <h2>{collection ? "Your collectibles" : "Collected cards"}</h2>
-          {!collectibles.length && !snapshot.isPending && (
-            <p>
-              Choose a card from <Link href="/rewards">Rewards</Link>.
-            </p>
+        <section className="portfolio-holdings panel">
+          {!collection && (
+            <div className="holdings-toolbar">
+              <div className="holdings-tabs" aria-label="Portfolio holdings">
+                {[
+                  ["all", "All holdings"],
+                  ["predictions", "Predictions"],
+                  ["collectibles", "Collectibles"],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    aria-pressed={tab === value}
+                    onClick={() => setTab(value!)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="text-button"
+                disabled={a.busy || snapshot.isFetching}
+                onClick={() =>
+                  void a.run(async () => {
+                    await a.request({ action: "refresh" });
+                  })
+                }
+              >
+                Refresh
+              </button>
+            </div>
           )}
-          <div className="demo-collection-grid">
-            {collectibles.map((c) => (
-              <article key={c.id} className="demo-collected">
-                {c.image && (
-                  <img
-                    src={c.image}
-                    alt=""
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                )}
-                <div>
-                  <h3>{c.name}</h3>
-                  <p>
-                    {usd(c.cost)} ·{" "}
-                    {c.source === "grail" ? "Grail" : "Collector Crypt"}
-                  </p>
-                  <p>{c.state === "confirmed" ? "Received" : c.state}</p>
-                  {c.mint && c.state === "confirmed" && (
-                    <a
-                      href={`https://explorer.solana.com/address/${c.mint}?cluster=devnet`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View asset ↗
-                    </a>
-                  )}
-                  {!["confirmed", "cancelled"].includes(c.state) && (
-                    <DemoMintActions item={c} />
-                  )}
+          {snapshot.isPending && <p role="status">Loading your holdings…</p>}
+          {!collection && tab !== "collectibles" && (
+            <div className="portfolio-section">
+              <div className="portfolio-section-heading">
+                <h2>
+                  Prediction positions <span>{positions.length}</span>
+                </h2>
+                <Select
+                  aria-label="Position status"
+                  value={positionFilter}
+                  onChange={(e) => setPositionFilter(e.target.value)}
+                >
+                  <option value="open">Open</option>
+                  <option value="closed">Closed</option>
+                  <option value="all">All positions</option>
+                </Select>
+              </div>
+              {visiblePositions.length ? (
+                <div className="position-list">
+                  {visiblePositions.map((p) => (
+                    <div className="position-row" key={p.id}>
+                      <span className={`position-side ${p.side}`}>
+                        {p.side === "yes" ? "Yes" : "No"}
+                      </span>
+                      <div className="position-identity">
+                        <Link
+                          href={
+                            p.replay
+                              ? "/demo"
+                              : `/markets/${p.eventTicker}?contract=${p.symbol}&side=${p.side}`
+                          }
+                        >
+                          {p.eventTitle}
+                        </Link>
+                        <h3>{p.label}</h3>
+                        <p>
+                          {Number(p.quantity).toLocaleString()} shares ·{" "}
+                          {usd(p.cost)} paid{p.replay ? " · Replay" : ""}
+                        </p>
+                      </div>
+                      <div className="position-result">
+                        <strong className={p.state === "won" ? "positive" : ""}>
+                          {p.state === "open"
+                            ? usd(p.quantity)
+                            : p.state === "sold"
+                              ? usd(p.saleProceeds ?? "0")
+                              : usd(p.payout ?? "0")}
+                        </strong>
+                        <span>
+                          {p.state === "open"
+                            ? "Potential reward"
+                            : p.state === "won"
+                              ? "Won"
+                              : p.state === "sold"
+                                ? "Sold"
+                                : p.state === "refunded"
+                                  ? "Refunded"
+                                  : "Lost"}
+                        </span>
+                      </div>
+                      <div className="position-actions">
+                        {p.state === "open" ? (
+                          <>
+                            <SellPosition position={p} />
+                            <Link
+                              href={
+                                p.replay
+                                  ? "/demo"
+                                  : `/markets/${p.eventTicker}?contract=${p.symbol}&side=${p.side}`
+                              }
+                            >
+                              Potential rewards
+                            </Link>
+                          </>
+                        ) : p.reward ? (
+                          <Link
+                            className="button button-outline"
+                            href={
+                              p.reward.state === "available"
+                                ? `/rewards?win=${p.id}`
+                                : "/collection"
+                            }
+                          >
+                            {p.reward.state === "available"
+                              ? "View rewards"
+                              : "View cards"}
+                          </Link>
+                        ) : p.state === "won" ? (
+                          <RecoverReward position={p} />
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </article>
-            ))}
-          </div>
-        </>
+              ) : (
+                <div className="holdings-empty">
+                  <ChartNoAxesCombined size={24} />
+                  <p>
+                    No {positionFilter === "all" ? "" : positionFilter}{" "}
+                    positions yet.
+                  </p>
+                  <Link className="text-link" href="/">
+                    Explore markets <ArrowUpRight size={15} />
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+          {(collection || tab !== "predictions") && (
+            <div className="portfolio-section">
+              <div className="portfolio-section-heading">
+                <h2>
+                  {collection ? "Your collection" : "Collectibles"}{" "}
+                  <span>{cards.length}</span>
+                </h2>
+                <Link className="text-link" href="/rewards">
+                  Browse rewards <ArrowUpRight size={15} />
+                </Link>
+              </div>
+              {cards.length ? (
+                <div className="collection-list">
+                  {cards.map((c) => (
+                    <article className="collection-row" key={c.id}>
+                      <CardImage src={c.image} alt={c.name} />
+                      <div className="collection-copy">
+                        <h3>{c.name}</h3>
+                        <p>
+                          {c.source === "grail" ? "Grail" : "Collector Crypt"} ·{" "}
+                          {c.rewardPositionId ? "Won reward" : "Collected"}
+                        </p>
+                        <CardValue valuation={c.valuation} />
+                      </div>
+                      <div className="collection-value">
+                        <strong>{usd(c.cost)}</strong>
+                        <span>
+                          {c.state === "confirmed"
+                            ? "In your collection"
+                            : "Transfer pending"}
+                        </span>
+                      </div>
+                      <div className="collection-actions">
+                        {c.state === "confirmed" && c.mint ? (
+                          <a
+                            className="text-link"
+                            href={`https://explorer.solana.com/address/${c.mint}?cluster=devnet`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            View asset <ArrowUpRight size={15} />
+                          </a>
+                        ) : (
+                          <DemoMintActions item={c} />
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="holdings-empty">
+                  <Layers3 size={24} />
+                  <p>Your collected cards will appear here.</p>
+                  <Link className="text-link" href="/rewards">
+                    Explore rewards <ArrowUpRight size={15} />
+                  </Link>
+                </div>
+              )}
+              <WalletCollection
+                embedded
+                excludeMints={cards.flatMap((c) => (c.mint ? [c.mint] : []))}
+              />
+            </div>
+          )}
+        </section>
       )}
-    </section>
+    </div>
+  );
+}
+function RecoverReward({ position }: { position: DemoPosition }) {
+  const a = useDemoAction(),
+    router = useRouter();
+  const [review, setReview] = useState(false);
+  return (
+    <div className="legacy-reward">
+      <Button
+        variant="outline"
+        disabled={a.busy}
+        onClick={() => {
+          if (!review) {
+            setReview(true);
+            return;
+          }
+          void a.run(async () => {
+            await a.request({ action: "recover-reward", id: position.id });
+            router.push(`/rewards?win=${position.id}`);
+          });
+        }}
+      >
+        {a.busy
+          ? "Moving reward…"
+          : review
+            ? "Confirm reward budget"
+            : "View rewards"}
+      </Button>
+      {review && (
+        <p>
+          Move {usd(position.payout ?? "0")} from your earlier payout into card
+          rewards.
+        </p>
+      )}
+      {a.error && <p role="alert">{a.error}</p>}
+    </div>
+  );
+}
+function SellPosition({ position }: { position: DemoPosition }) {
+  const a = useDemoAction(),
+    [quote, setQuote] = useState<{ proceeds: string; at: number } | null>(null),
+    key = useRef(crypto.randomUUID());
+  useEffect(() => {
+    setQuote(null);
+    key.current = crypto.randomUUID();
+  }, [position.id, a.user?.id, a.network]);
+  return (
+    <div className="sell-position">
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={a.busy}
+        onClick={() =>
+          void a.run(async () => {
+            if (!quote || Date.now() - quote.at > 15000) {
+              const result = await a.request<{ proceeds: string }>({
+                action: "sell-quote",
+                id: position.id,
+              });
+              setQuote({ proceeds: result.proceeds, at: Date.now() });
+              return;
+            }
+            await a.request({
+              action: "sell",
+              id: position.id,
+              key: key.current,
+              minimumProceeds: quote.proceeds,
+            });
+            setQuote(null);
+          })
+        }
+      >
+        {a.busy ? "Please wait…" : quote ? "Confirm sale" : "Sell"}
+      </Button>
+      {quote && <span>{usd(quote.proceeds)} estimated</span>}
+      {a.error && <p role="alert">{a.error}</p>}
+    </div>
+  );
+}
+export function DemoReplayControls() {
+  const a = useDemoAction(),
+    snapshot = usePrivateRead<DemoAccountView>(
+      "/api/demo",
+      a.network === "devnet",
+    );
+  const [selected, setSelected] = useState(""),
+    [result, setResult] = useState("yes");
+  const positions =
+    snapshot.data?.positions.filter((p) => p.replay && p.state === "open") ??
+    [];
+  const position = positions.find((p) => p.id === selected) ?? positions[0];
+  if (a.network !== "devnet" || !a.authenticated || !position) return null;
+  return (
+    <div className="settings-result">
+      <h3>Finish a replay</h3>
+      <Select
+        aria-label="Replay position"
+        value={position.id}
+        onChange={(e) => setSelected(e.target.value)}
+      >
+        {positions.map((p) => (
+          <option value={p.id} key={p.id}>
+            {p.label} · {p.side.toUpperCase()} · {Number(p.quantity)} shares
+          </option>
+        ))}
+      </Select>
+      <div className="replay-controls">
+        <Select
+          aria-label="Replay result"
+          value={result}
+          onChange={(e) => setResult(e.target.value)}
+        >
+          <option value="yes">Yes wins</option>
+          <option value="no">No wins</option>
+          <option value="void">Void · refund stake</option>
+        </Select>
+        <Button
+          disabled={a.busy}
+          onClick={() =>
+            void a.run(async () => {
+              await a.request({ action: "replay", id: position.id, result });
+            })
+          }
+        >
+          Apply result
+        </Button>
+      </div>
+      {a.error && <p role="alert">{a.error}</p>}
+      <Link className="text-link" href="/portfolio">
+        View portfolio <ArrowUpRight size={15} />
+      </Link>
+    </div>
   );
 }
 
-function DemoMintActions({
+export function MarketPositionStatus({ symbol }: { symbol: string }) {
+  const { network } = useNetwork(),
+    snapshot = usePrivateRead<DemoAccountView>(
+      "/api/demo",
+      network === "devnet",
+    );
+  const position =
+    snapshot.data?.positions.find(
+      (p) => p.symbol === symbol && p.reward && p.reward.state !== "claimed",
+    ) ??
+    snapshot.data?.positions.find(
+      (p) => p.symbol === symbol && p.state === "open",
+    );
+  if (network !== "devnet" || !position) return null;
+  return (
+    <div className="ticket-position">
+      <strong>
+        {position.reward
+          ? `You won ${usd(position.reward.budget)}`
+          : `You own ${Number(position.quantity).toLocaleString()} ${position.side.toUpperCase()} shares`}
+      </strong>
+      {position.reward ? (
+        <Link
+          className="reward-browse-button"
+          href={
+            position.reward.state === "available"
+              ? `/rewards?win=${position.id}`
+              : "/collection"
+          }
+        >
+          {position.reward.state === "available"
+            ? "View rewards"
+            : "View collection"}
+          <ArrowUpRight size={15} />
+        </Link>
+      ) : (
+        <SellPosition position={position} />
+      )}
+    </div>
+  );
+}
+
+export function DemoMintActions({
   item,
   onCancel,
 }: {
@@ -407,7 +781,13 @@ function DemoMintActions({
   }, [view.state, item.id, a.authenticated, a.network, a.user?.id]);
   const wallet = wallets.find((w) => w.address === item.wallet);
   if (view.state === "cancelled")
-    return <p role="status">Reservation refunded.</p>;
+    return (
+      <p role="status">
+        {item.rewardPositionId
+          ? "Returned to your reward budget."
+          : "Reservation refunded."}
+      </p>
+    );
   if (view.state === "confirmed")
     return (
       <p role="status">
@@ -504,7 +884,7 @@ function DemoMintActions({
             })
           }
         >
-          Cancel & refund
+          {item.rewardPositionId ? "Remove selection" : "Cancel & refund"}
         </button>
       )}
       {!wallet && <Link href="/wallet">Connect destination wallet</Link>}
@@ -514,9 +894,6 @@ function DemoMintActions({
 }
 
 export function DemoClaim({
-  source,
-  sourceId,
-  reserveId,
   name,
 }: {
   source: "collectorcrypt" | "grail";
@@ -524,113 +901,13 @@ export function DemoClaim({
   reserveId?: string;
   name: string;
 }) {
-  const a = useDemoAction(),
-    { wallets } = useWallets(),
-    { signMessage } = useSignMessage();
-  const [selected, setSelected] = useState(""),
-    [item, setItem] = useState<DemoCollectible | null>(null),
-    [verified, setVerified] = useState("");
-  const key = useRef(crypto.randomUUID());
-  const links = usePrivateRead<{ wallets: { address: string }[] }>(
-    "/api/wallet/links",
-    a.network === "devnet",
-  );
-  const wallet = wallets.find(
-    (w) => w.address === (selected || wallets[0]?.address),
-  );
-  useEffect(() => {
-    setItem(null);
-    setVerified("");
-    key.current = crypto.randomUUID();
-  }, [sourceId, reserveId, a.user?.id, a.network, wallet?.address]);
-  if (a.network !== "devnet") return null;
   return (
-    <div className="demo-claim">
-      {!a.authenticated ? (
-        <Button onClick={a.login}>Log in to collect</Button>
-      ) : !wallet ? (
-        <Link href="/wallet">Connect a wallet to collect</Link>
-      ) : (
-        <>
-          <label>
-            Destination wallet
-            <select
-              aria-label={`Wallet for ${name}`}
-              value={wallet.address}
-              onChange={(e) => setSelected(e.target.value)}
-            >
-              {wallets.map((w) => (
-                <option key={w.address} value={w.address}>
-                  {w.address.slice(0, 6)}…{w.address.slice(-4)}
-                </option>
-              ))}
-            </select>
-          </label>
-          {verified !== wallet.address &&
-          !links.data?.wallets.some((w) => w.address === wallet.address) ? (
-            <Button
-              size="sm"
-              disabled={a.busy}
-              onClick={() =>
-                void a.run(async () => {
-                  const proof = await a.request<{
-                    nonce: string;
-                    message: string;
-                  }>({ address: wallet.address }, "/api/wallet/challenge");
-                  const signed = await signMessage({
-                    message: new TextEncoder().encode(proof.message),
-                    wallet,
-                  });
-                  await a.request(
-                    {
-                      nonce: proof.nonce,
-                      signature: btoa(String.fromCharCode(...signed.signature)),
-                    },
-                    "/api/wallet/verify",
-                  );
-                  setVerified(wallet.address);
-                })
-              }
-            >
-              Verify wallet
-            </Button>
-          ) : !item ? (
-            <Button
-              disabled={a.busy}
-              onClick={() =>
-                void a.run(async () => {
-                  setItem(
-                    await a.request<DemoCollectible>({
-                      action: "collect",
-                      key: key.current,
-                      source,
-                      sourceId,
-                      reserveId,
-                      wallet: wallet.address,
-                    }),
-                  );
-                })
-              }
-            >
-              {a.busy ? "Preparing…" : "Collect this card"}
-            </Button>
-          ) : null}
-          {item && (
-            <DemoMintActions
-              item={item}
-              onCancel={() => {
-                setItem(null);
-                key.current = crypto.randomUUID();
-              }}
-            />
-          )}
-        </>
-      )}
-      {a.error && (
-        <p role="alert">
-          {a.error} <Link href="/collection">View saved cards</Link>
-        </p>
-      )}
-    </div>
+    <Link
+      className="reward-browse-button"
+      href="/rewards"
+      aria-label={`View rewards for ${name}`}
+    >
+      View rewards
+    </Link>
   );
 }

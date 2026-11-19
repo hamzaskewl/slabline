@@ -1,4 +1,7 @@
 "use client";
+import { Select } from "./ui/select";
+import { CardImage } from "./card-image";
+import { CardValue } from "./card-value";
 import { useState } from "react";
 import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
@@ -11,7 +14,13 @@ type Links = {
   network: "devnet" | "mainnet";
   wallets: { address: string; network: string }[];
 };
-export function WalletCollection() {
+export function WalletCollection({
+  embedded = false,
+  excludeMints = [],
+}: {
+  embedded?: boolean;
+  excludeMints?: string[];
+}) {
   const { network } = useNetwork();
   const { ready, authenticated, user, login, getAccessToken } = usePrivy();
   const links = usePrivateRead<Links>("/api/wallet/links");
@@ -42,11 +51,18 @@ export function WalletCollection() {
     ...new Map(
       pages?.flatMap((p) => p.assets).map((a) => [a.mint, a]),
     ).values(),
-  ];
+  ].filter((a) => !excludeMints.includes(a.mint));
+  if (embedded && (!authenticated || !wallet)) return null;
   return (
-    <section className="panel funding-panel account-panel">
+    <section
+      className={
+        embedded
+          ? "portfolio-section wallet-holdings"
+          : "panel funding-panel account-panel"
+      }
+    >
       <div className="section-heading">
-        <h2>Your collectibles</h2>
+        <h2>{embedded ? "Wallet collectibles" : "Your collectibles"}</h2>
         {links.data?.network === "devnet" ? (
           <span className="mode-badge">DEVNET</span>
         ) : null}
@@ -84,7 +100,7 @@ export function WalletCollection() {
               >
                 Solana wallet
               </label>
-              <select
+              <Select
                 id="collection-wallet"
                 className="account-wallet-select"
                 value={wallet}
@@ -95,7 +111,7 @@ export function WalletCollection() {
                     {w.address.slice(0, 8)}…{w.address.slice(-6)}
                   </option>
                 ))}
-              </select>
+              </Select>
               <div className="wallet-actions">
                 <Button
                   variant="outline"
@@ -115,36 +131,17 @@ export function WalletCollection() {
                 <p>
                   {collection.hasNextPage
                     ? "No collectibles on this page."
-                    : "No collectibles in this wallet."}
+                    : embedded
+                      ? "No additional collectibles in this wallet."
+                      : "No collectibles in this wallet."}
                 </p>
               ) : null}
               <div className="wallet-collection-grid">
                 {assets.map((a) => (
                   <article className="wallet-collectible" key={a.mint}>
-                    {a.imageUrl ? (
-                      <img
-                        src={a.imageUrl}
-                        alt={a.name}
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          e.currentTarget.hidden = true;
-                          e.currentTarget.nextElementSibling?.removeAttribute(
-                            "hidden",
-                          );
-                        }}
-                      />
-                    ) : (
-                      <div className="collection-image-missing">
-                        Image unavailable
-                      </div>
-                    )}
-                    {a.imageUrl ? (
-                      <div className="collection-image-missing" hidden>
-                        Image unavailable
-                      </div>
-                    ) : null}
+                    <CardImage src={a.imageUrl} alt={a.name} />
                     <h3>{a.name}</h3>
+                    <CardValue valuation={a.valuation} />
                     <a
                       className="text-link"
                       target="_blank"

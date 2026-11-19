@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { CardImage } from "./card-image";
 import { useState } from "react";
 import { ArrowRight, Layers3 } from "lucide-react";
 import type { GrailToken } from "@collectible/domain";
@@ -23,17 +24,7 @@ function GrailTile({ token }: { token: GrailToken }) {
         aria-label={`View ${token.name}`}
       >
         <span className="grade-badge">{token.chain}</span>
-        {token.image && !failed ? (
-          <img
-            src={token.image}
-            alt={token.name}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            onError={() => setFailed(true)}
-          />
-        ) : (
-          <Layers3 size={36} />
-        )}
+        <CardImage src={token.image} alt={token.name} />
       </Link>
       <div className="card-information">
         <span className="card-category">Grail token · {token.symbol}</span>

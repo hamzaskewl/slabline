@@ -5,12 +5,17 @@ import {
   fmvValuations,
   valuationJobs,
   comparableSales,
+  assets,
   eq,
   and,
   lte,
   sql,
   inArray,
 } from "@collectible/db";
+import {
+  storedListingSchema,
+  type WalletCollectible,
+} from "@collectible/domain";
 const keyFor = (card: Listing) => `${card.grader}:${card.cert}:${card.grade}`;
 const enabled = () =>
   process.env.ENABLE_PUBLIC_FMV === "true" &&
@@ -41,7 +46,7 @@ const fmvSchema = z.object({
   match_confidence: z.number().nullable().optional(),
   fmv: z
     .object({
-      price: z.number().nullable().optional(),
+      price: z.number().positive().finite().nullable().optional(),
       method: z.string(),
       confidence: z.number().optional(),
       price_explanation: z.string().optional(),
@@ -96,6 +101,7 @@ export async function fetchCardValuation(
   );
   if (
     comps.cert_info.cert !== card.cert ||
+    comps.cert_info.grader.toLowerCase() !== card.grader.toLowerCase() ||
     numericGrade(comps.grade_used) !== numericGrade(card.grade)
   )
     return null;
@@ -114,6 +120,8 @@ export async function fetchCardValuation(
           s.sale_url &&
           /^https:\/\//.test(s.sale_url) &&
           Number.isFinite(Date.parse(s.sale_date)) &&
+          s.grader.toLowerCase() === card.grader!.toLowerCase() &&
+          s.price > 0 &&
           numericGrade(s.grade) === numericGrade(card.grade!),
       )
       .slice(0, 5)
@@ -150,18 +158,91 @@ export async function attachCachedValuations(
 }
 export async function enqueueValuations(cards: Listing[]) {
   if (!enabled()) return;
-  for (const card of cards.filter((c) => c.cert).slice(0, 20)) {
-    const key = keyFor(card);
-    const [cached] = await getDb()
-      .select()
-      .from(fmvValuations)
-      .where(eq(fmvValuations.key, key))
-      .limit(1);
-    if (cached && cached.expiresAt.getTime() > Date.now()) continue;
+  // Queue all identities once; the worker remains rate-limited. Previously only
+  // the first 20 cards could ever receive an estimate.
+  const unique = [
+    ...new Map(
+      cards
+        .filter((c) => c.cert && c.grader && c.grade)
+        .map((c) => [keyFor(c), c]),
+    ).values(),
+  ];
+  if (!unique.length) return;
+  const cached = await getDb()
+    .select({ key: fmvValuations.key, expiresAt: fmvValuations.expiresAt })
+    .from(fmvValuations)
+    .where(inArray(fmvValuations.key, unique.map(keyFor)));
+  const fresh = new Set(
+    cached.filter((r) => r.expiresAt.getTime() > Date.now()).map((r) => r.key),
+  );
+  for (let index = 0; index < unique.length; index += 100) {
+    const batch = unique
+      .slice(index, index + 100)
+      .filter((c) => !fresh.has(keyFor(c)));
+    if (batch.length)
+      await getDb()
+        .insert(valuationJobs)
+        .values(batch.map((card) => ({ key: keyFor(card), listing: card })))
+        .onConflictDoNothing();
+  }
+}
+
+/** Keep provider-verified identities after a card leaves the listed inventory. */
+export async function cacheCardIdentities(cards: Listing[]) {
+  if (!process.env.DATABASE_URL || !cards.length) return;
+  const unique = [...new Map(cards.map((c) => [c.mint, c])).values()];
+  for (let i = 0; i < unique.length; i += 100)
     await getDb()
-      .insert(valuationJobs)
-      .values({ key, listing: card })
-      .onConflictDoNothing();
+      .insert(assets)
+      .values(
+        unique.slice(i, i + 100).map((c) => ({
+          mint: c.mint,
+          network: c.network,
+          provider: c.source,
+          data: c,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: assets.mint,
+        set: { data: sql`excluded.data` },
+      });
+}
+export async function attachWalletValuations(
+  items: WalletCollectible[],
+  network: "mainnet" | "devnet",
+) {
+  if (!enabled() || !items.length) return items;
+  try {
+    const rows = await getDb()
+      .select()
+      .from(assets)
+      .where(
+        and(
+          eq(assets.network, network),
+          eq(assets.provider, "collectorcrypt"),
+          inArray(
+            assets.mint,
+            items.map((c) => c.mint),
+          ),
+        ),
+      );
+    const listings = rows.flatMap((r) => {
+      const result = storedListingSchema.safeParse(r.data);
+      return result.success &&
+        result.data.mint === r.mint &&
+        result.data.network === network
+        ? [result.data]
+        : [];
+    });
+    const values = new Map(
+      (await attachCachedValuations(listings)).map((c) => [
+        c.mint,
+        c.valuation,
+      ]),
+    );
+    return items.map((c) => ({ ...c, valuation: values.get(c.mint) ?? null }));
+  } catch {
+    return items;
   }
 }
 export async function processValuationJob() {

@@ -1,11 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-const DemoClaim = dynamic(
-  () => import("./demo-controls").then((m) => m.DemoClaim),
-  { ssr: false },
-);
-import { Layers3 } from "lucide-react";
+import { CardImage } from "./card-image";
+import { CardValue } from "./card-value";
 import {
   payoutTarget,
   rewardForPayout,
@@ -58,7 +55,6 @@ export function RewardTarget({
     revision: number;
   } | null>(null);
   const selectedMint = choice?.revision === stakeRevision ? choice.mint : null;
-  const [failedImage, setFailedImage] = useState<string | null>(null);
   const { card, covered } = useMemo(
     () => rewardForPayout(cards, payout, selectedMint),
     [cards, payout, selectedMint],
@@ -126,16 +122,7 @@ export function RewardTarget({
         aria-atomic="true"
       >
         <div className="reward-target-image">
-          {card.frontImage && failedImage !== card.mint ? (
-            <img
-              src={card.frontImage}
-              alt={card.name}
-              referrerPolicy="no-referrer"
-              onError={() => setFailedImage(card.mint)}
-            />
-          ) : (
-            <Layers3 size={36} aria-label="Image unavailable" />
-          )}
+          <CardImage src={card.frontImage} alt={card.name} eager />
         </div>
         <div className="reward-card-copy">
           <h3>{card.name}</h3>
@@ -149,6 +136,7 @@ export function RewardTarget({
             })}{" "}
             <span>USDC</span>
           </div>
+          <CardValue valuation={card.valuation} />
           <span className={`reward-fit ${covered ? "covered" : ""}`}>
             {covered
               ? "Within estimated payout"
@@ -201,13 +189,6 @@ export function RewardTarget({
           </span>
         )}
       </button>
-      {replay && process.env.NEXT_PUBLIC_PRIVY_APP_ID && (
-        <DemoClaim
-          source="collectorcrypt"
-          sourceId={card.mint}
-          name={card.name}
-        />
-      )}
       <details className="reward-assumptions">
         <summary>Fees & availability</summary>
         <p>
@@ -221,6 +202,20 @@ export function RewardTarget({
           </a>
         )}
       </details>
+      {tokens.length > 0 && (
+        <div className="related-grail">
+          <h3>Grail rewards</h3>
+          {tokens.map((token) => (
+            <a
+              key={token.id}
+              className="text-link"
+              href={`/tokens/${token.chainId}/${token.address}`}
+            >
+              {token.name} · {token.symbol}
+            </a>
+          ))}
+        </div>
+      )}
     </aside>
   );
 }

@@ -23,7 +23,7 @@ import { createPublicKey, verify, timingSafeEqual } from "node:crypto";
 import { getDb, orders, walletLinks, eq, and, sql } from "@collectible/db";
 import type { DemoCollectible } from "@collectible/domain";
 import { solanaRpc } from "./solana";
-import { DemoError, collectibleView } from "./demo";
+import { DemoError, collectibleView, finalizeDemoReward } from "./demo";
 const CORE = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d";
 type MintData = DemoCollectible & {
   attempts?: number;
@@ -193,7 +193,11 @@ export async function submitDemoMint(
 export async function checkDemoMint(userId: string, id: string) {
   const row = await owned(userId, id),
     d = row.data as MintData;
-  if (row.state === "confirmed" || !d.mint) return collectibleView(row);
+  if (row.state === "confirmed") {
+    await finalizeDemoReward(userId, id);
+    return collectibleView(row);
+  }
+  if (!d.mint) return collectibleView(row);
   const rpc = solanaRpc("devnet");
   if (d.signature) {
     const status = (
@@ -235,7 +239,10 @@ export async function checkDemoMint(userId: string, id: string) {
       throw new DemoError("Asset ownership or metadata does not match.", 409);
     await getDb()
       .update(orders)
-      .set({ state: "confirmed" })
+      .set({
+        state: "confirmed",
+        data: { ...d, confirmedAt: new Date().toISOString() },
+      })
       .where(
         and(
           eq(orders.id, id),
@@ -243,6 +250,7 @@ export async function checkDemoMint(userId: string, id: string) {
         ),
       );
   }
+  await finalizeDemoReward(userId, id);
   return collectibleView(await owned(userId, id));
 }
 export async function retryDemoMint(userId: string, id: string) {

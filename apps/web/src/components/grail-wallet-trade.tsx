@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "./ui/select";
 import { useEffect, useRef, useState } from "react";
 import {
   usePrivy,
@@ -312,7 +313,7 @@ export default function WalletTrade({ token, market, blocker }: TradeProps) {
     <>
       <label className="token-amount-label">
         Your EVM wallet
-        <select
+        <Select
           value={address}
           disabled={busy || pending}
           onChange={(e) => setSelected(e.target.value)}
@@ -326,7 +327,7 @@ export default function WalletTrade({ token, market, blocker }: TradeProps) {
               {w.walletClientType}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       <div className="wallet-actions">
         <Button
@@ -383,7 +384,7 @@ export default function WalletTrade({ token, market, blocker }: TradeProps) {
       </label>
       <label className="token-amount-label">
         Slippage limit
-        <select
+        <Select
           value={slippage}
           disabled={busy || pending}
           onChange={(e) => {
@@ -394,7 +395,7 @@ export default function WalletTrade({ token, market, blocker }: TradeProps) {
           <option value="30">0.3%</option>
           <option value="50">0.5%</option>
           <option value="100">1%</option>
-        </select>
+        </Select>
       </label>
       {!pending && (
         <Button
@@ -504,7 +505,7 @@ export default function WalletTrade({ token, market, blocker }: TradeProps) {
         <summary>Test wallet connection</summary>
         <label className="token-amount-label">
           Test network
-          <select
+          <Select
             value={testNetwork}
             disabled={busy || pending}
             onChange={(e) => {
@@ -514,7 +515,7 @@ export default function WalletTrade({ token, market, blocker }: TradeProps) {
           >
             <option value="84532">Base Sepolia</option>
             <option value="46630">Robinhood Testnet</option>
-          </select>
+          </Select>
         </label>
         <Button
           variant="outline"

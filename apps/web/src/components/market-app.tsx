@@ -1,4 +1,12 @@
 "use client";
+import { Select } from "./ui/select";
+import { CardImage } from "./card-image";
+import { CardValue } from "./card-value";
+import {
+  AddReward,
+  RewardCheckout,
+  useRewardSelection,
+} from "./reward-checkout";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -63,12 +71,12 @@ const DemoOrder = dynamic(
   () => import("./demo-controls").then((m) => m.DemoOrder),
   { ssr: false },
 );
-const DemoPortfolio = dynamic(
-  () => import("./demo-controls").then((m) => m.DemoPortfolio),
+const MarketPositionStatus = dynamic(
+  () => import("./demo-controls").then((m) => m.MarketPositionStatus),
   { ssr: false },
 );
-const DemoClaim = dynamic(
-  () => import("./demo-controls").then((m) => m.DemoClaim),
+const DemoPortfolio = dynamic(
+  () => import("./demo-controls").then((m) => m.DemoPortfolio),
   { ssr: false },
 );
 const PriceChart = dynamic(() => import("./price-chart"), {
@@ -126,6 +134,7 @@ export function MarketApp({
   initialStake?: string;
 }) {
   const router = useRouter();
+  const rewardSelection = useRewardSelection();
   const { network } = useNetwork();
   const replay = section === "demo";
   useEffect(() => {
@@ -241,6 +250,7 @@ export function MarketApp({
           ))
         : visible[0];
   const cards = rewardQuery.data?.data.cards ?? [];
+  const replayCard = rewardQuery.data?.data.replayCard ?? DEMO_REPLAY_CARD;
   const tokens = rewardQuery.data?.data.tokens ?? [];
   const simulate = (order: Omit<PracticeOrder, "id" | "createdAt">) => {
     const updated = [
@@ -258,13 +268,7 @@ export function MarketApp({
     );
   };
   return (
-    <div
-      className={
-        section === "markets" || replay
-          ? "app-shell prediction-surface"
-          : "app-shell"
-      }
-    >
+    <div className="app-shell prediction-surface">
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -287,6 +291,7 @@ export function MarketApp({
                 <Link href="/rewards">Rewards</Link>
                 <Link href="/portfolio">Portfolio</Link>
                 <Link href="/wallet">Wallet</Link>
+                <Link href="/collection">Collection</Link>
               </nav>
             ) : (
               <form
@@ -366,21 +371,17 @@ export function MarketApp({
                   {c}
                 </button>
               ))}
-            <span className="navigation-divider" />
-            {navigation.slice(1).map((n) => (
-              <Link
-                key={n.href}
-                href={n.href}
-                className={section === n.label.toLowerCase() ? "active" : ""}
-              >
-                {n.label}
-              </Link>
-            ))}
-            {network === "devnet" && (
-              <Link className="practice-link" href="/demo">
-                Replay
-              </Link>
-            )}
+            <div className="account-navigation">
+              {navigation.slice(1).map((n) => (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  className={section === n.label.toLowerCase() ? "active" : ""}
+                >
+                  {n.label}
+                </Link>
+              ))}
+            </div>
           </nav>
         </header>
         <main id="main">
@@ -499,7 +500,7 @@ export function MarketApp({
                         cards={
                           replay
                             ? [
-                                DEMO_REPLAY_CARD,
+                                replayCard,
                                 ...cards.filter(
                                   (c) => c.mint !== DEMO_REPLAY_CARD.mint,
                                 ),
@@ -551,8 +552,18 @@ export function MarketApp({
             </>
           ) : section === "rewards" ? (
             <>
+              {status.data?.privyConfigured && <RewardCheckout />}
               <RewardCatalog
-                cards={cards}
+                cards={
+                  network === "devnet" && rewardSelection?.position?.replay
+                    ? [
+                        replayCard,
+                        ...cards.filter(
+                          (c) => c.mint !== DEMO_REPLAY_CARD.mint,
+                        ),
+                      ]
+                    : cards
+                }
                 tokens={tokens}
                 loading={rewardQuery.isLoading}
                 error={rewardQuery.data?.error}
@@ -565,7 +576,10 @@ export function MarketApp({
                 network === "devnet" ? (
                   <DemoPortfolio />
                 ) : (
-                  <PrivateAccount />
+                  <>
+                    <PrivateAccount />
+                    <WalletCollection />
+                  </>
                 )
               ) : null}
             </>
@@ -942,7 +956,7 @@ function MarketDetail({
           <p className="ticket-event">{market.title}</p>
           <label className="ticket-outcome">
             {contract && <MarketArt market={market} outcome={contract} />}
-            <select
+            <Select
               aria-label="Prediction outcome"
               value={symbol ?? ""}
               onChange={(e) => selectOutcome(e.target.value, side)}
@@ -953,8 +967,7 @@ function MarketDetail({
                   {c.label}
                 </option>
               ))}
-            </select>
-            <ChevronDown size={18} />
+            </Select>
           </label>
           <div className="side-toggle">
             {(["yes", "no"] as const).map((s) => (
@@ -1024,7 +1037,7 @@ function MarketDetail({
               Max
             </button>
           </div>
-          {process.env.NEXT_PUBLIC_PRIVY_APP_ID && symbol && (
+          {!practice && process.env.NEXT_PUBLIC_PRIVY_APP_ID && symbol && (
             <DemoOrder
               eventTicker={market.ticker ?? market.id}
               symbol={symbol}
@@ -1039,42 +1052,34 @@ function MarketDetail({
               Gemini trading connection pending.
             </p>
           )}
-          {practice ? (
-            <>
-              <Button
-                className="ticket-action"
-                disabled={!quote || units(quote.contracts) === 0n}
-                onClick={() => setReview(true)}
-              >
-                Review simulated order <ArrowRight size={16} />
-              </Button>
-              {review && quote ? (
-                <div className="review-box">
-                  <strong>SIMULATED order review</strong>
-                  <p>
-                    {side.toUpperCase()} on {contract?.label} ·{" "}
-                    {quote.contracts} contracts · {usd(quote.cost)} +{" "}
-                    {usd(quote.fees ?? "0")} fixture fee. No funds move.
-                  </p>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      onSimulate({
-                        symbol: symbol ?? "SIMULATED",
-                        side,
-                        stake,
-                        cost: quote.cost,
-                        contracts: quote.contracts,
-                      } as Omit<PracticeOrder, "id" | "createdAt">);
-                      setReview(false);
-                    }}
-                  >
-                    Confirm simulation
-                  </Button>
-                </div>
-              ) : null}
-            </>
-          ) : null}
+          {!practice && process.env.NEXT_PUBLIC_PRIVY_APP_ID && symbol && (
+            <MarketPositionStatus symbol={symbol} />
+          )}
+          {practice && (
+            <Button
+              className={`ticket-action trade-submit ${side}`}
+              disabled={!quote || units(quote.contracts) === 0n}
+              onClick={() => {
+                if (!review) {
+                  setReview(true);
+                  return;
+                }
+                if (quote) {
+                  onSimulate({
+                    symbol: symbol ?? "SIMULATED",
+                    side,
+                    stake,
+                    contracts: quote.contracts,
+                  });
+                  setReview(false);
+                }
+              }}
+            >
+              {review
+                ? "Confirm trade"
+                : `Buy ${side === "yes" ? "Yes" : "No"}`}
+            </Button>
+          )}
           <div className="execution-estimate" aria-label="Execution estimate">
             <div>
               <span title="Weighted average across available orders, before fees">
@@ -1127,9 +1132,7 @@ function MarketDetail({
 
 function CardTile({ card }: { card: Listing }) {
   const { network } = useNetwork();
-  const [collect, setCollect] = useState(false);
-  const [back, setBack] = useState(false),
-    [failed, setFailed] = useState(false);
+  const [back, setBack] = useState(false);
   const image = back ? card.backImage : card.frontImage;
   return (
     <article className="collectible-tile">
@@ -1137,26 +1140,15 @@ function CardTile({ card }: { card: Listing }) {
         <span className="grade-badge">
           {card.grader} {card.grade}
         </span>
-        {image && !failed ? (
-          <img
-            src={image}
-            alt={`${card.name}, ${back ? "back" : "front"} of actual slab`}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            onError={() => setFailed(true)}
-          />
-        ) : (
-          <div className="missing-image">
-            <Layers3 size={29} />
-            <span>Provider image unavailable</span>
-          </div>
-        )}
+        <CardImage
+          src={image}
+          alt={`${card.name}, ${back ? "back" : "front"}`}
+        />
         {card.backImage ? (
           <button
             className="flip-card"
             onClick={() => {
               setBack(!back);
-              setFailed(false);
             }}
             aria-label={`Show ${back ? "front" : "back"} of ${card.name}`}
           >
@@ -1179,22 +1171,19 @@ function CardTile({ card }: { card: Listing }) {
             <strong>{usd(card.ask)}</strong>
           </div>
         </div>
-        {network === "devnet" &&
-          process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
-          (collect ? (
-            <DemoClaim
-              source="collectorcrypt"
-              sourceId={card.mint}
-              name={card.name}
-            />
-          ) : (
-            <button
-              className="reward-browse-button"
-              onClick={() => setCollect(true)}
-            >
-              Collect card
-            </button>
-          ))}
+        <CardValue valuation={card.valuation} />
+        {network === "devnet" && process.env.NEXT_PUBLIC_PRIVY_APP_ID && (
+          <AddReward
+            item={{
+              source: "collectorcrypt",
+              sourceId: card.mint,
+              name: card.name,
+              image: card.frontImage,
+              cost: card.ask,
+              valuation: card.valuation,
+            }}
+          />
+        )}
       </div>
     </article>
   );
@@ -1270,7 +1259,7 @@ function RewardCatalog({
   ) => (
     <label>
       {label}
-      <select
+      <Select
         aria-label={label}
         value={filters[key]}
         onChange={(e) => update(key, e.target.value)}
@@ -1281,7 +1270,7 @@ function RewardCatalog({
             {v}
           </option>
         ))}
-      </select>
+      </Select>
     </label>
   );
   return (
@@ -1359,14 +1348,14 @@ function RewardCatalog({
             )}
             <label>
               Card type
-              <select
+              <Select
                 value={filters.feature}
                 onChange={(e) => update("feature", e.target.value)}
               >
                 <option value="">All cards</option>
                 <option value="autograph">Autographed</option>
                 <option value="rookie">Rookie</option>
-              </select>
+              </Select>
             </label>
             <label>
               Min price · USDC
@@ -1392,14 +1381,14 @@ function RewardCatalog({
             </label>
             <label>
               Sort by
-              <select
+              <Select
                 value={filters.sort}
                 onChange={(e) => update("sort", e.target.value)}
               >
                 <option value="high">Highest price</option>
                 <option value="low">Lowest price</option>
                 <option value="name">Name A–Z</option>
-              </select>
+              </Select>
             </label>
             <button
               className="filter-reset"
