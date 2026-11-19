@@ -1,0 +1,34 @@
+[
+  {
+    "tier": 25,
+    "path": "apps/web/public/packs/pull-25.webp",
+    "prompt": "Use case: product-mockup. Create one premium 3D collectible prediction pack asset for Slabline, price tier $25 (do not print price or any text). Single sealed vertical foil trading-card booster pack, front view with subtle physical thickness, straight-on centered, entire pack contained with generous transparent margin. Dark graphite black foil, brushed gunmetal silver panels, restrained ice-blue luminous diagonal split-slab geometry, intricate fine embossed grid, crisp crimped foil top and bottom. Premium realistic studio product rendering, clean silhouette, no props, no ground, no backdrop, no logos, no letters, no numbers. Palette #0b1118 #151e28 #293541 #80c9ff. Image for animated CSS3D pack on dark app UI. This is the entry tier: mostly charcoal with quiet blue edge light. Transparent background.",
+    "tool": "built-in image_gen",
+    "transparent": true,
+    "encoding": "WebP quality 90, original alpha preserved"
+  },
+  {
+    "tier": 50,
+    "path": "apps/web/public/packs/pull-50.webp",
+    "prompt": "Use case: product-mockup. One premium 3D collectible prediction booster pack asset for Slabline tier 50, NO text or numbers printed. Single sealed vertical foil trading-card pack centered straight-on front view with subtle physical thickness, whole silhouette visible and transparent margin. brushed steel foil with a bold ice-blue diagonal center panel, medium intensity cool rim highlights. Crimped foil top and bottom, embossed fine grid and abstract diagonal split-slab shapes. Realistic high-end studio product rendering, crisp clean silhouette. Palette limited graphite #0b1118 gunmetal #293541 silver ice-blue #80c9ff. No props, no floor, no background, no logos, no lettering. Designed for animated CSS3D pack in dark app interface. Transparent background.",
+    "tool": "built-in image_gen",
+    "transparent": true,
+    "encoding": "WebP quality 90, original alpha preserved"
+  },
+  {
+    "tier": 100,
+    "path": "apps/web/public/packs/pull-100.webp",
+    "prompt": "Use case: product-mockup. One premium 3D collectible prediction booster pack asset for Slabline tier 100, NO text or numbers printed. Single sealed vertical foil trading-card pack centered straight-on front view with subtle physical thickness, whole silhouette visible and transparent margin. dark titanium foil with crystalline ice-blue angular facets and bright silver borders, luminous premium etched details. Crimped foil top and bottom, embossed fine grid and abstract diagonal split-slab shapes. Realistic high-end studio product rendering, crisp clean silhouette. Palette limited graphite #0b1118 gunmetal #293541 silver ice-blue #80c9ff. No props, no floor, no background, no logos, no lettering. Designed for animated CSS3D pack in dark app interface. Transparent background.",
+    "tool": "built-in image_gen",
+    "transparent": true,
+    "encoding": "WebP quality 90, original alpha preserved"
+  },
+  {
+    "tier": 200,
+    "path": "apps/web/public/packs/pull-200.webp",
+    "prompt": "Use case: product-mockup. One premium 3D collectible prediction booster pack asset for Slabline tier 200, NO text or numbers printed. Single sealed vertical foil trading-card pack centered straight-on front view with subtle physical thickness, whole silhouette visible and transparent margin. elite black chrome foil with striking glacier-blue iridescent diagonal panels and silver holographic edges, luxurious prismatic blue reflections. Crimped foil top and bottom, embossed fine grid and abstract diagonal split-slab shapes. Realistic high-end studio product rendering, crisp clean silhouette. Palette limited graphite #0b1118 gunmetal #293541 silver ice-blue #80c9ff. No props, no floor, no background, no logos, no lettering. Designed for animated CSS3D pack in dark app interface. Transparent background.",
+    "tool": "built-in image_gen",
+    "transparent": true,
+    "encoding": "WebP quality 90, original alpha preserved"
+  }
+]
