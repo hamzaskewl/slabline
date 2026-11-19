@@ -189,6 +189,34 @@ export function demoCollectibleValue(
   );
 }
 
+/** Size a sale to the holding and executable selected-side bid depth. */
+export function demoSalePreview(
+  position: Pick<DemoPosition, "side" | "quantity">,
+  book: Book,
+  requested = position.quantity,
+) {
+  const lot = units(book.quantityIncrement);
+  if (lot <= 0n) throw new Error("Invalid share increment.");
+  const depth = bookForSide(book, position.side).bids.reduce(
+    (total, level) =>
+      total +
+      (units(level.price) > 0n ? (units(level.quantity) / lot) * lot : 0n),
+    0n,
+  );
+  const held = (units(position.quantity) / lot) * lot;
+  const maximum = held < depth ? held : depth;
+  const wanted = (units(requested) / lot) * lot;
+  const quantity = money(wanted < maximum ? wanted : maximum);
+  return {
+    maximum: money(maximum),
+    quantity,
+    proceeds:
+      units(quantity) > 0n
+        ? demoSaleQuote({ side: position.side, quantity }, book)
+        : null,
+  };
+}
+
 /** A full-position sale uses executable bids, never the last-traded price. */
 export function demoSaleQuote(
   position: Pick<DemoPosition, "side" | "quantity">,

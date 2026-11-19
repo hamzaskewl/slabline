@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {
-  demoSaleQuote,
+  demoSalePreview,
   money,
   units,
   type Book,
@@ -59,34 +59,44 @@ export function DemoSellOrder({
   useEffect(() => {
     setReceipt("");
   }, [symbol, side, replay, rehearsal, a.user?.id, a.network]);
-  let proceeds: string | null = null,
+  let preview: ReturnType<typeof demoSalePreview> | null = null,
     quoteError = "";
-  const valid =
-    !!position &&
-    /^\d+(\.\d{1,6})?$/.test(quantity) &&
-    units(quantity) > 0n &&
-    units(quantity) <= units(position.quantity);
-  if (valid && book && !stale && book.symbol === symbol) {
+  const readyBook = book && !stale && book.symbol === symbol ? book : null;
+  if (position && readyBook) {
     try {
-      proceeds = demoSaleQuote({ side, quantity }, book);
-    } catch (error) {
-      quoteError =
-        error instanceof Error ? error.message : "Sale estimate unavailable.";
+      preview = demoSalePreview(
+        position,
+        readyBook,
+        /^\d+(\.\d{1,6})?$/.test(quantity) ? quantity : "0",
+      );
+    } catch {
+      quoteError = "Sale estimate unavailable. Waiting for updated bids.";
     }
   }
+  const saleQuantity = preview?.quantity ?? "0";
+  const proceeds = preview?.proceeds ?? null;
+  const maximum = preview?.maximum ?? "0";
+  const adjusted =
+    preview !== null &&
+    /^\d+(\.\d{1,6})?$/.test(quantity) &&
+    units(quantity) !== units(saleQuantity);
+  // Keep edits capped when holdings or bid depth change, including between renders.
+  useEffect(() => {
+    if (adjusted) {
+      setQuantity(saleQuantity);
+      setPreset(saleQuantity === maximum ? 100 : null);
+      key.current = crypto.randomUUID();
+    }
+  }, [adjusted, saleQuantity, maximum]);
   const average =
     proceeds !== null
-      ? usd(money((units(proceeds) * 1000000n) / units(quantity)))
+      ? usd(money((units(proceeds) * 1000000n) / units(saleQuantity)))
       : "—";
   function choose(percent: number) {
-    if (!position || !book) return;
-    const lot = units(book.quantityIncrement);
-    if (lot <= 0n) return;
-    // Max retains the full executable quantity; formatting never changes an order.
+    if (!preview || !readyBook) return;
+    const lot = units(readyBook.quantityIncrement);
     const amount =
-      percent === 100
-        ? units(position.quantity)
-        : ((units(position.quantity) * BigInt(percent)) / 100n / lot) * lot;
+      ((units(preview.maximum) * BigInt(percent)) / 100n / lot) * lot;
     setQuantity(money(amount));
     setPreset(percent);
     setReceipt("");
@@ -101,7 +111,14 @@ export function DemoSellOrder({
           aria-label="Shares to sell"
           inputMode="decimal"
           autoComplete="off"
-          value={preset === null ? quantity : shares(quantity)}
+          value={
+            adjusted
+              ? shares(saleQuantity)
+              : preset === null && /^\d*(\.\d{0,2})?$/.test(quantity)
+                ? quantity
+                : shares(quantity)
+          }
+          maxLength={24}
           disabled={a.busy || !position}
           onChange={(event) => {
             if (!/^\d*(\.\d{0,2})?$/.test(event.target.value)) return;
@@ -118,7 +135,9 @@ export function DemoSellOrder({
             key={percent}
             type="button"
             aria-pressed={preset === percent}
-            disabled={a.busy || !position || !book}
+            disabled={
+              a.busy || !position || !preview || units(preview.maximum) === 0n
+            }
             onClick={() => choose(percent)}
           >
             {percent === 100 ? "Max" : `${percent}%`}
@@ -151,7 +170,7 @@ export function DemoSellOrder({
               action: "sell",
               id: position.id,
               key: key.current,
-              quantity,
+              quantity: saleQuantity,
               minimumProceeds: proceeds,
             });
             setReceipt("Sale complete");
@@ -169,7 +188,9 @@ export function DemoSellOrder({
                 ? "Loading position…"
                 : !position
                   ? "No shares to sell"
-                  : `Sell ${side === "yes" ? "Yes" : "No"}`}
+                  : preview && units(preview.maximum) === 0n
+                    ? "No buyers right now"
+                    : `Sell ${side === "yes" ? "Yes" : "No"}`}
       </Button>
       {receipt && (
         <p className="sale-receipt" role="status">
