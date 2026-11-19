@@ -7,6 +7,9 @@ import {
   outcomeImages,
   sortMarkets,
   marketStatusMatches,
+  isLiveGame,
+  isCurrentMarket,
+  featuredMarkets,
   type Market,
 } from "./index";
 const market = (
@@ -24,6 +27,91 @@ const market = (
   children: [],
   description: "",
   closesAt: null,
+});
+test("featured games exclude expired, resolved and past non-live events, prioritizing confirmed live games", () => {
+  const now = Date.parse("2026-11-19T06:00:00Z");
+  const game = (id: string, patch: Partial<Market> = {}): Market => ({
+    ...market(id, "Home vs Away", "100"),
+    startsAt: "2026-11-19T07:00:00Z",
+    closesAt: "2026-11-21T07:00:00Z",
+    sportsMarket: { type: "moneyline" },
+    contracts: ["Home", "Away"].map((label) => ({
+      symbol: id + label,
+      label,
+      status: "active",
+      imageUrl: "https://assets.gemini.com/team.png",
+      lastPrice: null,
+      quantityIncrement: null,
+      priceIncrement: null,
+    })),
+    ...patch,
+  });
+  const live = game("live", {
+    startsAt: "2026-11-19T04:00:00Z",
+    isLive: true,
+    volume: "1",
+  });
+  const upcoming = game("upcoming");
+  const expired = game("old", {
+    isLive: true,
+    startsAt: "2026-11-04T00:00:00Z",
+    closesAt: "2026-11-06T00:00:00Z",
+    volume: "999999",
+  });
+  const past = game("past", {
+    startsAt: "2026-11-19T03:00:00Z",
+    isLive: false,
+  });
+  const settled = game("settled", { status: "settled", isLive: true });
+  const resolved = game("resolved", {
+    resolvedAt: "2026-11-19T05:00:00Z",
+    isLive: true,
+  });
+  const unknown = game("unknown", { startsAt: null });
+  const endedContracts = game("contracts", {
+    contracts: upcoming.contracts.map((c) => ({ ...c, status: "settled" })),
+  });
+  expect(
+    featuredMarkets(
+      [
+        expired,
+        past,
+        upcoming,
+        settled,
+        resolved,
+        unknown,
+        live,
+        endedContracts,
+      ],
+      now,
+    ).map((m) => m.id),
+  ).toEqual(["live", "upcoming"]);
+  for (const m of [expired, past, settled, resolved, endedContracts])
+    expect(isCurrentMarket(m, now)).toBe(false);
+  expect(isLiveGame(live, now)).toBe(true);
+  expect(isLiveGame(upcoming, now)).toBe(false);
+  expect(isLiveGame({ ...upcoming, isLive: true }, now)).toBe(false);
+  expect(isLiveGame({ ...live, category: "Crypto" }, now)).toBe(false);
+  expect(isLiveGame({ ...live, isLive: undefined }, now)).toBe(false);
+  const staleFlag = {
+    ...live,
+    startsAt: "2026-11-15T00:00:00Z",
+    closesAt: "2026-11-30T00:00:00Z",
+  };
+  expect(isLiveGame(staleFlag, now)).toBe(false);
+  expect(isCurrentMarket(staleFlag, now)).toBe(false);
+  expect(featuredMarkets([staleFlag, upcoming], now).map((m) => m.id)).toEqual([
+    "upcoming",
+  ]);
+  expect(
+    isCurrentMarket({ ...past, sportsMarket: { type: "futures" } }, now),
+  ).toBe(true);
+  expect(featuredMarkets([upcoming], Date.parse(upcoming.startsAt!))).toEqual(
+    [],
+  );
+  expect(marketStatusMatches(expired, "active", now)).toBe(false);
+  expect(marketStatusMatches(settled, "resolved", now)).toBe(true);
+  expect(marketStatusMatches(expired, "all", now)).toBe(true);
 });
 test("search ranks exact and title matches ahead of volume, then volume within a match tier", () => {
   const broad = {

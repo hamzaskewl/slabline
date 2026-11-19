@@ -2,6 +2,7 @@ import { cached, listMarkets } from "@collectible/integrations";
 import {
   discoveryMarkets,
   marketMatches,
+  marketStatusMatches,
   marketPreview,
   normalizeMarketSearch,
   type Market,
@@ -18,7 +19,7 @@ export async function searchCatalog(
   const local = snapshot.data.filter((m) => marketMatches(m, search));
   try {
     const remote = await cached(
-      `gemini:search:v2:${status}:${search}`,
+      `gemini:search:v3:${status}:${search}`,
       30000,
       async () => ({
         data: await listMarkets(
@@ -36,6 +37,7 @@ export async function searchCatalog(
       stale: false,
       error: null,
       data: discoveryMarkets([...local, ...remote.data])
+        .filter((m) => marketStatusMatches(m, status))
         .map(marketPreview)
         .filter((m) => !category || m.category === category),
     };
@@ -47,6 +49,7 @@ export async function searchCatalog(
       error:
         "Gemini search is unavailable. Showing matches from the saved catalog; retry to search all markets.",
       data: discoveryMarkets(local)
+        .filter((m) => marketStatusMatches(m, status))
         .map(marketPreview)
         .filter((m) => !category || m.category === category),
     };

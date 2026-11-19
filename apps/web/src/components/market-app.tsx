@@ -57,6 +57,7 @@ import { usd } from "@/lib/utils";
 import { GrailCatalog } from "./grail-catalog";
 import { Discovery } from "./discovery";
 import { MarketSearch } from "./market-search";
+import { LiveBadge } from "./live-badge";
 import type { MarketStatusFilter } from "@collectible/domain";
 import { SlablineMark } from "./slabline-mark";
 import { OutcomeDetail } from "./outcome-detail";
@@ -155,7 +156,9 @@ export function MarketApp({
     useState<MarketStatusFilter>("active");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
-    setSearch(new URLSearchParams(window.location.search).get("q") ?? "");
+    const params = new URLSearchParams(window.location.search);
+    setSearch(params.get("q") ?? "");
+    if (params.get("category") === "live") setCategory("Live");
   }, []);
   useEffect(() => {
     const timer = setTimeout(
@@ -342,6 +345,7 @@ export function MarketApp({
               href="/"
               onClick={() => {
                 setCategory("All markets");
+                setMarketStatus("active");
                 setSearch("");
                 setPractice(false);
               }}
@@ -353,7 +357,22 @@ export function MarketApp({
             >
               <Zap size={14} /> All markets
             </Link>
+            <Link
+              href="/?category=live"
+              className={
+                section === "markets" && category === "Live" ? "active" : ""
+              }
+              onClick={() => {
+                setCategory("Live");
+                setMarketStatus("active");
+                setSearch("");
+                setPractice(false);
+              }}
+            >
+              <LiveBadge />
+            </Link>
             {[...new Set(markets.map((m) => m.category))]
+              .filter((c) => c !== "Live")
               .sort((a, b) =>
                 a === "Sports" ? -1 : b === "Sports" ? 1 : a.localeCompare(b),
               )

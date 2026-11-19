@@ -47,6 +47,8 @@ type RawEvent = {
   description?: string | null;
   expiryDate?: string | null;
   startTime?: string | null;
+  isLive?: boolean | null;
+  resolvedAt?: string | null;
   sportsMarket?: { type: string; subject?: string; sport?: string } | null;
 };
 const event: z.ZodType<RawEvent> = z.lazy(() =>
@@ -66,6 +68,8 @@ const event: z.ZodType<RawEvent> = z.lazy(() =>
     description: z.string().nullable().optional(),
     expiryDate: z.string().nullable().optional(),
     startTime: z.string().nullish(),
+    isLive: z.boolean().nullish(),
+    resolvedAt: z.string().nullish(),
     sportsMarket: z
       .object({
         type: z.string(),
@@ -94,6 +98,8 @@ export function normalizeEvent(raw: RawEvent): Market {
     description: raw.description ?? "",
     closesAt: raw.expiryDate ?? null,
     startsAt: raw.startTime ?? null,
+    isLive: raw.isLive ?? null,
+    resolvedAt: raw.resolvedAt ?? null,
     contracts: (raw.contracts ?? []).map((c) => ({
       symbol: c.instrumentSymbol,
       label: c.label ?? c.instrumentSymbol,

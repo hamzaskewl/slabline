@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
@@ -8,13 +8,17 @@ import {
   eventVolume,
   marketOutcomes,
   marketTeams,
-  sortMarkets,
+  featuredMarkets,
+  isCurrentMarket,
+  isLiveGame,
   type ChartRange,
   type Contract,
   type Market,
 } from "@collectible/domain";
 import { api } from "@/lib/trpc";
 import { MarketArt } from "./market-art";
+import { LiveBadge } from "./live-badge";
+import { useMarketClock } from "@/lib/use-market-clock";
 const PriceChart = dynamic(() => import("./price-chart"), {
   ssr: false,
   loading: () => <div className="chart-loading">Loading price history…</div>,
@@ -33,19 +37,24 @@ function buttonTextColor(color: string) {
 }
 
 export function FeaturedMarkets({ markets }: { markets: Market[] }) {
+  const now = useMarketClock();
+  const [ended, setEnded] = useState<string[]>([]);
+  const hideEnded = useCallback((id: string) => {
+    setEnded((ids) => (ids.includes(id) ? ids : [...ids, id]));
+  }, []);
   const featured = useMemo(
     () =>
-      sortMarkets(
-        markets.filter(
-          (m) => marketTeams(m).length === 2 && !m.title.includes(":"),
-        ),
-      ).slice(0, 4),
-    [markets],
+      featuredMarkets(
+        markets.filter((m) => !ended.includes(m.id)),
+        now,
+      ),
+    [markets, ended, now],
   );
   const [selected, setSelected] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [interacting, setInteracting] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(true);
+  const touch = useRef<{ x: number; y: number } | null>(null);
   const index = Math.max(
     0,
     featured.findIndex((m) => m.id === selected),
@@ -80,7 +89,28 @@ export function FeaturedMarkets({ markets }: { markets: Market[] }) {
       onMouseLeave={() => setInteracting(false)}
       onFocusCapture={() => setPaused(true)}
     >
-      <div className="featured-window">
+      <div
+        className="featured-window"
+        onTouchStart={(e) => {
+          const p = e.touches[0];
+          touch.current = p ? { x: p.clientX, y: p.clientY } : null;
+        }}
+        onTouchCancel={() => {
+          touch.current = null;
+        }}
+        onTouchEnd={(e) => {
+          const start = touch.current;
+          const end = e.changedTouches[0];
+          touch.current = null;
+          if (!start || !end) return;
+          const dx = end.clientX - start.x;
+          if (
+            Math.abs(dx) > 60 &&
+            Math.abs(dx) > Math.abs(end.clientY - start.y)
+          )
+            move(index + (dx < 0 ? 1 : -1));
+        }}
+      >
         <div
           className="featured-track"
           style={{ transform: `translateX(-${index * 100}%)` }}
@@ -96,7 +126,12 @@ export function FeaturedMarkets({ markets }: { markets: Market[] }) {
               inert={i !== index}
             >
               {i === index ? (
-                <FeaturedEvent key={market.id} market={market} />
+                <FeaturedEvent
+                  key={market.id}
+                  market={market}
+                  now={now}
+                  hideEnded={hideEnded}
+                />
               ) : (
                 <div className="featured-placeholder">
                   <h2>{market.title}</h2>
@@ -153,7 +188,15 @@ export function FeaturedMarkets({ markets }: { markets: Market[] }) {
     </section>
   );
 }
-function FeaturedEvent({ market }: { market: Market }) {
+function FeaturedEvent({
+  market,
+  now,
+  hideEnded,
+}: {
+  market: Market;
+  now: number;
+  hideEnded: (id: string) => void;
+}) {
   const detail = api.market.useQuery(
     { id: market.ticker ?? market.id },
     { staleTime: 30000, refetchInterval: 30000 },
@@ -165,6 +208,10 @@ function FeaturedEvent({ market }: { market: Market }) {
   );
   const teams = marketTeams(full);
   const [range, setRange] = useState<ChartRange>("ALL");
+  const current = isCurrentMarket(full, now);
+  useEffect(() => {
+    if (!current) hideEnded(market.id);
+  }, [current, market.id, hideEnded]);
   const href = `/markets/${market.ticker ?? market.id}`;
   const related = ["spread", "total"]
     .map((type) =>
@@ -178,6 +225,7 @@ function FeaturedEvent({ market }: { market: Market }) {
       ),
     )
     .filter((m): m is Market => !!m);
+  if (!current) return null;
   return (
     <div className="featured-event">
       <div className="featured-trading">
@@ -186,15 +234,19 @@ function FeaturedEvent({ market }: { market: Market }) {
           <div>
             <h2>{full.title}</h2>
             <p>
-              {full.startsAt
-                ? new Date(full.startsAt).toLocaleString("en-US", {
-                    weekday: "short",
-                    hour: "numeric",
-                    minute: "2-digit",
-                    month: "short",
-                    day: "numeric",
-                  })
-                : (full.subcategory ?? full.category)}
+              {isLiveGame(full, now) ? (
+                <LiveBadge />
+              ) : full.startsAt ? (
+                new Date(full.startsAt).toLocaleString("en-US", {
+                  weekday: "short",
+                  hour: "numeric",
+                  minute: "2-digit",
+                  month: "short",
+                  day: "numeric",
+                })
+              ) : (
+                (full.subcategory ?? full.category)
+              )}
             </p>
           </div>
         </Link>
@@ -235,7 +287,9 @@ function FeaturedEvent({ market }: { market: Market }) {
             </span>
           )}
           <div>
-            {full.startsAt ? (
+            {isLiveGame(full, now) ? (
+              <LiveBadge />
+            ) : full.startsAt ? (
               <time dateTime={full.startsAt}>
                 {new Date(full.startsAt).toLocaleTimeString("en-US", {
                   hour: "numeric",

@@ -53,6 +53,8 @@ export type Market = {
   liquidity?: string | null;
   createdAt?: string | null;
   startsAt?: string | null;
+  isLive?: boolean | null;
+  resolvedAt?: string | null;
   subcategory?: string | null;
   sportsMarket?: { type: string; subject?: string; sport?: string } | null;
   teams?: Contract[];

@@ -8,6 +8,7 @@ import {
   isPlayerProp,
   marketMatches,
   marketStatusMatches,
+  isLiveGame,
   type MarketStatusFilter,
   sortMarkets,
   type Market,
@@ -18,6 +19,8 @@ import { SnapshotStatus } from "./snapshot-status";
 import { MarketArt } from "./market-art";
 import { FeaturedMarkets } from "./featured-markets";
 import { DiscoveryControls } from "./discovery-controls";
+import { LiveBadge } from "./live-badge";
+import { useMarketClock } from "@/lib/use-market-clock";
 
 export function Discovery({
   markets,
@@ -52,6 +55,7 @@ export function Discovery({
   onPractice: () => void;
   snapshot?: ProviderResult<Market[]>;
 }) {
+  const now = useMarketClock();
   const [limit, setLimit] = useState(24);
   const [sort, setSort] = useState<MarketSort>("relevance");
   const [league, setLeague] = useState("");
@@ -89,12 +93,24 @@ export function Discovery({
   }, [search]);
   const categories = [
     "All markets",
-    ...new Set([...catalog, ...markets].map((m) => m.category).sort()),
+    "Live",
+    ...new Set(
+      [...catalog, ...markets]
+        .map((m) => m.category)
+        .filter((c) => c !== "Live")
+        .sort(),
+    ),
   ];
   const leagues = [
     ...new Set(
       [...catalog, ...markets]
-        .filter((m) => category === "All markets" || m.category === category)
+        .filter(
+          (m) =>
+            category === "All markets" ||
+            (category === "Live"
+              ? isLiveGame(m, now)
+              : m.category === category),
+        )
         .flatMap((m) => (m.subcategory ? [m.subcategory] : [])),
     ),
   ].sort();
@@ -103,10 +119,17 @@ export function Discovery({
       sortMarkets(
         markets.filter(
           (m) =>
-            (category === "All markets" || m.category === category) &&
+            (category === "All markets" ||
+              (category === "Live"
+                ? isLiveGame(m, now)
+                : m.category === category)) &&
             (!league || m.subcategory === league) &&
             marketMatches(m, query) &&
-            marketStatusMatches(m, status) &&
+            marketStatusMatches(
+              m,
+              category === "Live" ? "active" : status,
+              now,
+            ) &&
             (includeProps || !!query || !isPlayerProp(m)) &&
             (!favoritesOnly || favorites.includes(m.id)),
         ),
@@ -123,11 +146,13 @@ export function Discovery({
       favoritesOnly,
       favorites,
       sort,
+      now,
     ],
   );
   const changeCategory = (value: string) => {
     setCategory(value);
     setLeague("");
+    if (value === "Live" || value === "All markets") setStatus("active");
   };
   const clear = () => {
     setSearch("");
@@ -162,7 +187,7 @@ export function Discovery({
               aria-pressed={category === c}
               onClick={() => changeCategory(c)}
             >
-              {c === "All markets" ? "All" : c}
+              {c === "All markets" ? "All" : c === "Live" ? <LiveBadge /> : c}
             </button>
           ))}
           <button onClick={onPractice}>Practice</button>
@@ -173,7 +198,15 @@ export function Discovery({
           !favoritesOnly &&
           status === "active" && <FeaturedMarkets markets={catalog} />}
         <div className="discovery-heading">
-          <h1>{search.trim() ? "Search results" : category}</h1>
+          <h1>
+            {search.trim() ? (
+              "Search results"
+            ) : category === "Live" ? (
+              <LiveBadge />
+            ) : (
+              category
+            )}
+          </h1>
           <label className="discovery-search">
             <Search size={17} />
             <input
@@ -201,7 +234,11 @@ export function Discovery({
               (m) => m.liquidity != null && /^\d+(?:\.\d+)?$/.test(m.liquidity),
             )}
             status={status}
-            setStatus={setStatus}
+            setStatus={(next) => {
+              if (category === "Live" && next !== "active")
+                setCategory("All markets");
+              setStatus(next);
+            }}
             sort={sort}
             setSort={setSort}
             category={category}
@@ -277,11 +314,19 @@ export function Discovery({
         ) : !visible.length ? (
           <div className="empty-state">
             <Search size={28} />
-            <h2>{searching ? "Searching markets…" : "No matching markets"}</h2>
+            <h2>
+              {searching
+                ? "Searching markets…"
+                : category === "Live" && !query && !league
+                  ? "No games live right now"
+                  : "No matching markets"}
+            </h2>
             <p>
               {searching
                 ? "Checking Gemini for events beyond the saved catalog."
-                : "Try another search or clear your filters."}
+                : category === "Live" && !query && !league
+                  ? "Browse upcoming games in All markets."
+                  : "Try another search or clear your filters."}
             </p>
             {!searching && (
               <button className="button button-outline" onClick={clear}>
@@ -298,6 +343,7 @@ export function Discovery({
                   key={m.id}
                   saved={favorites.includes(m.id)}
                   onSave={() => toggleFavorite(m.id)}
+                  now={now}
                 />
               ))}
             </div>
@@ -318,10 +364,12 @@ function PredictionCard({
   market,
   saved,
   onSave,
+  now,
 }: {
   market: Market;
   saved: boolean;
   onSave: () => void;
+  now: number;
 }) {
   const outcomes = market.contracts.slice(0, 2);
   const href = `/markets/${market.ticker ?? market.id}`;
@@ -368,6 +416,7 @@ function PredictionCard({
         ))}
       </div>
       <div className="prediction-card-footer">
+        {isLiveGame(market, now) && <LiveBadge />}
         <span className="card-volume">{eventVolume(market.volume)}</span>
         <span className="card-category">
           {market.subcategory ?? market.category}

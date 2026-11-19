@@ -16,6 +16,7 @@ import {
 import {
   marketPreview,
   discoveryMarkets,
+  marketStatusMatches,
   rewardCategories,
   type Book,
   type Market,
@@ -299,6 +300,7 @@ const server = Bun.serve({
           ? await searchCatalog(search, category, result, state)
           : {
               data: discoveryMarkets(result.data)
+                .filter((m) => marketStatusMatches(m, state))
                 .map(marketPreview)
                 .filter((m) => !category || m.category === category),
             }),

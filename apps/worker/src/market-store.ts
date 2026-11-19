@@ -14,8 +14,8 @@ import type {
 } from "@collectible/domain";
 import { SnapshotCache, type Snapshot } from "./snapshot-cache";
 
-// Keep the existing keys so the first deployment reuses already saved data.
-const catalogKey = "gemini:markets:v6:all-active-categories";
+// Refresh old snapshots that predate provider live/resolution metadata.
+const catalogKey = "gemini:markets:v7:all-active-categories";
 const flatten = (items: Market[]): Market[] =>
   items.flatMap((m) => [m, ...flatten(m.children)]);
 const known = new Map<string, Market>();

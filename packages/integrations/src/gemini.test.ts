@@ -16,6 +16,31 @@ import {
   buyPercent,
 } from "@collectible/domain";
 
+test("catalog normalization preserves explicit live and resolution metadata through previews", async () => {
+  const raw = {
+    id: "game",
+    title: "Hawaii vs Washington State",
+    status: "active",
+    isLive: true,
+    startTime: "2026-11-19T03:00:00Z",
+    expiryDate: "2026-11-21T03:00:00Z",
+    resolvedAt: null,
+  };
+  const [game] = await collectMarketPages(async () => ({
+    data: [raw],
+    pagination: { total: 1 },
+  }));
+  expect(marketPreview(game!).isLive).toBe(true);
+  expect(marketPreview(game!).startsAt).toBe(raw.startTime);
+  expect(normalizeEvent({ ...raw, isLive: false }).isLive).toBe(false);
+  expect(normalizeEvent({ id: "unknown", title: "Unknown" }).isLive).toBeNull();
+  expect(
+    marketPreview(
+      normalizeEvent({ ...raw, resolvedAt: "2026-11-19T06:00:00Z" }),
+    ).resolvedAt,
+  ).toBe("2026-11-19T06:00:00Z");
+});
+
 test("Gemini championship outcomes retain the provider's Contentful team artwork", () => {
   const buffalo =
     "https://images.ctfassets.net/jg6lo9a2ukvr/zbZpcrxpSCQKQmcRYUDA6/728742e6d361d7bdc46863d79545d911/Buffalo_BillsDark.png";
