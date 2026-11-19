@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Layers3 } from "lucide-react";
 import {
   payoutTarget,
@@ -27,6 +27,8 @@ export function RewardTarget({
   side,
   stale,
   payout,
+  stake,
+  stakeRevision,
   onStake,
   loading,
   error,
@@ -38,16 +40,32 @@ export function RewardTarget({
   side: "yes" | "no";
   stale: boolean;
   payout: string | null;
+  stake: string;
+  stakeRevision: number;
   onStake: (value: string) => void;
   loading?: boolean;
   error?: string | null;
 }) {
-  const [selectedMint, setSelectedMint] = useState<string | null>(null);
+  const [choice, setChoice] = useState<{
+    mint: string;
+    revision: number;
+  } | null>(null);
+  const selectedMint = choice?.revision === stakeRevision ? choice.mint : null;
   const [failedImage, setFailedImage] = useState<string | null>(null);
-  const { card, next, covered } = useMemo(
+  const { card, covered } = useMemo(
     () => rewardForPayout(cards, payout, selectedMint),
     [cards, payout, selectedMint],
   );
+  // Keep the suggested image steady while live quotes update. Only editing the
+  // stake or explicitly browsing cards chooses a new target.
+  useEffect(() => {
+    if (
+      payout !== null &&
+      card &&
+      (choice?.revision !== stakeRevision || choice.mint !== card.mint)
+    )
+      setChoice({ mint: card.mint, revision: stakeRevision });
+  }, [card, payout, choice, stakeRevision]);
   const target = useMemo(() => {
     if (!card || !book || stale) return null;
     try {
@@ -56,14 +74,8 @@ export function RewardTarget({
       return null;
     }
   }, [card, book, side, stale]);
-  const nextTarget = useMemo(() => {
-    if (!next || !book || stale) return null;
-    try {
-      return payoutTarget(next.ask, book, side);
-    } catch {
-      return null;
-    }
-  }, [next, book, side, stale]);
+  const stakeMatchesTarget =
+    !!target?.stake && Number(stake) === Number(target.stake);
   const team = market && card ? teamCardMatch(market, card) : null;
   const selectedTeam = market ? selectedRewardTeam(market) : null;
   if (!card)
@@ -134,7 +146,7 @@ export function RewardTarget({
             {covered
               ? "Within estimated payout"
               : payout
-                ? "Closest card"
+                ? "Above estimated payout"
                 : "Card target"}
           </span>
         </div>
@@ -144,9 +156,7 @@ export function RewardTarget({
         selected={card}
         team={selectedTeam?.name}
         payout={payout}
-        onSelect={setSelectedMint}
-        onAuto={() => setSelectedMint(null)}
-        automatic={!selectedMint || !cards.some((c) => c.mint === selectedMint)}
+        onSelect={(mint) => setChoice({ mint, revision: stakeRevision })}
       />
       <dl className="reward-target-stats">
         <div>
@@ -166,33 +176,24 @@ export function RewardTarget({
           </dd>
         </div>
       </dl>
-      {!covered && (
-        <button
-          className="reward-set-stake"
-          disabled={!target?.stake}
-          onClick={() => target?.stake && onStake(target.stake)}
-        >
-          {target?.stake
-            ? `Set stake to ${usd(target.stake)}`
-            : stale || !book
-              ? "Waiting for live depth"
-              : "Target unavailable at current depth"}
-        </button>
-      )}
-      {covered && next && (
-        <button
-          className="reward-next"
-          disabled={!nextTarget?.stake}
-          onClick={() => nextTarget?.stake && onStake(nextTarget.stake)}
-        >
-          Target {usd(next.ask)} USDC card{" "}
+      <button
+        className="reward-set-stake"
+        disabled={!target?.stake || stakeMatchesTarget}
+        onClick={() => target?.stake && onStake(target.stake)}
+      >
+        {target?.stake
+          ? stakeMatchesTarget
+            ? "Stake set for this card"
+            : "Set stake for this card"
+          : stale || !book
+            ? "Waiting for live depth"
+            : "Target unavailable at current depth"}
+        {target?.stake && !stakeMatchesTarget && (
           <span>
-            {nextTarget?.stake
-              ? `Set stake to ${usd(nextTarget.stake)}`
-              : "Waiting for enough depth"}
+            {usd(target.stake)} USD · {shares(target.sharesNeeded)} shares
           </span>
-        </button>
-      )}
+        )}
+      </button>
       <details className="reward-assumptions">
         <summary>Fees & availability</summary>
         <p>

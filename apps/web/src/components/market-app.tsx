@@ -707,6 +707,7 @@ function MarketDetail({
     [expandedSymbol, setExpandedSymbol] = useState<string | null>(null),
     [side, setSide] = useState<"yes" | "no">(initialSide),
     [stake, setStake] = useState(initialStake),
+    [stakeRevision, setStakeRevision] = useState(0),
     [range, setRange] = useState<ChartRange>("ALL"),
     [review, setReview] = useState(false);
   const contract = contracts.find((c) => c.symbol === selectedSymbol);
@@ -950,6 +951,7 @@ function MarketDetail({
               value={stake}
               onChange={(e) => {
                 setStake(e.target.value);
+                setStakeRevision((revision) => revision + 1);
                 setReview(false);
               }}
               aria-describedby="quote-note"
@@ -960,6 +962,7 @@ function MarketDetail({
               <button
                 key={v}
                 onClick={() => {
+                  setStakeRevision((revision) => revision + 1);
                   setStake(
                     String(
                       Math.min(
@@ -1044,7 +1047,9 @@ function MarketDetail({
           </div>
         </aside>
         <RewardTarget
-          key={symbol}
+          key={`${symbol}:${side}`}
+          stake={stake}
+          stakeRevision={stakeRevision}
           loading={rewardsLoading}
           error={rewardsError}
           cards={possibleMatches}
@@ -1055,7 +1060,7 @@ function MarketDetail({
           stale={stale}
           payout={quote?.totalPayout ?? null}
           onStake={(value) => {
-            setStake(value.replace(/0+$/, "").replace(/\.$/, ""));
+            setStake(String(Number(value)));
             setReview(false);
           }}
         />
