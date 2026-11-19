@@ -187,8 +187,14 @@ export function outcomeRewardMarket(
     children: [],
   };
 }
-export function rewardCategories(markets: Market[]) {
-  const text = markets.filter(activeMarket).map(marketText).join(" ");
+export function rewardCategories(
+  markets: Market[],
+  options: { includeInactive?: boolean } = {},
+) {
+  const text = markets
+    .filter((m) => options.includeInactive || activeMarket(m))
+    .map(marketText)
+    .join(" ");
   return [
     ...sportCategories,
     ...["Pokemon", "One Piece", "Riftbound"].filter((c) => includes(text, c)),

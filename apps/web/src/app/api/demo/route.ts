@@ -20,7 +20,6 @@ import {
   units,
   demoPositionContext,
   positionRewardMarket,
-  matchingCards,
   matchingTokens,
 } from "@collectible/domain";
 import {
@@ -32,7 +31,8 @@ import {
   reconcileDemoPositions,
   requireDemoNetwork,
   DemoError,
-  listCards,
+  listRewardCards,
+  providerRead,
   listGrailTokens,
   getGrailRewardDetails,
   prepareDemoMint,
@@ -254,9 +254,15 @@ export async function POST(request: Request) {
       if (!position?.reward)
         throw new ApiError(409, "Choose a winning reward first.");
       const subject = positionRewardMarket(position);
-      const catalog = b.items.some((i) => i.source === "collectorcrypt")
-        ? await attachCachedValuations(await listCards("", [], "mainnet"))
-        : [];
+      const catalogResult = b.items.some((i) => i.source === "collectorcrypt")
+        ? await providerRead(() => listRewardCards(subject), [])
+        : { data: [], error: null };
+      if (catalogResult.error)
+        throw new ApiError(
+          503,
+          "Card listings are temporarily unavailable. Your reward is still available; try again shortly.",
+        );
+      const catalog = await attachCachedValuations(catalogResult.data);
       const grail = b.items.some((i) => i.source === "grail")
         ? await listGrailTokens()
         : [];
@@ -264,9 +270,7 @@ export async function POST(request: Request) {
       for (const choice of b.items) {
         let item: Omit<DemoCollectible, "id" | "state">;
         if (choice.source === "collectorcrypt") {
-          const card = matchingCards(subject, catalog).find(
-            (c) => c.mint === choice.sourceId,
-          );
+          const card = catalog.find((c) => c.mint === choice.sourceId);
           if (!card)
             throw new ApiError(
               409,
