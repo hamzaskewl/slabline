@@ -65,6 +65,7 @@ import { PredictNavigation } from "./predict-navigation";
 import { SlablineMark } from "./slabline-mark";
 import { OutcomeDetail } from "./outcome-detail";
 import { RewardTarget } from "./reward-target";
+import { useMobileNavigation } from "@/lib/use-mobile-navigation";
 import { useLiveBook } from "@/lib/use-live-book";
 import { retainMarketSnapshot } from "@/lib/market-snapshot";
 import { SnapshotStatus } from "./snapshot-status";
@@ -96,6 +97,10 @@ const PriceChart = dynamic(() => import("./price-chart"), {
 });
 const AuthButton = dynamic(
   () => import("./auth-controls").then((m) => m.AuthButton),
+  { ssr: false },
+);
+const AccountGate = dynamic(
+  () => import("./account-gate").then((m) => m.AccountGate),
   { ssr: false },
 );
 const PrivateAccount = dynamic(
@@ -173,6 +178,9 @@ export function MarketApp({
     [category, setCategory] = useState("All markets"),
     [practice, setPractice] = useState(false),
     [menuOpen, setMenuOpen] = useState(false);
+  const navigationRef = useMobileNavigation(
+    `${section}:${selectedId ?? ""}:${practice}`,
+  );
   const [orders, setOrders] = useState<PracticeOrder[]>([]),
     [notice, setNotice] = useState("");
   const [marketStatus, setMarketStatus] =
@@ -205,14 +213,18 @@ export function MarketApp({
           previous as ProviderResult<Market[]> | undefined,
           incoming as ProviderResult<Market[]>,
         ),
-      enabled: !selectedId && !replay && !practice && !pull,
+      enabled: section === "markets" && !selectedId && !replay && !practice,
     },
   );
   const searchQuery = api.markets.useQuery(
     { search: debouncedSearch, status: marketStatus },
     {
       enabled:
-        !selectedId && !replay && !practice && !pull && !!debouncedSearch,
+        section === "markets" &&
+        !selectedId &&
+        !replay &&
+        !practice &&
+        !!debouncedSearch,
       staleTime: 30000,
     },
   );
@@ -305,7 +317,10 @@ export function MarketApp({
     );
   };
   return (
-    <div className={`app-shell prediction-surface ${pull ? "pull-app" : ""}`}>
+    <div
+      className={`app-shell prediction-surface ${pull ? "pull-app" : ""}`}
+      ref={navigationRef}
+    >
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -318,14 +333,25 @@ export function MarketApp({
             </Link>
             <span className="brand-divider" />
             <PredictNavigation pull={pull} />
-            {detailView || pull ? (
+            {detailView || section !== "markets" ? (
               <nav className="board-navigation" aria-label="Market navigation">
-                <Link href="/" aria-current={pull ? undefined : "page"}>
+                <Link
+                  href="/"
+                  aria-current={section === "markets" ? "page" : undefined}
+                >
                   Predictions
                 </Link>
-                <Link href="/rewards">Rewards</Link>
-                <Link href="/portfolio">Portfolio</Link>
-                <Link href="/wallet">Wallet</Link>
+                {navigation.slice(1).map(({ href, label }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    aria-current={
+                      section === label.toLowerCase() ? "page" : undefined
+                    }
+                  >
+                    {label}
+                  </Link>
+                ))}
               </nav>
             ) : (
               <MarketSearch
@@ -369,7 +395,7 @@ export function MarketApp({
           </div>
           {!pull && (
             <nav
-              className={`exchange-navigation ${detailView ? "board-secondary" : ""} ${menuOpen ? "menu-expanded" : ""}`}
+              className={`exchange-navigation ${detailView || section !== "markets" ? "board-secondary" : ""} ${menuOpen ? "menu-expanded" : ""}`}
               aria-label="Main navigation"
             >
               <Link
@@ -610,46 +636,52 @@ export function MarketApp({
                 retry={() => void rewardQuery.refetch()}
               />
             </>
-          ) : section === "portfolio" ? (
-            <>
-              {status.data?.privyConfigured ? (
-                network === "devnet" ? (
-                  <DemoPortfolio />
+          ) : section === "portfolio" || section === "wallet" ? (
+            status.data?.privyConfigured ? (
+              <AccountGate>
+                {section === "portfolio" ? (
+                  <>
+                    {network === "devnet" ? (
+                      <DemoPortfolio />
+                    ) : (
+                      <>
+                        <PrivateAccount />
+                        <WalletCollection embedded />
+                      </>
+                    )}
+                    <ProfileEditor />
+                  </>
                 ) : (
                   <>
-                    <PrivateAccount />
-                    <WalletCollection embedded />
+                    <div className="mobile-wallet-actions">
+                      <AuthButton />
+                      <details className="install-help">
+                        <summary>Add to Home Screen</summary>
+                        <p>
+                          On iPhone, open this site in Safari, tap Share, then
+                          Add to Home Screen. Turn on Open as Web App if shown
+                          and tap Add. In Chrome on Android, open the browser
+                          menu and select Install app or Add to Home screen.
+                        </p>
+                      </details>
+                    </div>
+                    {network === "devnet" ? (
+                      <DemoPortfolio compact />
+                    ) : (
+                      <PrivateAccount compact />
+                    )}
+                    <ConnectedWalletPanel />
+                    {network === "mainnet" && <RelayFunding />}
                   </>
-                )
-              ) : null}
-              {status.data?.privyConfigured && <ProfileEditor />}
-            </>
-          ) : section === "wallet" ? (
-            <>
-              <div className="mobile-wallet-actions">
-                {status.data?.privyConfigured && <AuthButton />}
-                <details className="install-help">
-                  <summary>Add to Home Screen</summary>
-                  <p>
-                    On iPhone, open this site in Safari, tap Share, then Add to
-                    Home Screen. Turn on Open as Web App if shown and tap Add.
-                    In Chrome on Android, open the browser menu and select
-                    Install app or Add to Home screen.
-                  </p>
-                </details>
+                )}
+              </AccountGate>
+            ) : (
+              <div className="account-login" role="status">
+                {status.isPending
+                  ? "Loading…"
+                  : "Login is temporarily unavailable."}
               </div>
-              {status.data?.privyConfigured ? (
-                network === "devnet" ? (
-                  <DemoPortfolio compact />
-                ) : (
-                  <PrivateAccount compact />
-                )
-              ) : null}
-              {status.data?.privyConfigured ? <ConnectedWalletPanel /> : null}
-              {status.data?.privyConfigured && network === "mainnet" ? (
-                <RelayFunding />
-              ) : null}
-            </>
+            )
           ) : (
             <div className="redeem-flow panel">
               <h2>Physical redemption</h2>
@@ -706,7 +738,7 @@ export function MarketApp({
 
 function WalletEntry({ configured }: { configured: boolean }) {
   return configured ? (
-    <AuthButton />
+    <AuthButton header />
   ) : (
     <Button size="sm" variant="outline" asChild>
       <Link href="/wallet">
@@ -1298,7 +1330,7 @@ function MarketDetail({
   );
 }
 
-function CardTile({ card }: { card: Listing }) {
+function CardTile({ card, eager = false }: { card: Listing; eager?: boolean }) {
   const { network } = useNetwork();
   const [back, setBack] = useState(false);
   const image = back ? card.backImage : card.frontImage;
@@ -1310,6 +1342,7 @@ function CardTile({ card }: { card: Listing }) {
         </span>
         <CardImage
           src={image}
+          eager={eager}
           alt={`${card.name}, ${back ? "back" : "front"}`}
         />
         {card.backImage ? (
@@ -1371,8 +1404,8 @@ function CatalogGrid({
     <LoadingRows />
   ) : cards.length ? (
     <div className="collectible-grid">
-      {cards.map((c) => (
-        <CardTile card={c} key={c.mint} />
+      {cards.map((c, index) => (
+        <CardTile card={c} eager={index < 2} key={c.mint} />
       ))}
     </div>
   ) : (

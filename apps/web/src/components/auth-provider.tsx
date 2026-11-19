@@ -1,4 +1,5 @@
 "use client";
+import { SignInProvider } from "./sign-in-dialog";
 import type { ReactNode } from "react";
 import { base, baseSepolia, mainnet, sepolia } from "viem/chains";
 import { defineChain } from "viem";
@@ -20,8 +21,10 @@ export default function AuthProvider({
       config={{
         loginMethods: ["google", "email", "wallet"],
         appearance: {
-          theme: "dark",
-          accentColor: "#2e5cff",
+          theme: "#151e28",
+          accentColor: "#80c9ff",
+          logo: "/brand/slabline-app-icon.svg",
+          landingHeader: "Sign in to start trading",
           walletChainType: "ethereum-and-solana",
           walletList: [
             "detected_wallets",
@@ -82,7 +85,7 @@ export default function AuthProvider({
         },
       }}
     >
-      {children}
+      <SignInProvider>{children}</SignInProvider>
     </PrivyProvider>
   );
 }

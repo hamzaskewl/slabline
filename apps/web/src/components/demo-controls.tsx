@@ -1,8 +1,9 @@
 "use client";
+import { useSlablineAuth } from "./sign-in-dialog";
 import { Select } from "./ui/select";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePrivy, useConnectWallet } from "@privy-io/react-auth";
+import { useConnectWallet } from "@privy-io/react-auth";
 import { useWallets, useSignTransaction } from "@privy-io/react-auth/solana";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -29,7 +30,7 @@ import { useNetwork } from "./network-settings";
 import { Button } from "./ui/button";
 
 export function useDemoAction() {
-  const auth = usePrivy(),
+  const auth = useSlablineAuth(),
     { network } = useNetwork(),
     query = useQueryClient();
   const current = useRef({ owner: auth.user?.id, network });

@@ -664,7 +664,8 @@ input {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-@media (max-width: 760px) {
+@media (max-width: 760px),
+  (pointer: coarse) and (max-height: 540px) and (max-width: 1000px) {
   .app-shell .exchange-header-main {
     flex-wrap: wrap;
     padding-block: 10px;

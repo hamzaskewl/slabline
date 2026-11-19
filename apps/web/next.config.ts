@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { cardImagePatterns } from "./src/lib/card-images";
 const config: NextConfig = {
   transpilePackages: [
     "@collectible/domain",
@@ -6,6 +7,16 @@ const config: NextConfig = {
     "@collectible/db",
   ],
   poweredByHeader: false,
+  images: {
+    remotePatterns: cardImagePatterns,
+    localPatterns: [{ pathname: "/demo/**", search: "" }],
+    formats: ["image/webp"],
+    qualities: [75],
+    minimumCacheTTL: 86400,
+    maximumDiskCacheSize: 500_000_000,
+    // Arweave and Collector Crypt redirect to their image delivery URLs.
+    maximumRedirects: 3,
+  },
   async redirects() {
     return ["web-production-ae51051f.up.railway.app", "www.slabline.xyz"].map(
       (host) => ({

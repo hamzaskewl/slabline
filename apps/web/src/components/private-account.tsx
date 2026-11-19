@@ -1,13 +1,15 @@
 "use client";
+import { useSlablineAuth } from "./sign-in-dialog";
 import { useEffect, useRef, useState } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+
 import type { GeminiConnection, GeminiSnapshot } from "@collectible/domain";
 import { Button } from "./ui/button";
 import { usd } from "@/lib/utils";
 import { usePrivateRead } from "@/lib/use-private-read";
 import { PositionShare } from "./position-share";
 export function PrivateAccount({ compact = false }: { compact?: boolean }) {
-  const { ready, authenticated, login, getAccessToken, user } = usePrivy();
+  const { ready, authenticated, login, getAccessToken, user } =
+    useSlablineAuth();
   const connection = usePrivateRead<GeminiConnection>("/api/gemini/connection");
   const snapshot = usePrivateRead<GeminiSnapshot>(
     "/api/gemini/account",

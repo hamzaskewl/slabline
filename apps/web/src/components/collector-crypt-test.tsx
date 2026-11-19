@@ -1,7 +1,8 @@
 "use client";
+import { useSlablineAuth } from "./sign-in-dialog";
 import { Select } from "./ui/select";
 import { useEffect, useRef, useState } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+
 import { useWallets, useSignTransaction } from "@privy-io/react-auth/solana";
 import Link from "next/link";
 import {
@@ -12,7 +13,7 @@ import {
 import { Button } from "./ui/button";
 
 export function CollectorCryptTest() {
-  const { authenticated, login, getAccessToken, user } = usePrivy(),
+  const { authenticated, login, getAccessToken, user } = useSlablineAuth(),
     { wallets } = useWallets(),
     { signTransaction } = useSignTransaction();
   const [cards, setCards] = useState<Listing[] | null>(null),

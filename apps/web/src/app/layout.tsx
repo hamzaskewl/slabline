@@ -10,8 +10,10 @@ import "./market-artwork.css";
 import "./discovery.css";
 import "./demo.css";
 import "./account.css";
+import "./sign-in.css";
 import "./slabline.css";
 import "./fmv.css";
+import "./responsive-panels.css";
 import { Providers } from "@/components/providers";
 export const metadata: Metadata = {
   applicationName: "Slabline",

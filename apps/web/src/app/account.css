@@ -1162,7 +1162,8 @@
 }
 @media (max-width: 760px) {
   .prediction-surface main.portfolio-page {
-    padding: 20px 16px 0;
+    padding: 20px max(16px, env(safe-area-inset-right)) 0
+      max(16px, env(safe-area-inset-left));
   }
   .portfolio-topline {
     grid-template-columns: minmax(0, 1fr);
@@ -1403,4 +1404,27 @@
   color: var(--ink);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
+}
+
+/* One quiet entry point before loading any private account panels. */
+.account-login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  min-height: clamp(240px, 48svh, 440px);
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+.account-login h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.account-login .button {
+  min-width: 160px;
+  min-height: 44px;
+  border-radius: 10px;
 }
