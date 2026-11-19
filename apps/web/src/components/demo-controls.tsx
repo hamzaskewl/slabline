@@ -195,6 +195,8 @@ export function DemoPortfolio({
       </section>
     );
   const data = snapshot.data;
+  const collectibles =
+    data?.collectibles.filter((c) => c.state !== "cancelled") ?? [];
   return (
     <section className="panel funding-panel demo-portfolio">
       {!collection && (
@@ -314,13 +316,13 @@ export function DemoPortfolio({
       {!compact && (
         <>
           <h2>{collection ? "Your collectibles" : "Collected cards"}</h2>
-          {!data?.collectibles.length && !snapshot.isPending && (
+          {!collectibles.length && !snapshot.isPending && (
             <p>
               Choose a card from <Link href="/rewards">Rewards</Link>.
             </p>
           )}
           <div className="demo-collection-grid">
-            {data?.collectibles.map((c) => (
+            {collectibles.map((c) => (
               <article key={c.id} className="demo-collected">
                 {c.image && (
                   <img
@@ -337,7 +339,7 @@ export function DemoPortfolio({
                     {c.source === "grail" ? "Grail" : "Collector Crypt"}
                   </p>
                   <p>{c.state === "confirmed" ? "Received" : c.state}</p>
-                  {c.mint && (
+                  {c.mint && c.state === "confirmed" && (
                     <a
                       href={`https://explorer.solana.com/address/${c.mint}?cluster=devnet`}
                       target="_blank"
