@@ -8,6 +8,7 @@ import {
   shareIdentity,
   identityLabel,
   shareNumber,
+  shareEntryPrice,
   shareProfit,
   shareIntent,
   slabFromListing,
@@ -136,6 +137,14 @@ test("Anonymous public shaping contains no identity, private IDs, wallets or bal
   expect(identityLabel({ ...s, identity: shareIdentity(true) })).toBe("Trader");
 });
 test("exact huge and fractional money, absent targets, and encoded platform intents", () => {
+  expect(shareEntryPrice("0.275172413793")).toBe("0.28");
+  expect(shareEntryPrice("0.274999999999")).toBe("0.27");
+  expect(shareEntryPrice("0.995")).toBe("1.00");
+  expect(shareEntryPrice("99999999999999999.995")).toBe(
+    "100,000,000,000,000,000.00",
+  );
+  expect(shareEntryPrice("0")).toBe("0.00");
+  expect(shareEntryPrice(null)).toBe("—");
   expect(shareNumber("99999999999999999.123456", 2)).toBe(
     "99,999,999,999,999,999.123456",
   );

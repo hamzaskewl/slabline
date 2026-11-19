@@ -249,6 +249,20 @@ export const shareAmount = (s: ShareSnapshot) =>
     : s.state === "sold"
       ? s.trade.saleProceeds
       : s.trade.finalGrossPayout;
+/** Round display-only entry prices to cents without losing precision to Number. */
+export function shareEntryPrice(value: string | null): string {
+  if (value === null || !/^\d+(\.\d+)?$/.test(value)) return "—";
+  const [whole, fraction = ""] = value.split(".");
+  const cents =
+    BigInt(whole!) * 100n +
+    BigInt(fraction.padEnd(2, "0").slice(0, 2)) +
+    ((fraction[2] ?? "0") >= "5" ? 1n : 0n);
+  return shareNumber(
+    `${cents / 100n}.${(cents % 100n).toString().padStart(2, "0")}`,
+    2,
+    2,
+  );
+}
 const exactDecimal = (v: string | null | undefined): string | null =>
   typeof v === "string" && /^\d+(\.\d{1,6})?$/.test(v) ? v : null;
 export function shareFeeQualifier(t: ShareSnapshot["trade"]) {

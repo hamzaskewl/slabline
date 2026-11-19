@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!share) return { title: "Share not found · Slabline" };
   const s = share.snapshot,
     title = `${s.market.title} · Slabline`;
-  const description = `${identityLabel(s)} · ${shareStateCopy[s.state].headline}: ${shareNumber(shareAmount(s), 2)} ${s.trade.currency}${s.environment === "production" ? "" : ` · ${s.environment.toUpperCase()}`}`;
+  const description = `${identityLabel(s)} · ${shareStateCopy[s.state].headline}: $${shareNumber(shareAmount(s), 2)}`;
   const base = (process.env.APP_URL ?? "http://localhost:3000").replace(
     /\/$/,
     "",
@@ -67,14 +67,8 @@ export default async function PublicPositionShare({ params }: Props) {
         src={`/share/${token}/image`}
         width="1200"
         height="630"
-        alt={`${identityLabel(share.snapshot)} · ${shareStateCopy[share.snapshot.state].headline} · ${shareNumber(shareAmount(share.snapshot), 2)} ${share.snapshot.trade.currency}${share.snapshot.slab ? ` · ${share.snapshot.slab.role === "collected" ? "Collected" : "Target slab"}: ${share.snapshot.slab.name}` : ""}`}
+        alt={`${identityLabel(share.snapshot)} · ${shareStateCopy[share.snapshot.state].headline} · $${shareNumber(shareAmount(share.snapshot), 2)}${share.snapshot.slab ? ` · ${share.snapshot.slab.role === "collected" ? "Collected" : "Slab"}: ${share.snapshot.slab.name}` : ""}`}
       />
-      <p>
-        Captured {share.snapshot.capturedAt.replace("T", " ").slice(0, 19)} UTC.{" "}
-        {share.snapshot.environment !== "production" &&
-          `${share.snapshot.environment.toUpperCase()} · `}
-        This is a saved position snapshot.
-      </p>
       <Link className="button button-outline" href="/">
         Explore markets
       </Link>

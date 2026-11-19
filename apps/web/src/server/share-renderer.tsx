@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   identityLabel,
   shareAmount,
-  shareFeeQualifier,
+  shareEntryPrice,
   shareNumber,
   shareStateCopy,
   type ShareSnapshot,
@@ -78,7 +78,7 @@ export function ShareCard({
   const rows = [
     ["Position", s.market.side?.toUpperCase() ?? "—"],
     ["Cost", shareNumber(s.trade.cost, 2)],
-    ["Avg. entry", shareNumber(s.trade.averageEntryPrice, 2, 12)],
+    ["Avg. entry", shareEntryPrice(s.trade.averageEntryPrice)],
     ["Shares", shareNumber(s.trade.quantity)],
   ];
   const title = titleLines(s.market.title);
@@ -88,7 +88,10 @@ export function ShareCard({
       : `${s.trade.profit.startsWith("-") ? "−" : "+"}$${shareNumber(s.trade.profit.replace("-", ""), 2)}`;
   const profitLine = `${copy.profit} ${profitAmount}`,
     splitProfit = textWidth(profitLine, 22) > 440;
-  const returnLine = `${s.trade.roiPercent === null ? "" : `${shareNumber(s.trade.roiPercent, 1, 2)}% return · `}${s.trade.profitBasis === "before-fees" ? "Before fees" : "After fees"}`;
+  const returnLine =
+    s.trade.roiPercent === null
+      ? ""
+      : `${shareNumber(s.trade.roiPercent, 1, 2)}% return`;
   return (
     <div
       style={{
@@ -177,19 +180,11 @@ export function ShareCard({
       >
         {value === null ? "—" : `$${amount}`}
       </Line>
-      <Line x={48} y={394} width={440} size={18} color="#8E9CAC">
-        {s.trade.currency} · gross{" "}
-        {s.state === "open"
-          ? "conditional payout"
-          : s.state === "sold"
-            ? "proceeds"
-            : "payout"}
-      </Line>
       {s.trade.profit !== null && s.state !== "pending" && (
         <>
           <Line
             x={48}
-            y={432}
+            y={406}
             width={440}
             size={22}
             style={{ whiteSpace: "nowrap" }}
@@ -199,7 +194,7 @@ export function ShareCard({
           {splitProfit && (
             <Line
               x={48}
-              y={462}
+              y={436}
               width={440}
               size={fitSize(profitAmount, 440, 23)}
               style={{ whiteSpace: "nowrap" }}
@@ -207,16 +202,18 @@ export function ShareCard({
               {profitAmount}
             </Line>
           )}
-          <Line
-            x={48}
-            y={splitProfit ? 498 : 468}
-            width={440}
-            size={fitSize(returnLine, 440, splitProfit ? 16 : 18)}
-            color="#8E9CAC"
-            style={{ whiteSpace: "nowrap" }}
-          >
-            {returnLine}
-          </Line>
+          {returnLine && (
+            <Line
+              x={48}
+              y={splitProfit ? 472 : 442}
+              width={440}
+              size={fitSize(returnLine, 440, splitProfit ? 16 : 18)}
+              color="#8E9CAC"
+              style={{ whiteSpace: "nowrap" }}
+            >
+              {returnLine}
+            </Line>
+          )}
         </>
       )}
       <div
@@ -239,13 +236,6 @@ export function ShareCard({
       <Line x={factsX} y={444} width={factsWidth} size={18} color="#8E9CAC">
         {clip(s.market.selectedOutcome, 48)}
       </Line>
-      <Line
-        x={factsX}
-        y={488}
-        width={factsWidth}
-        size={15}
-        color="#8E9CAC"
-      >{`${s.trade.currency} per share at entry`}</Line>
       {s.slab && (
         <>
           <div
@@ -262,7 +252,11 @@ export function ShareCard({
             size={17}
             style={{ justifyContent: "center" }}
           >
-            {s.slab.role === "collected" ? "COLLECTED" : "TARGET SLAB"}
+            {s.slab.role === "collected"
+              ? "COLLECTED"
+              : s.state === "won"
+                ? "SLAB WON"
+                : "SLAB"}
           </Line>
           {s.slab.frontImage ? (
             <img
@@ -332,19 +326,6 @@ export function ShareCard({
       <Line x={88} y={558} width={220} size={28}>
         Slabline
       </Line>
-      <Line
-        x={510}
-        y={551}
-        width={642}
-        size={16}
-      >{`${s.environment === "production" ? "" : `${s.environment.toUpperCase()} · `}${s.capturedAt.slice(0, 16).replace("T", " ")} UTC`}</Line>
-      <Line
-        x={510}
-        y={580}
-        width={642}
-        size={16}
-        color="#C5CFDA"
-      >{`${s.state === "pending" ? "Resolution unconfirmed" : s.state === "open" ? "Conditional on a correct outcome" : "Collectible receipt shown separately"} · ${shareFeeQualifier(s.trade)}`}</Line>
     </div>
   );
 }
