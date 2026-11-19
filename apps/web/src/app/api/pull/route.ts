@@ -83,7 +83,7 @@ const action = z.discriminatedUnion("action", [
       .string()
       .max(32)
       .regex(/^\d+(\.\d{1,6})?$/)
-      .optional(),
+      .refine((value) => units(value) > 0n),
   }),
 ]);
 
