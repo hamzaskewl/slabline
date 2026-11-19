@@ -224,7 +224,7 @@ function PullRedemption({
           Checking markets…
         </p>
       ) : null}
-      {catalog.error || catalog.data?.error ? (
+      {catalog.unavailable ? (
         <>
           <p className="pull-error" role="alert">
             Market catalog unavailable.
@@ -234,11 +234,26 @@ function PullRedemption({
           </PullRetry>
         </>
       ) : (
-        !catalog.searching &&
-        catalog.markets.length === 0 && (
-          <p className="pull-muted">
-            No matching markets. Try a broader search to use your saved budget.
-          </p>
+        !catalog.searching && (
+          <>
+            {catalog.delayed && (
+              <>
+                <p className="pull-muted" role="status">
+                  Market updates delayed. Showing saved catalog results.
+                </p>
+                <PullRetry onClick={() => void catalog.refetch()}>
+                  Refresh markets
+                </PullRetry>
+              </>
+            )}
+            {catalog.markets.length === 0 && (
+              <p className="pull-muted">
+                {catalog.delayed
+                  ? "No matches in the saved catalog. Try a broader search."
+                  : "No matching markets. Try a broader search to use your saved budget."}
+              </p>
+            )}
+          </>
         )
       )}
       {chosen && (

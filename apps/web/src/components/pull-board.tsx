@@ -29,12 +29,10 @@ export function PullBoard({
   const [tier, setTier] = useState<PullTier>(25);
   const [theme, setTheme] = useState<PullTheme>({ kind: "all" });
   const catalog = usePullCatalog(theme);
-  const eligible =
-    !catalog.searching &&
-    !catalog.error &&
-    !catalog.data?.error &&
-    catalog.markets.length > 0 &&
-    (theme.kind === "all" || !!theme.label.trim());
+  const hasTheme = theme.kind === "all" || !!theme.label.trim();
+  const hasMatches =
+    hasTheme && !catalog.searching && catalog.markets.length > 0;
+  const eligible = hasMatches && !catalog.delayed;
   return (
     <section className="pull-workspace" aria-labelledby="pull-title">
       <header className="pull-heading">
@@ -87,24 +85,33 @@ export function PullBoard({
                   ? `Enter a ${theme.kind} name to explore available markets.`
                   : catalog.searching
                     ? "Checking available markets…"
-                    : catalog.error || catalog.data?.error
+                    : catalog.unavailable
                       ? "Market catalog unavailable."
-                      : !eligible
-                        ? "No matching markets. Try another search or choose All markets."
-                        : `${catalog.markets.length} matching ${catalog.markets.length === 1 ? "market" : "markets"}`}
+                      : hasMatches
+                        ? `${catalog.markets.length} matching ${catalog.markets.length === 1 ? "market" : "markets"}`
+                        : catalog.delayed
+                          ? "No matches in the saved catalog. Try another search or choose All markets."
+                          : "No matching markets. Try another search or choose All markets."}
               </p>
-              {eligible && theme.kind !== "all" && (
+              {hasMatches && theme.kind !== "all" && (
                 <ul>
                   {catalog.markets.slice(0, 3).map((market) => (
                     <li key={market.id}>{market.title}</li>
                   ))}
                 </ul>
               )}
-              {(catalog.error || catalog.data?.error) && !catalog.searching && (
-                <PullRetry onClick={() => void catalog.refetch()}>
-                  Refresh markets
-                </PullRetry>
+              {catalog.delayed && !catalog.searching && (
+                <p className="pull-muted">
+                  Market updates delayed. New packs open when the catalog
+                  refreshes.
+                </p>
               )}
+              {(catalog.delayed || catalog.unavailable) &&
+                !catalog.searching && (
+                  <PullRetry onClick={() => void catalog.refetch()}>
+                    Refresh markets
+                  </PullRetry>
+                )}
             </div>
             <div className="pull-odds-inline">
               <h3>Pack odds</h3>
