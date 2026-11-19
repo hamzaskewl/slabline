@@ -10,16 +10,80 @@ export type MarketSort =
   | "competitive"
   | "name";
 export type MarketStatusFilter = "active" | "resolved" | "all";
-export function marketStatusMatches(m: Market, status: MarketStatusFilter) {
+export function marketStatusMatches(
+  m: Market,
+  status: MarketStatusFilter,
+  now = Date.now(),
+) {
   return (
     status === "all" ||
     (status === "resolved"
       ? ["settled", "invalid"].includes(m.status)
-      : m.status === "active")
+      : isCurrentMarket(m, now))
   );
 }
 const dateValue = (value?: string | null) =>
   value && Number.isFinite(Date.parse(value)) ? Date.parse(value) : null;
+
+// Provider "active" can outlast the game. Never infer Live from start time alone.
+export function isLiveMarket(m: Market, now = Date.now()): boolean {
+  const start = dateValue(m.startsAt);
+  // Gemini can retain isLive on days-old games whose settlement expiry was
+  // extended. Bound promotion of single games; this never settles a market.
+  const game = isSportsGame(m);
+  const windowHours =
+    m.sportsMarket?.sport === "baseball"
+      ? 12
+      : m.sportsMarket?.sport === "american_football"
+        ? 8
+        : 6;
+  return (
+    m.isLive === true &&
+    isOpenMarket(m, now) &&
+    (start === null || start <= now) &&
+    (!game || (start !== null && now - start < windowHours * 3600000))
+  );
+}
+function isSportsGame(m: Market): boolean {
+  return (
+    m.category === "Sports" &&
+    m.sportsMarket?.type !== "futures" &&
+    (!!m.sportsMarket || /\bvs\.?\s/i.test(m.title))
+  );
+}
+function isOpenMarket(m: Market, now: number): boolean {
+  const close = dateValue(m.closesAt);
+  return (
+    m.status === "active" &&
+    !m.resolvedAt &&
+    (close === null || close > now) &&
+    (!m.contracts.length ||
+      (m.outcomeCount ?? 0) > m.contracts.length ||
+      m.contracts.some((c) => c.status === "active"))
+  );
+}
+export function isCurrentMarket(m: Market, now = Date.now()): boolean {
+  if (!isOpenMarket(m, now)) return false;
+  const start = dateValue(m.startsAt);
+  const game = isSportsGame(m);
+  return !game || start === null || start > now || isLiveMarket(m, now);
+}
+export function isLiveGame(m: Market, now = Date.now()): boolean {
+  return isSportsGame(m) && isLiveMarket(m, now);
+}
+export function featuredMarkets(markets: Market[], now = Date.now()): Market[] {
+  return sortMarkets(
+    markets.filter(
+      (m) =>
+        isCurrentMarket(m, now) &&
+        marketTeams(m).length === 2 &&
+        !m.title.includes(":") &&
+        (isLiveGame(m, now) || (dateValue(m.startsAt) ?? -Infinity) > now),
+    ),
+  )
+    .sort((a, b) => Number(isLiveGame(b, now)) - Number(isLiveGame(a, now)))
+    .slice(0, 4);
+}
 const decimalValue = (value?: string | null) =>
   value != null &&
   /^\d+(?:\.\d+)?$/.test(value) &&
