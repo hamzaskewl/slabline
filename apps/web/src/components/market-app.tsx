@@ -11,7 +11,6 @@ import dynamic from "next/dynamic";
 import {
   ArrowRight,
   ArrowLeft,
-  ArrowUpRight,
   BarChart3,
   Check,
   ChevronDown,
@@ -404,9 +403,6 @@ export function MarketApp({
                           : "Physical redemption"}
                 </h1>
               </div>
-              <Link href="/" className="button button-outline button-pill">
-                Explore markets <ArrowUpRight size={16} />
-              </Link>
             </div>
           ) : null}
           {notice ? (
