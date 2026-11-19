@@ -162,3 +162,69 @@ test("settled Spurs claims query relevant categories and keep only listed Spurs 
     globalThis.fetch = original;
   }
 });
+
+test("card browsing prefers safe provider CDN renditions with original fallbacks", async () => {
+  const original = globalThis.fetch;
+  const base = {
+    itemName: "Listed card",
+    grade: "10",
+    gradingCompany: "PSA",
+    listing: { price: 145, currency: "USDC" },
+    frontImage: "https://arweave.net/original-front",
+    backImage: "https://arweave.net/original-back",
+  };
+  globalThis.fetch = (async () =>
+    Response.json({
+      filterNFtCard: [
+        {
+          ...base,
+          id: "medium",
+          nftAddress: "medium",
+          images: {
+            frontM: "https://d1xpxki1g4htqu.cloudfront.net/medium",
+            frontS: "https://d1xpxki1g4htqu.cloudfront.net/small",
+            backS: "https://d1xpxki1g4htqu.cloudfront.net/back-small",
+          },
+        },
+        {
+          ...base,
+          id: "small",
+          nftAddress: "small",
+          images: {
+            frontM: "https://attacker.test/medium",
+            frontS: "https://d1xpxki1g4htqu.cloudfront.net/small",
+          },
+        },
+        {
+          ...base,
+          id: "original",
+          nftAddress: "original",
+          images: {
+            frontM: "http://localhost/medium",
+            frontS: null,
+            backS: null,
+          },
+        },
+      ],
+      nextCursor: null,
+    })) as unknown as typeof fetch;
+  try {
+    const cards = await listCards(
+      `cdn-images-${crypto.randomUUID()}`,
+      [],
+      "mainnet",
+    );
+    expect(cards.map((c) => c.frontImage)).toEqual([
+      "https://d1xpxki1g4htqu.cloudfront.net/medium",
+      "https://d1xpxki1g4htqu.cloudfront.net/small",
+      base.frontImage,
+    ]);
+    expect(cards.map((c) => c.backImage)).toEqual([
+      "https://d1xpxki1g4htqu.cloudfront.net/back-small",
+      base.backImage,
+      base.backImage,
+    ]);
+  } finally {
+    globalThis.fetch = original;
+  }
+});

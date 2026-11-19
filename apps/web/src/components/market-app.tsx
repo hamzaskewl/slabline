@@ -1315,7 +1315,7 @@ function MarketDetail({
   );
 }
 
-function CardTile({ card }: { card: Listing }) {
+function CardTile({ card, eager = false }: { card: Listing; eager?: boolean }) {
   const { network } = useNetwork();
   const [back, setBack] = useState(false);
   const image = back ? card.backImage : card.frontImage;
@@ -1327,6 +1327,7 @@ function CardTile({ card }: { card: Listing }) {
         </span>
         <CardImage
           src={image}
+          eager={eager}
           alt={`${card.name}, ${back ? "back" : "front"}`}
         />
         {card.backImage ? (
@@ -1388,8 +1389,8 @@ function CatalogGrid({
     <LoadingRows />
   ) : cards.length ? (
     <div className="collectible-grid">
-      {cards.map((c) => (
-        <CardTile card={c} key={c.mint} />
+      {cards.map((c, index) => (
+        <CardTile card={c} eager={index < 2} key={c.mint} />
       ))}
     </div>
   ) : (

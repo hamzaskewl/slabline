@@ -144,7 +144,7 @@ export function RewardBrowser({
                       aria-label={`Choose ${c.name}`}
                       aria-pressed={c.mint === selected?.mint}
                     />
-                    <CardImage src={c.frontImage} alt={c.name} />
+                    <CardImage src={c.frontImage} alt={c.name} sizes="96px" />
                     <span className="reward-browser-card-copy">
                       <strong>{c.name}</strong>
                       {cardTeam(c) && <span>Team on card: {cardTeam(c)}</span>}

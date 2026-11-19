@@ -145,7 +145,7 @@ export async function listCards(
     networkOverride ??
     (process.env.COLLECTOR_CRYPT_NETWORK === "devnet" ? "devnet" : "mainnet");
   return cached(
-    `cards:v4:${network}:${categories.join(",")}:${search}`,
+    `cards:v5:${network}:${categories.join(",")}:${search}`,
     60000,
     async () => {
       const base =
@@ -195,11 +195,13 @@ export async function listCards(
           cert: c.gradingID ?? null,
           year: c.year ? String(c.year) : null,
           set: c.set ?? null,
+          // Provider CDN renditions avoid fetching multi-megabyte originals
+          // from Arweave before the web image cache can be populated.
           frontImage:
-            safeImage(c.frontImage) ??
             safeImage(c.images?.frontM) ??
-            safeImage(c.images?.frontS),
-          backImage: safeImage(c.backImage) ?? safeImage(c.images?.backS),
+            safeImage(c.images?.frontS) ??
+            safeImage(c.frontImage),
+          backImage: safeImage(c.images?.backS) ?? safeImage(c.backImage),
           ask: String(c.listing!.price),
           currency: "USDC" as const,
           seller: c.owner?.wallet ?? null,
