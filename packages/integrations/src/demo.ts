@@ -1050,6 +1050,11 @@ export async function sellDemoPosition(
           ...data,
           quantity: money(remaining > 0n ? remaining : totalSold),
           cost: money(remaining > 0n ? units(data.cost) - basis : totalBasis),
+          averagePrice: money(
+            ((remaining > 0n ? units(data.cost) - basis : totalBasis) *
+              1000000n) /
+              (remaining > 0n ? remaining : totalSold),
+          ),
           soldQuantity: money(totalSold),
           realizedCost: money(totalBasis),
           soldAt: new Date().toISOString(),

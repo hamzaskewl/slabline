@@ -543,6 +543,7 @@ test.skipIf(!process.env.DATABASE_URL)(
         state: "sold",
         quantity: "125.000000",
         cost: "35.000000",
+        averagePrice: "0.280000",
         saleProceeds: "37.500000",
       });
       expect(account.balance).toBe("102.500000");
