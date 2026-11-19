@@ -20,6 +20,7 @@ import {
   Gift,
   Layers3,
   Menu,
+  PackageOpen,
   RefreshCw,
   Search,
   Trophy,
@@ -146,6 +147,7 @@ const flatten = (items: Market[]): Market[] =>
 export function MarketApp({
   section = "markets",
   selectedId,
+  pullOpeningId,
   initialSide = "yes",
   initialTrade = "buy",
   initialOutcome = 0,
@@ -155,6 +157,7 @@ export function MarketApp({
 }: {
   section?: string;
   selectedId?: string;
+  pullOpeningId?: string;
   initialSide?: "yes" | "no";
   initialTrade?: "buy" | "sell";
   initialOutcome?: number;
@@ -165,7 +168,7 @@ export function MarketApp({
   const router = useRouter();
   const { network } = useNetwork();
   const replay = section === "demo";
-  const pull = section === "pull-predict";
+  const pull = section === "pull-predict" || section === "pull-packs";
   const scenario = rehearsal === "grail" ? DEMO_GRAIL_REPLAY : DEMO_REPLAY;
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
@@ -341,7 +344,7 @@ export function MarketApp({
                 >
                   Predictions
                 </Link>
-                {navigation.slice(1).map(({ href, label }) => (
+                {navigation.slice(1).map(({ href, label, icon: Icon }) => (
                   <Link
                     key={href}
                     href={href}
@@ -349,7 +352,7 @@ export function MarketApp({
                       section === label.toLowerCase() ? "page" : undefined
                     }
                   >
-                    {label}
+                    <Icon size={15} aria-hidden="true" /> {label}
                   </Link>
                 ))}
               </nav>
@@ -414,6 +417,9 @@ export function MarketApp({
               >
                 <Zap size={14} /> All markets
               </Link>
+              <Link href="/pull-predict" className="pull-nav-entry">
+                <PackageOpen size={16} aria-hidden="true" /> Pull &amp; Predict
+              </Link>
               <Link
                 href="/?category=live"
                 className={
@@ -456,7 +462,7 @@ export function MarketApp({
                       section === n.label.toLowerCase() ? "active" : ""
                     }
                   >
-                    {n.label}
+                    <n.icon size={15} aria-hidden="true" /> {n.label}
                   </Link>
                 ))}
               </div>
@@ -498,7 +504,11 @@ export function MarketApp({
             </div>
           ) : null}
           {pull ? (
-            <PullPredict configured={status.data?.privyConfigured} />
+            <PullPredict
+              configured={status.data?.privyConfigured}
+              view={section === "pull-packs" ? "packs" : "shop"}
+              openingId={pullOpeningId}
+            />
           ) : section === "markets" || replay ? (
             <>
               {!selectedId && !practice && !replay ? (

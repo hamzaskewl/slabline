@@ -7,7 +7,7 @@
 .pull-heading,
 .pull-panel-heading,
 .pull-history li,
-.pull-history button,
+.pull-history a,
 .pull-odds li {
   display: flex;
   align-items: center;
@@ -103,7 +103,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .pull-theme-options {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .pull-choice {
@@ -195,13 +195,13 @@
 .pull-history li {
   padding: 0;
 }
-.pull-history button {
+.pull-history a {
   width: 100%;
   min-height: 44px;
   text-align: left;
   color: #b7c6d5;
 }
-.pull-history button[aria-pressed="true"] {
+.pull-history a[aria-pressed="true"] {
   color: var(--lime);
 }
 .pull-budget {
@@ -684,7 +684,7 @@
   color: #bde4ff;
   font-size: clamp(42px, 10.8vw, 86px);
   line-height: 1;
-  letter-spacing: -0.07em;
+  letter-spacing: -0.03em;
   font-weight: 690;
   filter: drop-shadow(0 0 18px #73beff64);
 }
@@ -826,7 +826,7 @@
 .pull-pack-print strong {
   font-size: clamp(20px, 24cqw, 48px);
   font-weight: 760;
-  letter-spacing: -0.07em;
+  letter-spacing: -0.03em;
   line-height: 1.05;
 }
 
@@ -842,8 +842,12 @@
 
 .pull-cinematic-amount .pull-reel-window {
   display: block;
-  overflow: hidden;
-  line-height: 1.18;
+  overflow: clip;
+  overflow-clip-margin: 0.12em;
+  padding-inline: 0.06em;
+  margin-inline: -0.015em;
+  flex: none;
+  line-height: 1.25;
   font: inherit;
   color: inherit;
 }
@@ -881,4 +885,166 @@
 
 .pull-cinematic-wallet-overlay {
   pointer-events: none;
+}
+.pull-page-links,
+.pull-pack-tabs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pull-page-links a,
+.pull-pack-tabs a {
+  color: #b1ddff;
+  text-underline-offset: 4px;
+}
+.pull-pack-tabs a {
+  border: 1px solid #405268;
+  border-radius: 8px;
+  padding: 12px;
+}
+.pull-pack-tabs a[aria-current="page"] {
+  background: #293b4d;
+  border-color: #80c9ff;
+}
+.pull-team-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  max-height: 168px;
+  overflow-y: auto;
+  scrollbar-color: #405268 #151e28;
+}
+.pull-team-options button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #405268;
+  border-radius: 8px;
+  color: #c3d0dd;
+  background: transparent;
+  cursor: pointer;
+}
+.pull-team-options button:hover,
+.pull-team-options button[aria-pressed="true"] {
+  background: #293b4d;
+  color: #f3f6fa;
+}
+.pull-market-list {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.pull-market-card {
+  min-width: 0;
+  text-align: left;
+}
+.pull-market-card[data-selected="true"] {
+  border-color: #80c9ff;
+}
+.pull-market-card button.prediction-card-title {
+  background: none;
+  border: 0;
+  text-align: left;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+}
+.pull-market-card .prediction-card-heading {
+  min-width: 0;
+}
+.pull-market-card .prediction-card-title {
+  overflow-wrap: anywhere;
+}
+.pull-market-card .outcome-label {
+  min-width: 0;
+}
+.pull-market-card .outcome-label > span:last-child {
+  overflow-wrap: anywhere;
+}
+.pull-market-card .prediction-card-footer {
+  flex-wrap: wrap;
+}
+.pull-market-card > .button {
+  width: 100%;
+  margin-top: 12px;
+  justify-content: center;
+}
+.pull-trade-selection {
+  display: grid;
+  gap: 16px;
+  scroll-margin-top: 20px;
+  padding-block: 16px;
+  border-block: 1px solid #405268;
+}
+.pull-reveal-market {
+  width: 100%;
+  min-width: 0;
+  animation: pull-label-enter 450ms ease both;
+}
+.pull-reveal-market .prediction-card {
+  background: #151e28;
+}
+.pull-reveal-market .outcome-yes,
+.pull-reveal-market .outcome-no {
+  pointer-events: none;
+}
+.pull-cinematic-amount {
+  max-width: 100%;
+  min-width: 0;
+}
+.pull-cinematic-amount strong {
+  font-size: clamp(32px, 9vw, 76px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.pull-cinematic-footer .pull-stack {
+  width: 100%;
+  justify-items: center;
+}
+.pull-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.pull-cinematic-footer .pull-action {
+  justify-self: center;
+}
+.exchange-navigation .pull-nav-entry {
+  color: #b1ddff;
+  background: #1c2b39;
+}
+.board-navigation a,
+.account-navigation a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pull-workspace :focus-visible {
+  outline: 2px solid #80c9ff;
+  outline-offset: 3px;
+}
+@media (max-width: 560px) {
+  .pull-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .pull-market-card {
+    padding: 12px;
+  }
+  .pull-panel-heading {
+    flex-wrap: wrap;
+  }
+  .pull-market-card .prediction-outcome {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pull-reveal-market {
+    animation: none;
+  }
 }

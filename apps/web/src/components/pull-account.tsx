@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConnectWallet } from "@privy-io/react-auth";
@@ -41,8 +42,13 @@ function openingState(opening: PullOpening) {
       return "Position opened";
   }
 }
-
-export function PullAccount() {
+export function PullAccount({
+  view = "shop",
+  openingId,
+}: {
+  view?: "shop" | "packs";
+  openingId?: string;
+}) {
   const auth = useDemoAction();
   const { setNetwork } = useNetwork();
 
@@ -79,17 +85,28 @@ export function PullAccount() {
     );
   }
   return (
-    <SignedInPull key={auth.user.id} owner={auth.user.id} actions={auth} />
+    <SignedInPull
+      key={auth.user.id}
+      owner={auth.user.id}
+      actions={auth}
+      view={view}
+      openingId={openingId}
+    />
   );
 }
 
 function SignedInPull({
   owner,
   actions,
+  view,
+  openingId,
 }: {
   owner: string;
+  view: "shop" | "packs";
+  openingId?: string;
   actions: ReturnType<typeof useDemoAction>;
 }) {
+  const router = useRouter();
   const account = usePrivateRead<PullAccountView>(path);
   const links = usePrivateRead<{ wallets: { address: string }[] }>(
     "/api/wallet/links",
@@ -98,11 +115,12 @@ function SignedInPull({
   const query = useQueryClient();
   const { wallets } = useWallets();
   const { connectWallet } = useConnectWallet();
-  const [activeId, setActiveId] = useState<string>();
+  const [activeId, setActiveId] = useState<string | undefined>(openingId);
   const [presentation, setPresentation] = useState<PackPresentation>();
   const [focusOpening, setFocusOpening] = useState(0);
   const [selectedWallet, setSelectedWallet] = useState("");
   const [actionArea, setActionArea] = useState<"pack" | "opening">("pack");
+  const draftClosed = useRef(false);
   const attempts = useRef(new Map<string, string>());
   const wallet =
     wallets.find((entry) => entry.address === selectedWallet) ?? wallets[0];
@@ -110,11 +128,15 @@ function SignedInPull({
     (entry) => entry.address === wallet?.address,
   );
   const data = account.data;
-  const openings = data?.openings ?? [];
-  const active =
-    openings.find((opening) => opening.id === activeId) ??
-    openings.find((opening) => opening.state !== "redeemed") ??
-    openings[0];
+  const openings = (data?.openings ?? []).filter(
+    (opening) => opening.state !== "cancelled",
+  );
+  const active = activeId
+    ? openings.find((opening) => opening.id === activeId)
+    : (openings.find((opening) => opening.state === "ready") ?? openings[0]);
+  useEffect(() => {
+    setActiveId(openingId);
+  }, [openingId]);
 
   useEffect(() => {
     if (focusOpening && !presentation)
@@ -143,7 +165,7 @@ function SignedInPull({
           ...previous,
           balance: balance ?? previous.balance,
           openings: [
-            opening,
+            ...(opening.state === "cancelled" ? [] : [opening]),
             ...previous.openings.filter(({ id }) => id !== opening.id),
           ],
         },
@@ -151,15 +173,51 @@ function SignedInPull({
   }
 
   function save(opening: PullOpening, balance?: string) {
+    if (opening.state === "cancelled") setPresentation(undefined);
     update(opening, balance);
-    selectOpening(opening.id);
+    if (opening.state !== "cancelled") selectOpening(opening.id);
     void account.refetch({ cancelRefetch: true });
   }
+
+  useEffect(() => {
+    if (
+      view !== "packs" ||
+      active?.state !== "pending" ||
+      !active.requestSignature ||
+      presentation
+    )
+      return;
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function check() {
+      try {
+        const result = await request<{
+          opening: PullOpening;
+          balance?: string;
+        }>({
+          action: "verify",
+          id: active!.id,
+          requestSignature: active!.requestSignature,
+        });
+        if (!disposed && result.opening.state !== "pending")
+          update(result.opening, result.balance);
+      } catch {
+        /* Keep the saved pack available for a manual check. */
+      }
+      if (!disposed) timer = setTimeout(check, 5000);
+    }
+    void check();
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+    };
+  }, [view, active?.id, active?.state, active?.requestSignature, presentation]);
 
   function open(pack: PackPresentation) {
     const { tier, theme } = pack;
     return actions.run(async () => {
       setActionArea("pack");
+      draftClosed.current = false;
       setPresentation(pack);
       const payer =
         data?.randomnessMode === "magicblock-devnet"
@@ -179,7 +237,17 @@ function SignedInPull({
         opening: PullOpening;
         balance?: string;
         recoveredSignature?: string;
-      }>({ action: "open", key, tier, theme, payer });
+      }>({ action: "open", key, tier, theme, payer }).catch((error) => {
+        // A lost response may already have reserved cash. Retain its purchase
+        // key until the server definitively reports cancellation.
+        if (error instanceof Error && /cancelled/i.test(error.message)) {
+          attempts.current.delete(storageKey);
+          try {
+            localStorage.removeItem(storageKey);
+          } catch {}
+        }
+        throw error;
+      });
       if (response.recoveredSignature) {
         try {
           localStorage.setItem(
@@ -188,15 +256,72 @@ function SignedInPull({
           );
         } catch {}
       }
+      if (draftClosed.current) {
+        const cancelled = await request<{
+          opening: PullOpening;
+          balance?: string;
+        }>({ action: "cancel", id: response.opening.id });
+        update(cancelled.opening, cancelled.balance);
+      }
       setPresentation((current) =>
         current ? { ...current, id: response.opening.id } : current,
       );
-      save(response.opening, response.balance);
+      if (!draftClosed.current) save(response.opening, response.balance);
       attempts.current.delete(storageKey);
       try {
         localStorage.removeItem(storageKey);
       } catch {}
     });
+  }
+  const cleaned = useRef(false);
+  const [cleanupError, setCleanupError] = useState("");
+  useEffect(() => {
+    if (!data || cleaned.current) return;
+    cleaned.current = true;
+    const abandoned = data.openings.filter(
+      (opening) => opening.state === "pending" && !opening.requestSignature,
+    );
+    void (async () => {
+      for (const opening of abandoned) {
+        try {
+          // Do not cancel an older client's signed request while it is in flight.
+          if (
+            localStorage.getItem(`slabline-pull-request:${opening.id}`) ||
+            localStorage.getItem(`slabline-pull-signature:${opening.id}`)
+          )
+            continue;
+          const result = await request<{
+            opening: PullOpening;
+            balance?: string;
+          }>({ action: "cancel", id: opening.id });
+          update(result.opening, result.balance);
+        } catch {
+          setCleanupError(
+            "Could not check an unfinished opening. Refresh Your packs to try again.",
+          );
+        }
+      }
+    })();
+  }, [data]);
+  async function closePresentation(choose?: boolean) {
+    draftClosed.current = true;
+    const closing = presentation;
+    setPresentation(undefined);
+    if (choose && closing?.id) {
+      router.push(`/pull-predict/packs?opening=${closing.id}`);
+    } else if (closing?.id) {
+      try {
+        const result = await request<{
+          opening: PullOpening;
+          balance?: string;
+        }>({ action: "cancel", id: closing.id });
+        update(result.opening, result.balance);
+      } catch {
+        setCleanupError(
+          "Your opening is saved while we check its transaction. View it in Your packs.",
+        );
+      }
+    }
   }
 
   const displayedOpening = openings.find(
@@ -216,144 +341,204 @@ function SignedInPull({
 
   return (
     <>
-      <PullBoard
-        balance={data?.balance}
-        busy={actions.busy}
-        mode={data?.randomnessMode}
-        opening={
-          active && (
-            <PullOpeningPanel
-              key={active.id}
-              opening={active}
-              inPresentation={!!presentation}
-              onResume={() =>
-                setPresentation({
-                  tier: active.tier,
-                  theme: active.theme,
-                  id: active.id,
-                })
-              }
-              actions={openingActions}
-            />
-          )
-        }
-        history={
-          openings.length > 0 && (
-            <section
-              className="pull-panel pull-history"
-              aria-labelledby="pull-history-title"
-            >
-              <h2 id="pull-history-title">Opening history</h2>
-              <ul>
+      {cleanupError && (
+        <p className="pull-error" role="alert">
+          {cleanupError}
+        </p>
+      )}
+      {view === "shop" &&
+        !presentation &&
+        actionArea === "opening" &&
+        actions.error && (
+          <p className="pull-error" role="alert">
+            {actions.error}
+          </p>
+        )}
+      {view === "packs" ? (
+        <section className="pull-workspace pull-stack">
+          <header className="pull-heading">
+            <div>
+              <h1>Your packs</h1>
+              <p>Use your unlocked budget on a prediction.</p>
+            </div>
+            <div className="pull-page-links">
+              <Link href="/pull-predict">Choose a pack</Link>
+            </div>
+          </header>
+          {account.isPending ? (
+            <p role="status">Loading your packs…</p>
+          ) : account.error ? (
+            <div role="alert">
+              {account.error.message}
+              <PullRetry onClick={() => void account.refetch()}>
+                Refresh packs
+              </PullRetry>
+            </div>
+          ) : !openings.length ? (
+            <p>
+              No packs yet.{" "}
+              <Link href="/pull-predict">Choose your first pack</Link>.
+            </p>
+          ) : (
+            <>
+              <nav className="pull-pack-tabs" aria-label="Your packs">
                 {openings.map((opening) => (
-                  <li key={opening.id}>
-                    <button
-                      type="button"
-                      disabled={actions.busy}
-                      aria-pressed={opening.id === active?.id}
-                      onClick={() => selectOpening(opening.id)}
-                    >
-                      <strong>${opening.tier} pack</strong>
-                      <span>{openingState(opening)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )
-        }
-        action={(pack, eligible) => {
-          const { tier, theme } = pack;
-          if (account.error)
-            return (
-              <div>
-                <p className="pull-error" role="alert">
-                  {account.error.message}
-                </p>
-                <PullRetry onClick={() => void account.refetch()}>
-                  Refresh account
-                </PullRetry>
-              </div>
-            );
-          if (!data)
-            return (
-              <p className="pull-muted" role="status">
-                Loading demo balance…
-              </p>
-            );
-          const insufficient = units(data.balance) < units(String(tier));
-          const walletPaid = data.randomnessMode === "magicblock-devnet";
-          return (
-            <div className="pull-stack">
-              {walletPaid && wallets.length > 1 && (
-                <label className="pull-field">
-                  <span>Solana Devnet wallet</span>
-                  <select
-                    value={wallet?.address}
-                    onChange={(event) => setSelectedWallet(event.target.value)}
+                  <Link
+                    key={opening.id}
+                    aria-current={
+                      opening.id === active?.id ? "page" : undefined
+                    }
+                    href={`/pull-predict/packs?opening=${opening.id}`}
+                    onClick={() => selectOpening(opening.id)}
                   >
-                    {wallets.map((entry) => (
-                      <option key={entry.address}>{entry.address}</option>
-                    ))}
-                  </select>
-                </label>
+                    ${opening.tier} · {openingState(opening)}
+                  </Link>
+                ))}
+              </nav>
+              {!active && (
+                <p className="pull-muted">
+                  This opening is no longer available. Choose one of your saved
+                  packs above.
+                </p>
               )}
-              {walletPaid && !wallet ? (
-                <PullRetry
-                  onClick={() =>
-                    void connectWallet({ walletChainType: "solana-only" })
-                  }
-                >
-                  Connect Solana wallet
-                </PullRetry>
-              ) : walletPaid && !verifiedWallet ? (
-                <div className="pull-stack">
-                  <p className="pull-muted">
-                    {links.isPending
-                      ? "Checking verified Devnet wallets…"
-                      : "Verify your connected wallet before opening an onchain pack."}
-                  </p>
-                  <Button variant="outline" asChild className="pull-action">
-                    <Link href="/wallet">Manage wallet verification</Link>
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  className="pull-action"
-                  disabled={!eligible || insufficient || actions.busy}
-                  onClick={() =>
-                    void open({
-                      ...pack,
-                      theme:
-                        theme.kind === "all"
-                          ? theme
-                          : { ...theme, label: theme.label.trim() },
+              {active && (
+                <PullOpeningPanel
+                  key={active.id}
+                  opening={active}
+                  actions={openingActions}
+                  inPresentation={!!presentation}
+                  onResume={() =>
+                    setPresentation({
+                      tier: active.tier,
+                      theme: active.theme,
+                      id: active.id,
                     })
                   }
-                >
-                  <PackageOpen size={17} aria-hidden="true" /> Open ${tier} pack
-                </Button>
+                />
               )}
-              {insufficient && (
-                <p className="pull-muted">
-                  Your {usdc(data.balance)} demo balance is below this pack
-                  price.
-                </p>
-              )}
-              {actions.busy && (
+            </>
+          )}
+        </section>
+      ) : (
+        <PullBoard
+          balance={data?.balance}
+          busy={actions.busy}
+          mode={data?.randomnessMode}
+          history={
+            openings.length > 0 && (
+              <section
+                className="pull-panel pull-history"
+                aria-labelledby="pull-history-title"
+              >
+                <h2 id="pull-history-title">Opening history</h2>
+                <ul>
+                  {openings.map((opening) => (
+                    <li key={opening.id}>
+                      <Link href={`/pull-predict/packs?opening=${opening.id}`}>
+                        <strong>${opening.tier} pack</strong>
+                        <span>{openingState(opening)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          }
+          action={(pack, eligible) => {
+            const { tier, theme } = pack;
+            if (account.error)
+              return (
+                <div>
+                  <p className="pull-error" role="alert">
+                    {account.error.message}
+                  </p>
+                  <PullRetry onClick={() => void account.refetch()}>
+                    Refresh account
+                  </PullRetry>
+                </div>
+              );
+            if (!data)
+              return (
                 <p className="pull-muted" role="status">
-                  Processing request…
+                  Loading balance…
                 </p>
-              )}
-              {actionArea === "pack" && actions.error && (
-                <p className="pull-error" role="alert">
-                  {actions.error}
-                </p>
-              )}
-            </div>
-          );
-        }}
-      />
+              );
+            const insufficient = units(data.balance) < units(String(tier));
+            const walletPaid = data.randomnessMode === "magicblock-devnet";
+            return (
+              <div className="pull-stack">
+                {walletPaid && wallets.length > 1 && (
+                  <label className="pull-field">
+                    <span>Solana Devnet wallet</span>
+                    <select
+                      value={wallet?.address}
+                      onChange={(event) =>
+                        setSelectedWallet(event.target.value)
+                      }
+                    >
+                      {wallets.map((entry) => (
+                        <option key={entry.address}>{entry.address}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {walletPaid && !wallet ? (
+                  <PullRetry
+                    onClick={() =>
+                      void connectWallet({ walletChainType: "solana-only" })
+                    }
+                  >
+                    Connect Solana wallet
+                  </PullRetry>
+                ) : walletPaid && !verifiedWallet ? (
+                  <div className="pull-stack">
+                    <p className="pull-muted">
+                      {links.isPending
+                        ? "Checking verified Devnet wallets…"
+                        : "Verify your connected wallet before opening an onchain pack."}
+                    </p>
+                    <Button variant="outline" asChild className="pull-action">
+                      <Link href="/wallet">Manage wallet verification</Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    className="pull-action"
+                    style={{ width: "100%", justifySelf: "stretch" }}
+                    disabled={!eligible || insufficient || actions.busy}
+                    onClick={() =>
+                      void open({
+                        ...pack,
+                        theme:
+                          theme.kind === "all"
+                            ? theme
+                            : { ...theme, label: theme.label.trim() },
+                      })
+                    }
+                  >
+                    <PackageOpen size={17} aria-hidden="true" /> Open ${tier}
+                  </Button>
+                )}
+                {insufficient && (
+                  <p className="pull-muted">
+                    Your {usdc(data.balance)} balance is below this pack price.
+                  </p>
+                )}
+                {actions.busy && (
+                  <p className="pull-muted" role="status">
+                    Opening pack…
+                  </p>
+                )}
+                {actionArea === "pack" && actions.error && (
+                  <p className="pull-error" role="alert">
+                    {actions.error}
+                  </p>
+                )}
+              </div>
+            );
+          }}
+        />
+      )}
       {presentation && (
         <PullCinematic
           pack={presentation}
@@ -361,10 +546,7 @@ function SignedInPull({
           waiting={actions.busy}
           error={actionArea === "pack" ? actions.error : undefined}
           actions={openingActions}
-          onClose={(choose) => {
-            setPresentation(undefined);
-            if (choose && displayedOpening) selectOpening(displayedOpening.id);
-          }}
+          onClose={(choose) => void closePresentation(choose)}
         />
       )}
     </>

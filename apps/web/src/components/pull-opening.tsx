@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   activeMarket,
+  canonicalPullTheme,
+  pullMarketTitle,
   marketOutcomes,
   units,
   type Market,
@@ -16,6 +18,7 @@ import { usdc } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { usePullCatalog } from "./pull-catalog";
 import type { PullActions } from "./pull-account";
+import { PullMarketCards } from "./pull-market-cards";
 import { PullRetry } from "./pull-board";
 
 type Quote = ReturnType<typeof quoteDepth>;
@@ -52,7 +55,7 @@ export function PullOpeningPanel({
               disabled={actions.busy}
               onClick={onResume}
             >
-              Resume opening
+              View opening
             </Button>
           )}
         </div>
@@ -92,11 +95,11 @@ export function PullOpeningPanel({
                     <dd>{opening.redemption.quantity}</dd>
                   </div>
                   <div>
-                    <dt>Demo cost</dt>
+                    <dt>Cost</dt>
                     <dd>{usdc(opening.redemption.cost)}</dd>
                   </div>
                   <div>
-                    <dt>Returned to demo cash</dt>
+                    <dt>Returned to balance</dt>
                     <dd>{usdc(opening.redemption.remainder)}</dd>
                   </div>
                 </dl>
@@ -152,9 +155,6 @@ export function PullOpeningPanel({
           </p>
         </details>
       )}
-      {!opening.proof && opening.randomnessSource === "demo-csprng" && (
-        <p className="pull-muted">Practice draw using server randomness.</p>
-      )}
     </section>
   );
 }
@@ -166,109 +166,102 @@ function PullRedemption({
   opening: PullOpening;
   actions: PullActions;
 }) {
-  const [theme, setTheme] = useState<PullTheme>(opening.theme ?? allMarkets);
+  const theme = canonicalPullTheme(opening.theme ?? allMarkets);
   const [search, setSearch] = useState("");
-  const [chosen, setChosen] = useState<Market | null>(null);
+  const [selection, setSelection] = useState<{
+    market: Market;
+    symbol?: string;
+    side?: Side;
+  } | null>(null);
   const catalog = usePullCatalog(theme, search);
   return (
     <div className="pull-stack">
-      <h3>Choose a market and outcome</h3>
-      {theme.kind !== "all" ? (
-        <div className="pull-panel-heading">
-          <span className="pull-muted">{theme.label}</span>
-          <PullRetry
-            onClick={() => {
-              setChosen(null);
-              setTheme(allMarkets);
-            }}
-          >
-            Show all markets
-          </PullRetry>
-        </div>
-      ) : (
-        <label className="pull-field">
-          <span>Find a market</span>
-          <input
-            type="search"
-            value={search}
-            maxLength={100}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </label>
-      )}
+      <div className="pull-panel-heading">
+        <h3>{theme.kind === "all" ? "Choose your prediction" : theme.label}</h3>
+        <span className="pull-muted">Highest volume first</span>
+      </div>
       <label className="pull-field">
-        <span>Market</span>
-        <select
-          value={chosen?.id ?? ""}
-          disabled={actions.busy}
-          onChange={(event) =>
-            setChosen(
-              catalog.markets.find(
-                (market) => market.id === event.target.value,
-              ) ?? null,
-            )
-          }
-        >
-          <option value="">Select a market</option>
-          {chosen &&
-            !catalog.markets.some((market) => market.id === chosen.id) && (
-              <option value={chosen.id}>{chosen.title}</option>
-            )}
-          {catalog.markets.map((market) => (
-            <option key={market.id} value={market.id}>
-              {market.title}
-            </option>
-          ))}
-        </select>
+        <span>Search unlocked markets</span>
+        <input
+          type="search"
+          value={search}
+          maxLength={100}
+          onChange={(event) => setSearch(event.target.value)}
+        />
       </label>
-      {chosen && (
-        <p className="pull-muted pull-selected-title">{chosen.title}</p>
+      {selection && (
+        <section
+          className="pull-trade-selection"
+          aria-label="Selected prediction"
+        >
+          <div className="pull-panel-heading">
+            <h3>{pullMarketTitle(selection.market)}</h3>
+            <Button
+              variant="ghost"
+              disabled={actions.busy}
+              onClick={() => setSelection(null)}
+            >
+              Change market
+            </Button>
+          </div>
+          <PullTrade
+            key={`${selection.market.id}:${selection.symbol}:${selection.side}`}
+            opening={opening}
+            chosen={selection.market}
+            initialSymbol={selection.symbol}
+            initialSide={selection.side}
+            actions={actions}
+          />
+        </section>
       )}
-      {catalog.searching ? (
+      {catalog.searching && (
         <p className="pull-muted" role="status">
-          Checking markets…
+          Finding markets…
         </p>
-      ) : null}
+      )}
       {catalog.unavailable ? (
-        <>
-          <p className="pull-error" role="alert">
-            Market catalog unavailable.
-          </p>
-          <PullRetry onClick={() => void catalog.refetch()}>
-            Refresh markets
-          </PullRetry>
-        </>
+        <p className="pull-error" role="alert">
+          Market catalog unavailable. Your budget is saved.
+        </p>
       ) : (
-        !catalog.searching && (
-          <>
-            {catalog.delayed && (
-              <>
-                <p className="pull-muted" role="status">
-                  Market updates delayed. Showing saved catalog results.
-                </p>
-                <PullRetry onClick={() => void catalog.refetch()}>
-                  Refresh markets
-                </PullRetry>
-              </>
-            )}
-            {catalog.markets.length === 0 && (
-              <p className="pull-muted">
-                {catalog.delayed
-                  ? "No matches in the saved catalog. Try a broader search."
-                  : "No matching markets. Try a broader search to use your saved budget."}
-              </p>
-            )}
-          </>
+        catalog.delayed && (
+          <p className="pull-muted" role="status">
+            Market updates delayed. Showing saved markets.
+          </p>
         )
       )}
-      {chosen && (
-        <PullTrade
-          key={chosen.id}
-          opening={opening}
-          chosen={chosen}
-          actions={actions}
-        />
+      {(catalog.unavailable || catalog.delayed) && (
+        <PullRetry onClick={() => void catalog.refetch()}>
+          Refresh markets
+        </PullRetry>
       )}
+      {!catalog.searching &&
+        !catalog.unavailable &&
+        catalog.markets.length === 0 && (
+          <p className="pull-muted">
+            No open markets match this search. Your budget is saved.{" "}
+            {search && (
+              <button type="button" onClick={() => setSearch("")}>
+                Clear search
+              </button>
+            )}
+          </p>
+        )}
+      <PullMarketCards
+        key={search}
+        markets={catalog.markets}
+        theme={theme}
+        selectedId={selection?.market.id}
+        disabled={actions.busy}
+        onSelect={(market, symbol, side) => {
+          setSelection({ market, symbol, side });
+          requestAnimationFrame(() =>
+            document
+              .querySelector(".pull-trade-selection")
+              ?.scrollIntoView({ block: "start", behavior: "smooth" }),
+          );
+        }}
+      />
     </div>
   );
 }
@@ -277,13 +270,17 @@ function PullTrade({
   opening,
   chosen,
   actions,
+  initialSymbol = "",
+  initialSide = "yes",
 }: {
   opening: PullOpening;
   chosen: Market;
+  initialSymbol?: string;
+  initialSide?: Side;
   actions: PullActions;
 }) {
-  const [symbol, setSymbol] = useState("");
-  const [side, setSide] = useState<Side>("yes");
+  const [symbol, setSymbol] = useState(initialSymbol);
+  const [side, setSide] = useState<Side>(initialSide);
   const [review, setReview] = useState<{
     quote: Quote;
     eventTicker: string;
@@ -430,7 +427,7 @@ function PullTrade({
               <dd>{usdc(quote.totalPayout)}</dd>
             </div>
             <div>
-              <dt>Returned to demo cash</dt>
+              <dt>Returned to balance</dt>
               <dd>{usdc(quote.unspent)}</dd>
             </div>
           </dl>
@@ -462,7 +459,7 @@ function PullTrade({
                 })
               }
             >
-              Confirm demo position
+              Confirm prediction
             </Button>
           )}
         </>

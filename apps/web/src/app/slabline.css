@@ -968,3 +968,13 @@ input {
     margin-left: auto;
   }
 }
+.exchange-navigation .pull-nav-entry {
+  color: #b1ddff;
+  background: #1c2b39;
+}
+.board-navigation a,
+.account-navigation a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
