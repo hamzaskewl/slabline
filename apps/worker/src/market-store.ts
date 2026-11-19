@@ -225,7 +225,7 @@ export async function savedMarket(
   const ticker = seed?.ticker ?? (!/^\d+$/.test(id) ? id : null);
   if (!ticker) return { ...catalog, data: seed ?? null };
   const r = await events.read(
-    `gemini:event:v2:${ticker}`,
+    `gemini:event:v3:${ticker}`,
     async () => {
       const market = await getMarketByTicker(ticker);
       remember([market]);
