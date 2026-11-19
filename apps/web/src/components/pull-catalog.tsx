@@ -1,9 +1,15 @@
 "use client";
 
 import { api } from "@/lib/trpc";
-import { activeMarket, type Market, type PullTheme } from "@collectible/domain";
+import {
+  activeMarket,
+  type Market,
+  type ProviderResult,
+  type PullTheme,
+} from "@collectible/domain";
 import { useEffect, useMemo, useState } from "react";
 import { useMarketClock } from "@/lib/use-market-clock";
+import { retainMarketSnapshot } from "@/lib/market-snapshot";
 
 function matchesTheme(market: Market, theme: PullTheme): boolean {
   if (theme.kind === "all") return true;
@@ -25,14 +31,25 @@ export function usePullCatalog(theme: PullTheme, search = "") {
   }, [text]);
   const result = api.markets.useQuery(
     { search: query, status: "active" },
-    { refetchInterval: (q) => (q.state.data?.refreshing ? 2000 : 15000) },
+    {
+      refetchInterval: (q) => (q.state.data?.refreshing ? 2000 : 15000),
+      structuralSharing: (previous, incoming) =>
+        retainMarketSnapshot(
+          previous as ProviderResult<Market[]> | undefined,
+          incoming as ProviderResult<Market[]>,
+        ),
+    },
   );
+  const available =
+    result.data?.source === "live" || result.data?.source === "cache";
+  const searching =
+    query !== text ||
+    (!available && (result.isPending || !!result.data?.refreshing));
+  const delayed =
+    available && !!(result.data?.stale || result.data?.error || result.error);
   const markets = useMemo(
     () =>
-      (result.data?.source === "live" || result.data?.source === "cache"
-        ? result.data.data
-        : []
-      ).filter(
+      (available ? (result.data?.data ?? []) : []).filter(
         (market) =>
           activeMarket(market) &&
           !!market.ticker &&
@@ -40,11 +57,13 @@ export function usePullCatalog(theme: PullTheme, search = "") {
           (!market.closesAt || Date.parse(market.closesAt) > now) &&
           matchesTheme(market, theme),
       ),
-    [result.data, theme, now],
+    [available, result.data, theme, now],
   );
   return {
     ...result,
     markets,
-    searching: result.isPending || query !== text || !!result.data?.refreshing,
+    searching,
+    delayed,
+    unavailable: !searching && !available,
   };
 }
