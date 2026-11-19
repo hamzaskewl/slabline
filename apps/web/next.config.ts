@@ -6,6 +6,16 @@ const config: NextConfig = {
     "@collectible/db",
   ],
   poweredByHeader: false,
+  async redirects() {
+    return ["web-production-ae51051f.up.railway.app", "www.slabline.xyz"].map(
+      (host) => ({
+        source: "/:path*",
+        has: [{ type: "host" as const, value: host.replaceAll(".", "\\.") }],
+        destination: "https://slabline.xyz/:path*",
+        permanent: true,
+      }),
+    );
+  },
   async headers() {
     return [
       {
