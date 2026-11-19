@@ -1,6 +1,6 @@
 # Slabline demonstration
 
-Use Devnet and sign in. These links open repeatable account-backed rehearsals; they do not trade real Gemini contracts or spend mainnet funds. Wallet **Add $100** replenishes rehearsal cash. Settings **Finish a replay** lets the presenter select a saved rehearsal position and apply Yes/No/Void. Select the matching subject: San Antonio for cards, Omniverse / Grail for Jensen.
+Use Devnet and sign in. These links open repeatable account-backed rehearsals; they do not trade real Gemini contracts or spend mainnet funds. Wallet **Add $100** replenishes rehearsal cash. Settings **Finish a replay** lets the presenter select a saved rehearsal position and apply Yes/No/Void. Select the matching subject: San Antonio for cards, Omniverse for Jensen.
 
 ## Player slab
 

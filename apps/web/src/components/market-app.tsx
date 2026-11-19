@@ -835,7 +835,13 @@ function MarketDetail({
   const renderRewards = (heldShares = "0") =>
     rehearsal === "grail" ? (
       <GrailRehearsal
-        payout={money(units(heldShares) + units(quote?.totalPayout ?? "0"))}
+        payout={
+          quote
+            ? money(units(heldShares) + units(quote.totalPayout))
+            : units(heldShares) > 0n
+              ? heldShares
+              : null
+        }
         side={side}
       />
     ) : (

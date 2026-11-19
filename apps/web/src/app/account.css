@@ -539,7 +539,8 @@
   min-height: 240px;
 }
 .reward-target-image > .card-media {
-  min-height: 170px;
+  height: 100%;
+  min-height: 0;
 }
 .reward-browser-card > .card-media {
   width: 96px;
