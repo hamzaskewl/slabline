@@ -1,0 +1,12 @@
+Provider logo provenance (retrieved 2026-11-19)
+
+Gemini exchange: gemini-wordmark.svg is the unmodified header SVG from
+https://www.gemini.com/ (Gemini Home link), with its original black paths,
+94:20 aspect ratio and clear space. Used only in the disabled upcoming
+Gemini sign-in option, separate from the more prominent Slabline mark.
+Usage guidance: https://support.gemini.com/hc/en-us/articles/210017573-Brand-material-usage
+
+Google: google-g.png is the unmodified Google G icon linked by
+https://developers.google.com/identity/branding-guidelines
+Source: https://developers.google.com/static/identity/images/g-logo.png
+Rendered without recoloring or stretching, on the white Google sign-in button.

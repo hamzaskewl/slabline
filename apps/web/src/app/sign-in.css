@@ -1,0 +1,159 @@
+.header-auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header-auth-actions .button {
+  min-height: 40px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.sign-in-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  background: #0009;
+  backdrop-filter: blur(4px);
+  animation: sign-in-fade 160ms ease-out;
+}
+.sign-in-dialog {
+  position: fixed;
+  z-index: 181;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(
+    100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+  );
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--rule);
+  border-radius: 24px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 24px 80px #0007;
+  padding: 40px 32px 32px;
+  text-align: center;
+  animation: sign-in-fade 160ms ease-out;
+}
+.sign-in-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+.sign-in-close:hover {
+  color: var(--ink);
+  background: var(--slabline-raised);
+}
+.sign-in-logo {
+  display: block;
+  margin: 0 auto 22px;
+  border-radius: 18px;
+}
+.sign-in-dialog h2 {
+  margin: 0 0 28px;
+  font-size: clamp(21px, 5.5vw, 26px);
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.sign-in-options {
+  display: grid;
+  gap: 10px;
+}
+.sign-in-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 50px;
+  padding: 10px 12px;
+  border: 1px solid #435364;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 550;
+}
+.sign-in-option:hover:not(:disabled) {
+  background: var(--slabline-raised);
+}
+.sign-in-option img,
+.sign-in-option svg {
+  flex-shrink: 0;
+}
+.sign-in-option.sign-in-google {
+  background: #fff;
+  border-color: #747775;
+  color: #1f1f1f;
+}
+.sign-in-google img {
+  object-fit: contain;
+}
+.sign-in-google:hover:not(:disabled) {
+  background: #f2f2f2;
+}
+.sign-in-option.sign-in-gemini {
+  margin-top: 6px;
+  flex-direction: column;
+  gap: 6px;
+  background: #d0f4f7;
+  border-color: #d0f4f7;
+  color: #12272a;
+  opacity: 1;
+}
+.sign-in-gemini > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sign-in-gemini small {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.sign-in-error {
+  margin-top: 16px;
+  color: var(--red);
+  font-size: 13px;
+}
+@keyframes sign-in-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 760px),
+  (pointer: coarse) and (max-height: 540px) and (max-width: 1000px) {
+  .app-shell .exchange-header .header-account {
+    display: block;
+  }
+  .header-auth-actions .auth-signup {
+    display: none;
+  }
+  .header-auth-actions .button {
+    padding-inline: 10px;
+    min-height: 44px;
+  }
+  .sign-in-dialog {
+    padding: 36px 20px 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sign-in-dialog,
+  .sign-in-overlay {
+    animation: none;
+  }
+}

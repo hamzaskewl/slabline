@@ -1,10 +1,11 @@
 "use client";
+import { useSlablineAuth } from "./sign-in-dialog";
 import { Select } from "./ui/select";
 import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
 import { useWalletPreference } from "./wallet-preferences";
 import Link from "next/link";
-import { usePrivy } from "@privy-io/react-auth";
+
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { WalletCollection as Collection } from "@collectible/domain";
 import { privateRead, usePrivateRead } from "@/lib/use-private-read";
@@ -22,7 +23,8 @@ export function WalletCollection({
   excludeMints?: string[];
 }) {
   const { network } = useNetwork();
-  const { ready, authenticated, user, login, getAccessToken } = usePrivy();
+  const { ready, authenticated, user, login, getAccessToken } =
+    useSlablineAuth();
   const links = usePrivateRead<Links>("/api/wallet/links");
   const [selected, setSelected] = useWalletPreference(user?.id, network);
   const wallet =
@@ -186,7 +188,7 @@ export function WalletCollection({
 
 export function WalletInventorySettings() {
   const { network } = useNetwork(),
-    { user, authenticated } = usePrivy();
+    { user, authenticated } = useSlablineAuth();
   const links = usePrivateRead<Links>("/api/wallet/links");
   const [selected, choose] = useWalletPreference(user?.id, network);
   const wallets = links.data?.wallets ?? [];

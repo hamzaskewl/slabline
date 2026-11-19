@@ -1,4 +1,5 @@
 "use client";
+import { useSlablineAuth } from "./sign-in-dialog";
 import { Select } from "./ui/select";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -44,7 +45,7 @@ type Balances = {
   paymentSymbol: string;
 };
 export default function WalletTrade({ token, market, blocker }: TradeProps) {
-  const { authenticated, login, getAccessToken } = usePrivy(),
+  const { authenticated, login, getAccessToken } = useSlablineAuth(),
     { wallets } = useWallets(),
     { connectWallet } = useConnectWallet(),
     { createWallet } = useCreateWallet();
