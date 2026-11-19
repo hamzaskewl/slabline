@@ -1,10 +1,15 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { PULL_OUTCOMES, PULL_TIERS, type PullTier } from "@collectible/domain";
+import {
+  PULL_OUTCOMES,
+  PULL_TIERS,
+  type PullTheme,
+  type PullTier,
+} from "@collectible/domain";
 import { Button } from "./ui/button";
 import { usd, usdc } from "@/lib/utils";
-import { usePullCatalog, type PullTheme } from "./pull-catalog";
+import { usePullCatalog } from "./pull-catalog";
 
 export function PullBoard({
   balance,

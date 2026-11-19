@@ -5,14 +5,18 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConnectWallet } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
-import { units, type PullOpening, type PullTier } from "@collectible/domain";
+import {
+  units,
+  type PullOpening,
+  type PullTheme,
+  type PullTier,
+} from "@collectible/domain";
 import { usePrivateRead } from "@/lib/use-private-read";
 import { usdc } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { useDemoAction } from "./demo-controls";
 import { useNetwork } from "./network-settings";
 import { PullBoard, PullRetry } from "./pull-board";
-import type { PullTheme } from "./pull-catalog";
 import { PullOpeningPanel } from "./pull-opening";
 
 const path = "/api/pull";

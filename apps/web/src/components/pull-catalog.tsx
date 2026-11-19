@@ -2,7 +2,6 @@
 
 import { api } from "@/lib/trpc";
 import { activeMarket, type Market, type PullTheme } from "@collectible/domain";
-export type { PullTheme } from "@collectible/domain";
 import { useEffect, useMemo, useState } from "react";
 import { useMarketClock } from "@/lib/use-market-clock";
 

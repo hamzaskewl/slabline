@@ -2,21 +2,33 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   activeMarket,
   marketOutcomes,
   units,
   type Market,
   type PullOpening,
+  type PullTheme,
   type quoteDepth,
 } from "@collectible/domain";
 import { api } from "@/lib/trpc";
 import { usdc } from "@/lib/utils";
 import { Button } from "./ui/button";
-import { usePullCatalog, type PullTheme } from "./pull-catalog";
+import { usePullCatalog } from "./pull-catalog";
 import type { PullActions } from "./pull-account";
-import { PullRandomness } from "./pull-randomness";
 import { PullRetry } from "./pull-board";
+
+const PullRandomness = dynamic(
+  () => import("./pull-randomness").then((module) => module.PullRandomness),
+  {
+    loading: () => (
+      <p className="pull-muted" role="status">
+        Loading the saved devnet draw…
+      </p>
+    ),
+  },
+);
 
 type Quote = ReturnType<typeof quoteDepth>;
 type Side = "yes" | "no";
