@@ -12,6 +12,7 @@ import {
   type DemoCollectible,
   type DemoPosition,
   activeDemoPosition,
+  demoCollectibleValue,
 } from "@collectible/domain";
 import { ArrowUpRight } from "lucide-react";
 import { MarketArtwork } from "./market-artwork";
@@ -21,9 +22,10 @@ import { CardValue } from "./card-value";
 import { PortfolioOverview } from "./portfolio-overview";
 import { WalletCollection } from "./wallet-collection";
 import { usePrivateRead } from "@/lib/use-private-read";
-import { usd } from "@/lib/utils";
+import { usd, usdc } from "@/lib/utils";
 import { useNetwork } from "./network-settings";
 import { Button } from "./ui/button";
+import { RewardWalletFunding } from "./reward-wallet-funding";
 
 export function useDemoAction() {
   const auth = usePrivy(),
@@ -220,14 +222,14 @@ export function DemoPortfolio({
   const openCost = positions
     .filter((p) => p.state === "open")
     .reduce((sum, p) => sum + units(p.cost), 0n);
-  const cardCost = cards.reduce((sum, c) => sum + units(c.cost), 0n);
+  const cardCost = cards.reduce((sum, c) => sum + demoCollectibleValue(c), 0n);
   const rewardValue = wins.reduce(
     (sum, p) =>
       sum +
       units(p.reward!.budget) -
       cards
         .filter((c) => c.rewardPositionId === p.id)
-        .reduce((v, c) => v + units(c.cost), 0n),
+        .reduce((v, c) => v + units(c.cost) - units(c.topUp ?? "0"), 0n),
     0n,
   );
   const total = money(
@@ -708,6 +710,20 @@ export function DemoMintActions({
     );
   return (
     <div className="demo-mint-actions">
+      {units(view.topUp ?? "0") > 0n &&
+        ["reserved", "prepared"].includes(view.state) && (
+          <RewardWalletFunding
+            wallet={view.wallet}
+            verified={true}
+            amount={view.topUp!}
+          />
+        )}
+      {view.payment && units(view.topUp ?? "0") > 0n && (
+        <details className="reward-payment-recipient">
+          <summary>Payment destination</summary>
+          <code>{view.payment.recipient}</code>
+        </details>
+      )}
       {!wallet && (
         <Button
           variant="outline"
@@ -767,7 +783,9 @@ export function DemoMintActions({
             })
           }
         >
-          Mint to wallet
+          {units(view.topUp ?? "0") > 0n
+            ? `Pay ${usdc(view.topUp!)} test USDC & mint`
+            : "Mint to wallet"}
         </Button>
       )}
       {view.state !== "confirmed" && (

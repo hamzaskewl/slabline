@@ -7,16 +7,38 @@ import {
   activeDemoPosition,
   demoPositionContext,
   positionRewardMarket,
+  demoCollectibleValue,
 } from "./demo";
 import { matchingCards, type Market } from "./index";
-test("reward selections enforce 80–100% including sub-cent rounding", () => {
+test("reward selections enforce 80–105% including exact USDC rounding", () => {
   expect(rewardAllocation("100", ["50", "30"]).valid).toBe(true);
   expect(rewardAllocation("100", ["79.999999"]).valid).toBe(false);
   expect(rewardAllocation("100", ["100"]).remainder).toBe("0.000000");
-  expect(rewardAllocation("100", ["100.000001"]).overBudget).toBe(true);
+  expect(rewardAllocation("100", ["100.000001"]).topUp).toBe("0.000001");
+  expect(rewardAllocation("145", ["100", "52.25"]).valid).toBe(true);
+  expect(rewardAllocation("145", ["152.25"]).topUp).toBe("7.250000");
+  expect(rewardAllocation("145", ["152.250001"]).overBudget).toBe(true);
+  expect(rewardAllocation("0.000019", ["0.000020"]).overBudget).toBe(true);
+  expect(rewardAllocation("100", ["81"], "5").valid).toBe(false);
+  expect(rewardAllocation("100", ["85"], "5").remainder).toBe("20.000000");
+  expect(rewardAllocation("100", ["101"], "2").additionalTopUp).toBe(
+    "0.000000",
+  );
+  expect(() => rewardAllocation("100", ["-1", "101"])).toThrow();
   expect(rewardAllocation("0.000001", ["0.000001"]).valid).toBe(true);
   expect(rewardAllocation("0.000001", []).valid).toBe(false);
   expect(rewardAllocation("0", []).valid).toBe(false);
+});
+test("portfolio includes wallet contributions only after card delivery", () => {
+  expect(
+    demoCollectibleValue({ cost: "105", topUp: "5", state: "reserved" }),
+  ).toBe(100_000_000n);
+  expect(
+    demoCollectibleValue({ cost: "105", topUp: "5", state: "confirmed" }),
+  ).toBe(105_000_000n);
+  expect(demoCollectibleValue({ cost: "80", state: "reserved" })).toBe(
+    80_000_000n,
+  );
 });
 test("sales use bids for the selected side and reject unavailable depth", () => {
   expect(demoSaleQuote({ side: "yes", quantity: "10" }, DEMO_REPLAY.book)).toBe(

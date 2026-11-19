@@ -13,17 +13,19 @@ import { X } from "lucide-react";
 import {
   rewardAllocation,
   units,
+  money,
   type DemoAccountView,
   type DemoPosition,
   type Valuation,
 } from "@collectible/domain";
 import { usePrivateRead } from "@/lib/use-private-read";
-import { usd } from "@/lib/utils";
+import { usd, usdc } from "@/lib/utils";
 import { useDemoAction } from "./demo-controls";
 import { Select } from "./ui/select";
 import { Button } from "./ui/button";
 import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
+import { RewardWalletFunding } from "./reward-wallet-funding";
 export type RewardPick = {
   source: "collectorcrypt" | "grail";
   sourceId: string;
@@ -115,8 +117,12 @@ export function AddReward({ item }: { item: RewardPick }) {
     ...committed.map((p) => p.cost),
     ...c.picks.map((p) => p.cost),
   ].reduce((sum, cost) => sum + units(cost), 0n);
-  const tooMuch =
-    !selected && total + units(item.cost) > units(c.position.reward.budget);
+  const allocation = rewardAllocation(
+    c.position.reward.budget,
+    [money(total + units(item.cost))],
+    money(committed.reduce((sum, card) => sum + units(card.topUp ?? "0"), 0n)),
+  );
+  const tooMuch = !selected && allocation.overBudget;
   const already = committed.some(
     (p) =>
       p.sourceId ===
@@ -139,8 +145,10 @@ export function AddReward({ item }: { item: RewardPick }) {
         : selected
           ? "Remove from rewards"
           : tooMuch
-            ? "Above remaining budget"
-            : "Add to rewards"}
+            ? "Above 5% limit"
+            : units(allocation.additionalTopUp) > 0n
+              ? `Add · ${usdc(allocation.additionalTopUp)} from wallet`
+              : "Add to rewards"}
     </button>
   );
 }
@@ -181,10 +189,12 @@ export function RewardCheckout() {
       (card) =>
         card.rewardPositionId === position.id && card.state !== "cancelled",
     ) ?? [];
-  const allocation = rewardAllocation(reward.budget, [
-    ...committed.map((p) => p.cost),
-    ...picks.map((p) => p.cost),
-  ]);
+  const allocation = rewardAllocation(
+    reward.budget,
+    [...committed.map((p) => p.cost), ...picks.map((p) => p.cost)],
+    money(committed.reduce((sum, card) => sum + units(card.topUp ?? "0"), 0n)),
+  );
+  const needsTopUp = units(allocation.additionalTopUp) > 0n;
   const approved =
     wallet &&
     (verified === `${a.user?.id}:${wallet.address}` ||
@@ -200,8 +210,11 @@ export function RewardCheckout() {
           <dd>{usd(allocation.total)}</dd>
         </div>
         <div>
-          <dt>Minimum in cards · 80%</dt>
-          <dd>{usd(allocation.minimum)}</dd>
+          <dt>From your wallet</dt>
+          <dd>
+            {usdc(allocation.additionalTopUp)}
+            <small>Up to {usdc(allocation.maxTopUp)} · 5%</small>
+          </dd>
         </div>
         <div>
           <dt>Cash remainder</dt>
@@ -215,6 +228,10 @@ export function RewardCheckout() {
           </dd>
         </div>
       </dl>
+      <p className="reward-range">
+        Choose {usd(allocation.minimum)}–{usd(allocation.maximum)} in cards. Any
+        amount above your reward comes from your wallet.
+      </p>
       {picks.length > 0 && (
         <details className="reward-basket">
           <summary>
@@ -242,6 +259,19 @@ export function RewardCheckout() {
           </div>
         </details>
       )}
+      {needsTopUp && !data?.rewardTopUpEnabled && (
+        <p role="status">
+          Wallet top-ups are not available yet. You can still claim cards within
+          your reward budget.
+        </p>
+      )}
+      {needsTopUp && wallet && data?.rewardTopUpEnabled && (
+        <RewardWalletFunding
+          wallet={wallet.address}
+          verified={!!approved}
+          amount={allocation.additionalTopUp}
+        />
+      )}
       <div className="reward-checkout-actions">
         {wallet ? (
           <Select
@@ -264,7 +294,13 @@ export function RewardCheckout() {
           </Button>
         )}
         <Button
-          disabled={a.busy || !wallet || !allocation.valid || !picks.length}
+          disabled={
+            a.busy ||
+            !wallet ||
+            !allocation.valid ||
+            !picks.length ||
+            (needsTopUp && !data?.rewardTopUpEnabled)
+          }
           onClick={() =>
             void a.run(async () => {
               if (!wallet) return;
@@ -291,6 +327,7 @@ export function RewardCheckout() {
                 id: position.id,
                 key: key.current,
                 wallet: wallet.address,
+                expectedTopUp: allocation.additionalTopUp,
                 items: picks.map((p) => ({
                   source: p.source,
                   sourceId: p.sourceId,
@@ -303,7 +340,11 @@ export function RewardCheckout() {
             })
           }
         >
-          {a.busy ? "Saving rewards…" : "Confirm rewards"}
+          {a.busy
+            ? "Saving rewards…"
+            : needsTopUp
+              ? `Confirm · ${usdc(allocation.additionalTopUp)} extra`
+              : "Confirm rewards"}
         </Button>
       </div>
       {a.error && <p role="alert">{a.error}</p>}
