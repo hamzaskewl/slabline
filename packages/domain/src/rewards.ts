@@ -1,4 +1,5 @@
 import { teamCardMatch, cardTeam } from "./team-cards";
+import { currentFmv } from "./valuations";
 import type { Contract, Listing, Market } from "./index";
 
 export type GrailToken = {
@@ -248,6 +249,7 @@ export type RewardFilters = {
   team?: string;
 };
 export function filterCards(cards: Listing[], f: RewardFilters) {
+  const now = Date.now();
   return cards
     .filter(
       (c) =>
@@ -266,11 +268,20 @@ export function filterCards(cards: Listing[], f: RewardFilters) {
           /\b(autograph|signed|auto)\b/i.test(c.name)) &&
         (f.feature !== "rookie" || /\b(rookie|rc)\b/i.test(c.name)),
     )
-    .sort((a, b) =>
-      f.sort === "low"
+    .sort((a, b) => {
+      if (f.sort === "fmv") {
+        const av = currentFmv(a.valuation, now);
+        const bv = currentFmv(b.valuation, now);
+        return (
+          (bv ?? -1) - (av ?? -1) ||
+          a.name.localeCompare(b.name) ||
+          a.mint.localeCompare(b.mint)
+        );
+      }
+      return f.sort === "low"
         ? Number(a.ask) - Number(b.ask)
         : f.sort === "name"
           ? a.name.localeCompare(b.name)
-          : Number(b.ask) - Number(a.ask),
-    );
+          : Number(b.ask) - Number(a.ask);
+    });
 }

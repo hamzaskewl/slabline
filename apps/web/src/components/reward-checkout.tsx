@@ -243,7 +243,7 @@ export function RewardCheckout() {
                 <CardImage src={p.image} alt={p.name} />
                 <div>
                   <strong>{p.name}</strong>
-                  <CardValue valuation={p.valuation} />
+                  <CardValue valuation={p.valuation} ask={p.cost} />
                 </div>
                 <b>{usd(p.cost)}</b>
                 <button

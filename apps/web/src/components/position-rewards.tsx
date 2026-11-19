@@ -421,7 +421,7 @@ export function PositionRewardCatalog({
               <div className="claim-card-copy">
                 <h3>{card.name}</h3>
                 <strong>{usd(card.ask)}</strong>
-                <CardValue valuation={card.valuation} />
+                <CardValue valuation={card.valuation} ask={card.ask} />
                 {claimable ? (
                   <AddReward
                     item={{

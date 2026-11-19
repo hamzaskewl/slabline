@@ -10,6 +10,7 @@ export * from "./discovery";
 export * from "./profiles";
 export * from "./team-cards";
 export * from "./demo";
+export * from "./valuations";
 import { marketSearchText, marketTeams, competitiveValue } from "./discovery";
 import { relatedCards } from "./rewards";
 

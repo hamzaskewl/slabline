@@ -1,0 +1,124 @@
+.card-fmv {
+  --fmv-color: #a7b3c0;
+  --fmv-border: #4b5865;
+  --fmv-background: #202a33;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 4px 9px;
+  border: 1px solid var(--fmv-border);
+  border-radius: 999px;
+  background: var(--fmv-background);
+  color: var(--fmv-color);
+  font-size: 11px;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: help;
+}
+.card-fmv[data-tone="green"] {
+  --fmv-color: #72e3aa;
+  --fmv-border: #2f7653;
+  --fmv-background: #152d23;
+}
+.card-fmv[data-tone="amber"] {
+  --fmv-color: #f1cc77;
+  --fmv-border: #7b6333;
+  --fmv-background: #30291b;
+}
+.card-fmv[data-tone="red"] {
+  --fmv-color: #f79c96;
+  --fmv-border: #844b49;
+  --fmv-background: #332122;
+}
+.card-fmv .card-fmv-label {
+  color: inherit;
+  font-weight: 500;
+}
+.card-fmv > strong {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.card-fmv > svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+.card-fmv:hover,
+.card-fmv[data-state="instant-open"],
+.card-fmv[data-state="delayed-open"] {
+  border-color: var(--fmv-color);
+}
+.card-fmv:focus-visible {
+  outline: 2px solid var(--fmv-color);
+  outline-offset: 3px;
+}
+.fmv-tooltip {
+  z-index: 200;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: 16px;
+  border: 1px solid #485765;
+  border-radius: 12px;
+  background: #17212b;
+  color: #c8d2dc;
+  box-shadow: 0 12px 40px #0008;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.fmv-tooltip > strong {
+  display: block;
+  color: #f1f6fa;
+  font-size: 14px;
+}
+.fmv-tooltip p {
+  margin: 8px 0 0;
+}
+.fmv-tooltip .fmv-tooltip-comparison {
+  font-weight: 600;
+}
+.fmv-tooltip-comparison[data-tone="green"] {
+  color: #72e3aa;
+}
+.fmv-tooltip-comparison[data-tone="amber"] {
+  color: #f1cc77;
+}
+.fmv-tooltip-comparison[data-tone="red"] {
+  color: #f79c96;
+}
+.fmv-tooltip-meta {
+  display: block;
+  margin-top: 10px;
+  color: #a7b5c3;
+  font-size: 11px;
+}
+.fmv-tooltip-arrow {
+  fill: #485765;
+}
+.reward-browser-card {
+  position: relative;
+}
+.reward-browser-card[data-selected="true"],
+.reward-browser-card:has(.reward-browser-select:focus-visible) {
+  border-color: #78cfff;
+}
+.reward-browser-select {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.reward-browser-card .card-fmv {
+  position: relative;
+  z-index: 2;
+}

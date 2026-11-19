@@ -200,7 +200,7 @@ setInterval(async () => {
     return;
   try {
     await recoverValuationJobs();
-    const cards = await listCards();
+    const cards = await listCards("", rewardCategories(knownMarkets()));
     await cacheCardIdentities([DEMO_REPLAY_CARD, ...cards]);
     await enqueueValuations([DEMO_REPLAY_CARD, ...cards]);
   } catch {

@@ -137,6 +137,9 @@ export async function attachCachedValuations(
 ): Promise<Listing[]> {
   if (!enabled() || !cards.length) return cards;
   try {
+    // Every card surface can discover inventory outside the background scan.
+    // Enqueue identities, never make provider calls in the browser/request path.
+    await enqueueValuations(cards);
     const keys = cards.filter((c) => c.cert).map(keyFor);
     if (!keys.length) return cards;
     const rows = await getDb()

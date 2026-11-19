@@ -1326,7 +1326,7 @@ function CardTile({ card }: { card: Listing }) {
             <strong>{usd(card.ask)}</strong>
           </div>
         </div>
-        <CardValue valuation={card.valuation} />
+        <CardValue valuation={card.valuation} ask={card.ask} />
         {network === "devnet" && process.env.NEXT_PUBLIC_PRIVY_APP_ID && (
           <AddReward
             item={{
@@ -1391,7 +1391,7 @@ function RewardCatalog({
     min: "",
     max: "",
     feature: "",
-    sort: "high",
+    sort: "fmv",
     team: "",
   };
   const [filters, setFilters] = useState<RewardFilters>(defaults);
@@ -1540,8 +1540,9 @@ function RewardCatalog({
                 value={filters.sort}
                 onChange={(e) => update("sort", e.target.value)}
               >
-                <option value="high">Highest price</option>
-                <option value="low">Lowest price</option>
+                <option value="fmv">Highest FMV</option>
+                <option value="high">Highest listing price</option>
+                <option value="low">Lowest listing price</option>
                 <option value="name">Name A–Z</option>
               </Select>
             </label>
@@ -1560,7 +1561,7 @@ function RewardCatalog({
       <div className="reward-result-count" role="status">
         {loading
           ? "Loading rewards…"
-          : `${source === "cards" ? visible.length : visibleTokens.length} ${source === "cards" ? "cards" : "tokens"}`}
+          : `${source === "cards" ? visible.length : visibleTokens.length} ${source === "cards" ? "cards" : "tokens"}${source === "cards" && filters.sort === "fmv" ? " · Highest FMV first" : ""}`}
       </div>
       {source === "cards" ? (
         <CatalogGrid
