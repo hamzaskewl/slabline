@@ -22,10 +22,6 @@ import {
 import { createPublicKey, verify, timingSafeEqual } from "node:crypto";
 import { getDb, orders, walletLinks, eq, and, sql } from "@collectible/db";
 import { units, type DemoCollectible } from "@collectible/domain";
-import {
-  rewardPaymentSources,
-  rewardPaymentInstructions,
-} from "./reward-payment";
 import { solanaRpc } from "./solana";
 import { DemoError, collectibleView, finalizeDemoReward } from "./demo";
 const CORE = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d";
@@ -34,7 +30,19 @@ type MintData = DemoCollectible & {
   lastValidBlockHeight?: string;
   metadataUri?: string;
   signedBase64?: string;
+  /** Legacy transfer drafts can be reconciled, but never signed or rebroadcast. */
+  payment?: unknown;
 };
+export function requireUnpaidDemoMint(card: {
+  topUp?: string;
+  payment?: unknown;
+}) {
+  if (units(card.topUp ?? "0") > 0n || card.payment != null)
+    throw new DemoError(
+      "Paid rewards require a marketplace purchase from your wallet. Demo card claims cannot spend wallet funds.",
+      409,
+    );
+}
 async function owned(userId: string, id: string) {
   const [row] = await getDb()
     .select()
@@ -68,11 +76,6 @@ export async function buildDemoMint(
   name: string,
   uri: string,
   lifetime?: { blockhash: string; lastValidBlockHeight: bigint },
-  topUp?: {
-    amount: string;
-    payment: NonNullable<DemoCollectible["payment"]>;
-    sources: { address: string; amount: bigint }[];
-  },
 ) {
   const latest =
     lifetime ??
@@ -85,24 +88,12 @@ export async function buildDemoMint(
     .use(mplCore())
     .use(signerIdentity(createNoopSigner(publicKey(wallet))));
   const asset = generateSigner(umi);
-  if (topUp && topUp.payment.network !== "devnet")
-    throw new DemoError("Demo rewards only accept Devnet test USDC.");
-  let builder = create(umi, {
+  const builder = create(umi, {
     asset,
     owner: publicKey(wallet),
     name: name.slice(0, 64),
     uri,
   });
-  if (topUp)
-    builder = builder.add(
-      await rewardPaymentInstructions(
-        umi,
-        wallet,
-        topUp.amount,
-        topUp.payment,
-        topUp.sources,
-      ),
-    );
   const transaction = await builder
     .setBlockhash({
       blockhash: latest.blockhash,
@@ -154,6 +145,7 @@ export async function prepareDemoMint(userId: string, id: string) {
   const row = await owned(userId, id),
     d = row.data as MintData;
   await requireDemoWallet(userId, d.wallet);
+  if (["reserved", "prepared"].includes(row.state)) requireUnpaidDemoMint(d);
   if (row.state === "prepared" && d.lastValidBlockHeight) {
     const height = await solanaRpc("devnet")
       .getBlockHeight({ commitment: "confirmed" })
@@ -166,26 +158,7 @@ export async function prepareDemoMint(userId: string, id: string) {
   }
   if (row.state !== "reserved") return collectibleView(row);
   const uri = `${process.env.APP_URL ?? "http://localhost:3000"}/api/demo/metadata/${row.id}`;
-  let topUp: Parameters<typeof buildDemoMint>[4];
-  if (units(d.topUp ?? "0") > 0n) {
-    if (!d.payment || d.payment.network !== "devnet")
-      throw new DemoError("Reward payment configuration is unavailable.", 409);
-    try {
-      topUp = {
-        amount: d.topUp!,
-        payment: d.payment,
-        sources: await rewardPaymentSources(d.wallet, d.topUp!, d.payment),
-      };
-    } catch (error) {
-      throw new DemoError(
-        error instanceof Error
-          ? error.message
-          : "Wallet funds are unavailable.",
-        409,
-      );
-    }
-  }
-  const prepared = await buildDemoMint(d.wallet, d.name, uri, undefined, topUp);
+  const prepared = await buildDemoMint(d.wallet, d.name, uri);
   const [updated] = await getDb()
     .update(orders)
     .set({ state: "prepared", data: { ...d, ...prepared } })
@@ -202,6 +175,7 @@ export async function submitDemoMint(
     d = row.data as MintData;
   await requireDemoWallet(userId, d.wallet);
   if (row.state !== "prepared") return checkDemoMint(userId, id);
+  requireUnpaidDemoMint(d);
   if (!d.unsignedBase64) throw new DemoError("Prepare this card first.", 409);
   const sig = inspectDemoMintSignature(
     d.unsignedBase64,
@@ -304,6 +278,7 @@ export async function retryDemoMint(userId: string, id: string) {
   const row = await owned(userId, id),
     d = row.data as MintData;
   await requireDemoWallet(userId, d.wallet);
+  requireUnpaidDemoMint(d);
   if (
     row.state !== "submitted" ||
     !d.signedBase64 ||
