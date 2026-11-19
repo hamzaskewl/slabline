@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import {
   rewardAllocation,
   demoSaleQuote,
+  demoSalePreview,
   DEMO_REPLAY,
   DEMO_REPLAY_CARD,
   activeDemoPosition,
@@ -50,6 +51,73 @@ test("sales use bids for the selected side and reject unavailable depth", () => 
   expect(() =>
     demoSaleQuote({ side: "yes", quantity: "100000" }, DEMO_REPLAY.book),
   ).toThrow("Not enough buyers");
+});
+
+test("sale previews cap oversized requests to holdings and available buyers", () => {
+  const book = {
+    ...DEMO_REPLAY.book,
+    bids: [
+      { price: "0.20", quantity: "100" },
+      { price: "0.10", quantity: "150" },
+    ],
+  };
+  expect(
+    demoSalePreview({ side: "yes", quantity: "225" }, book, "999"),
+  ).toEqual({
+    maximum: "225.000000",
+    quantity: "225.000000",
+    proceeds: "32.500000",
+  });
+  expect(demoSalePreview({ side: "yes", quantity: "300" }, book)).toEqual({
+    maximum: "250.000000",
+    quantity: "250.000000",
+    proceeds: "35.000000",
+  });
+  expect(
+    demoSalePreview({ side: "yes", quantity: "300" }, book, "25").proceeds,
+  ).toBe("5.000000");
+  const thinner = { ...book, bids: [{ price: "0.20", quantity: "80" }] };
+  expect(
+    demoSalePreview({ side: "yes", quantity: "300" }, thinner, "250"),
+  ).toEqual({
+    maximum: "80.000000",
+    quantity: "80.000000",
+    proceeds: "16.000000",
+  });
+  // Execution remains strict if depth changes after the displayed quote.
+  expect(() =>
+    demoSaleQuote({ side: "yes", quantity: "250" }, thinner),
+  ).toThrow("Not enough buyers");
+});
+
+test("sale capacity uses NO bids, floors each level to its lot and handles no buyers", () => {
+  const book = {
+    ...DEMO_REPLAY.book,
+    quantityIncrement: "0.25",
+    asks: [
+      { price: "0.60", quantity: "1.49" },
+      { price: "0.80", quantity: "1.49" },
+      { price: "1", quantity: "900" },
+    ],
+  };
+  expect(demoSalePreview({ side: "no", quantity: "5" }, book, "100")).toEqual({
+    maximum: "2.500000",
+    quantity: "2.500000",
+    proceeds: "0.750000",
+  });
+  expect(
+    demoSalePreview({ side: "no", quantity: "5" }, book, "1.49").quantity,
+  ).toBe("1.250000");
+  expect(
+    demoSalePreview({ side: "yes", quantity: "225" }, { ...book, bids: [] }),
+  ).toEqual({
+    maximum: "0.000000",
+    quantity: "0.000000",
+    proceeds: null,
+  });
+  expect(
+    demoSalePreview({ side: "yes", quantity: "0" }, DEMO_REPLAY.book).proceeds,
+  ).toBeNull();
 });
 
 test("winning positions stay active until their reward is fully claimed", () => {
