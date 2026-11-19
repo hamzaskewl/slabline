@@ -12,6 +12,36 @@
   font-size: 23px;
   margin-right: auto;
 }
+.discovery-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+  margin-right: auto;
+}
+.app-shell .discovery-heading .discovery-title h1 {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+}
+.discovery-count {
+  color: var(--muted);
+  font-size: 0.78em;
+  font-weight: 500;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.discovery-title .discovery-clear-filters {
+  min-height: 32px;
+  padding: 5px 8px;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+}
 .discovery-actions {
   display: flex;
   align-items: center;
