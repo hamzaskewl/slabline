@@ -221,7 +221,12 @@ export function demoShareSnapshot(
       fees: null,
       costIncludesFees: false,
       ...shareProfit(proceeds, p.cost, null, false),
-      payoutReceipt: state === "won" ? "unclaimed" : "not-applicable",
+      payoutReceipt:
+        state === "won"
+          ? p.reward?.delivery === "cash"
+            ? "received"
+            : "unclaimed"
+          : "not-applicable",
     },
     slab,
   };

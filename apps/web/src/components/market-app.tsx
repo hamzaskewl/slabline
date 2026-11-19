@@ -1,4 +1,5 @@
 "use client";
+import { GrailRehearsal } from "./grail-rehearsal";
 import { Select } from "./ui/select";
 import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
@@ -10,7 +11,6 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   ArrowRight,
-  ArrowLeft,
   BarChart3,
   Check,
   ChevronDown,
@@ -30,6 +30,7 @@ import {
 import {
   asksForSide,
   DEMO_REPLAY,
+  DEMO_GRAIL_REPLAY,
   DEMO_REPLAY_CARD,
   cents,
   quoteDepth,
@@ -69,6 +70,10 @@ import { MarketArt } from "./market-art";
 import { NetworkSettings, useNetwork } from "./network-settings";
 const DemoOrder = dynamic(
   () => import("./demo-controls").then((m) => m.DemoOrder),
+  { ssr: false },
+);
+const PositionHoldings = dynamic(
+  () => import("./demo-controls").then((m) => m.PositionHoldings),
   { ssr: false },
 );
 const MarketPositionStatus = dynamic(
@@ -128,6 +133,7 @@ export function MarketApp({
   initialOutcome = 0,
   initialSymbol,
   initialStake = "25",
+  rehearsal,
 }: {
   section?: string;
   selectedId?: string;
@@ -135,10 +141,12 @@ export function MarketApp({
   initialOutcome?: number;
   initialSymbol?: string;
   initialStake?: string;
+  rehearsal?: "grail";
 }) {
   const router = useRouter();
   const { network } = useNetwork();
   const replay = section === "demo";
+  const scenario = rehearsal === "grail" ? DEMO_GRAIL_REPLAY : DEMO_REPLAY;
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       void navigator.serviceWorker
@@ -231,20 +239,22 @@ export function MarketApp({
   );
   const selected = replay
     ? ({
-        id: DEMO_REPLAY.eventTicker,
-        ticker: DEMO_REPLAY.eventTicker,
-        title: DEMO_REPLAY.eventTitle,
-        category: "Sports",
-        subcategory: "Pro Basketball",
+        id: scenario.eventTicker,
+        ticker: scenario.eventTicker,
+        title: scenario.eventTitle,
+        category: rehearsal ? "Business" : "Sports",
+        subcategory: rehearsal ? "NVIDIA" : "Pro Basketball",
         status: "active",
-        imageUrl: null,
-        description: "Recorded Gemini market replay",
+        imageUrl: rehearsal ? (scenario.artwork[0]?.src ?? null) : null,
+        description: rehearsal
+          ? "NVIDIA rehearsal with illustrative depth"
+          : "Recorded Gemini market replay",
         closesAt: null,
         children: [],
         contracts: [
           {
-            symbol: DEMO_REPLAY.book.symbol,
-            label: DEMO_REPLAY.label,
+            symbol: scenario.book.symbol,
+            label: scenario.label,
             status: "active",
             lastPrice: null,
             quantityIncrement: "1",
@@ -491,27 +501,15 @@ export function MarketApp({
                 />
               ) : (
                 <>
-                  <nav
-                    className="detail-breadcrumb"
-                    aria-label="Back to markets"
-                  >
-                    <Link
-                      href="/"
-                      className="button button-outline button-pill"
+                  {practice && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setPractice(false)}
                     >
-                      <ArrowLeft size={16} aria-hidden="true" />
-                      All markets
-                    </Link>
-                    {practice ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setPractice(false)}
-                      >
-                        Exit practice
-                      </Button>
-                    ) : null}
-                  </nav>
+                      Exit practice
+                    </Button>
+                  )}
                   {!practice && <SnapshotStatus result={selectedQuery.data} />}
                   <div className="exchange-grid">
                     {selected ? (
@@ -525,6 +523,7 @@ export function MarketApp({
                         market={selected}
                         practice={practice}
                         replay={replay}
+                        rehearsal={rehearsal}
                         cards={
                           replay
                             ? [
@@ -732,6 +731,7 @@ function MarketDetail({
   market,
   practice,
   replay = false,
+  rehearsal,
   cards,
   tokens,
   onSimulate,
@@ -745,6 +745,7 @@ function MarketDetail({
   market: Market;
   practice: boolean;
   replay?: boolean;
+  rehearsal?: "grail";
   cards: Listing[];
   tokens: GrailToken[];
   onSimulate: (o: Omit<PracticeOrder, "id" | "createdAt">) => void;
@@ -776,7 +777,11 @@ function MarketDetail({
   } | null>(null);
   const live = useLiveBook(replay ? undefined : symbol, practice);
   const { book, latestTrade, stale } = replay
-    ? { book: DEMO_REPLAY.book, latestTrade: null, stale: false }
+    ? {
+        book: rehearsal === "grail" ? DEMO_GRAIL_REPLAY.book : DEMO_REPLAY.book,
+        latestTrade: null,
+        stale: false,
+      }
     : live;
   const livePrice = (s: "yes" | "no") =>
     !book || stale ? null : (asksForSide(book, s)[0]?.price ?? null);
@@ -827,6 +832,44 @@ function MarketDetail({
     ? matchingTokens(rewardMarket, tokens)
     : [];
 
+  const renderRewards = (heldShares = "0") =>
+    rehearsal === "grail" ? (
+      <GrailRehearsal
+        payout={money(units(heldShares) + units(quote?.totalPayout ?? "0"))}
+        side={side}
+      />
+    ) : (
+      <RewardTarget
+        heldShares={heldShares}
+        onTargetSelect={(mint) =>
+          symbol && setExplicitTarget({ symbol, side, mint })
+        }
+        key={`${symbol}:${side}`}
+        stake={stake}
+        stakeRevision={stakeRevision}
+        replay={replay}
+        loading={rewardsLoading}
+        error={rewardsError}
+        cards={possibleMatches}
+        tokens={possibleTokens}
+        market={rewardMarket}
+        book={book}
+        side={side}
+        stale={stale}
+        payout={
+          quote
+            ? money(units(heldShares) + units(quote.totalPayout))
+            : units(heldShares) > 0n
+              ? heldShares
+              : null
+        }
+        onStake={(value) => {
+          setStake(String(Number(value)));
+          setReview(false);
+        }}
+      />
+    );
+
   return (
     <>
       <section className="market-detail panel">
@@ -836,7 +879,16 @@ function MarketDetail({
             <h1>{market.title}</h1>
           </div>
         </div>
-        {practice ? (
+        {rehearsal === "grail" ? (
+          <div className="practice-chart">
+            <h2>NVIDIA prediction. Jensen reward.</h2>
+            <p>
+              No Jensen Huang slab was listed in the catalog check. A winning
+              prediction goes to JENSEN on Grail.
+            </p>
+            <span>Rehearsal with illustrative prediction depth.</span>
+          </div>
+        ) : practice ? (
           <div className="practice-chart">
             <BarChart3 size={35} />
             <strong>Simulated depth, real math.</strong>
@@ -962,7 +1014,9 @@ function MarketDetail({
           <h2 className="prediction-title">
             The prediction{" "}
             {replay ? (
-              <span>Replay · recorded book</span>
+              <span>
+                {rehearsal ? "Illustrative depth" : "Replay · recorded book"}
+              </span>
             ) : network === "mainnet" ? (
               <span>Estimate</span>
             ) : null}
@@ -1053,6 +1107,10 @@ function MarketDetail({
           </div>
           {!practice && process.env.NEXT_PUBLIC_PRIVY_APP_ID && symbol && (
             <DemoOrder
+              onFilled={() => {
+                setStake("0");
+                setReview(false);
+              }}
               targetMint={
                 explicitTarget?.symbol === symbol &&
                 explicitTarget.side === side
@@ -1065,6 +1123,7 @@ function MarketDetail({
               stake={String(Number(stake))}
               shares={quote?.contracts ?? null}
               replay={replay}
+              rehearsal={rehearsal}
             />
           )}
           {network === "mainnet" && (
@@ -1073,7 +1132,12 @@ function MarketDetail({
             </p>
           )}
           {!practice && process.env.NEXT_PUBLIC_PRIVY_APP_ID && symbol && (
-            <MarketPositionStatus symbol={symbol} />
+            <MarketPositionStatus
+              symbol={symbol}
+              side={side}
+              replay={replay}
+              rehearsal={rehearsal}
+            />
           )}
           {practice && (
             <Button
@@ -1126,28 +1190,18 @@ function MarketDetail({
             </div>
           </div>
         </aside>
-        <RewardTarget
-          onTargetSelect={(mint) =>
-            symbol && setExplicitTarget({ symbol, side, mint })
-          }
-          key={`${symbol}:${side}`}
-          stake={stake}
-          stakeRevision={stakeRevision}
-          replay={replay}
-          loading={rewardsLoading}
-          error={rewardsError}
-          cards={possibleMatches}
-          tokens={possibleTokens}
-          market={rewardMarket}
-          book={book}
-          side={side}
-          stale={stale}
-          payout={quote?.totalPayout ?? null}
-          onStake={(value) => {
-            setStake(String(Number(value)));
-            setReview(false);
-          }}
-        />
+        {process.env.NEXT_PUBLIC_PRIVY_APP_ID && !practice ? (
+          <PositionHoldings
+            symbol={symbol}
+            side={side}
+            replay={replay}
+            rehearsal={rehearsal}
+          >
+            {renderRewards}
+          </PositionHoldings>
+        ) : (
+          renderRewards()
+        )}
       </div>
     </>
   );

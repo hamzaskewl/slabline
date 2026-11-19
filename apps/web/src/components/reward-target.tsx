@@ -5,6 +5,8 @@ import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
 import {
   payoutTarget,
+  money,
+  units,
   rewardForPayout,
   teamCardMatch,
   selectedRewardTeam,
@@ -23,6 +25,7 @@ const shares = (value: string) =>
   Number(value).toLocaleString("en-US", { maximumFractionDigits: 6 });
 export function RewardTarget({
   cards,
+  heldShares = "0",
   tokens,
   market,
   book,
@@ -38,6 +41,7 @@ export function RewardTarget({
   error,
 }: {
   cards: Listing[];
+  heldShares?: string;
   tokens: GrailToken[];
   market: Market | null;
   book: Book | null;
@@ -74,11 +78,14 @@ export function RewardTarget({
   const target = useMemo(() => {
     if (!card || !book || stale) return null;
     try {
-      return payoutTarget(card.ask, book, side);
+      const needed = units(card.ask) - units(heldShares);
+      if (needed <= 0n)
+        return { sharesNeeded: "0", stake: null, averagePrice: null };
+      return payoutTarget(money(needed), book, side);
     } catch {
       return null;
     }
-  }, [card, book, side, stale]);
+  }, [card, book, side, stale, heldShares]);
   const stakeMatchesTarget =
     !!target?.stake && Number(stake) === Number(target.stake);
   const team = market && card ? teamCardMatch(market, card) : null;
@@ -160,11 +167,11 @@ export function RewardTarget({
       />
       <dl className="reward-target-stats">
         <div>
-          <dt>Winning shares needed</dt>
+          <dt>Additional shares needed</dt>
           <dd>{target ? shares(target.sharesNeeded) : shares(card.ask)}</dd>
         </div>
         <div>
-          <dt>Estimated stake</dt>
+          <dt>Additional stake</dt>
           <dd>
             {target?.stake ? usd(target.stake) : "—"} <small>USD</small>
           </dd>
@@ -190,9 +197,11 @@ export function RewardTarget({
           ? stakeMatchesTarget
             ? "Stake set for this card"
             : "Set stake for this card"
-          : stale || !book
-            ? "Waiting for live depth"
-            : "Target unavailable at current depth"}
+          : units(heldShares) >= units(card.ask)
+            ? "Covered by your position"
+            : stale || !book
+              ? "Waiting for live depth"
+              : "Target unavailable at current depth"}
         {target?.stake && !stakeMatchesTarget && (
           <span>
             {usd(target.stake)} USD · {shares(target.sharesNeeded)} shares

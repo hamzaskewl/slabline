@@ -26,6 +26,8 @@ import {
   demoPayout,
   explicitResolution,
   DEMO_REPLAY,
+  DEMO_GRAIL_REPLAY,
+  demoGrailQuantity,
 } from "@collectible/domain";
 import {
   demoAccount,
@@ -39,6 +41,7 @@ import {
   finalizeDemoReward,
   sellDemoPosition,
   recoverDemoReward,
+  cashDemoReward,
 } from "./demo";
 import {
   buildDemoMint,
@@ -388,6 +391,226 @@ test.skipIf(!process.env.DATABASE_URL)(
         for (const table of [settlements, positions, orders, fundingIntents])
           await db.delete(table).where(eq(table.userId, userId));
         await db.delete(users).where(eq(users.id, userId));
+      }
+    }
+  },
+);
+
+test.skipIf(!process.env.DATABASE_URL)(
+  "position fills aggregate, partial exits retain basis, cash and Grail settle once",
+  async () => {
+    const db = getDb();
+    const [owner, stranger] = await db
+      .insert(users)
+      .values([
+        { privyId: `lifecycle-${crypto.randomUUID()}` },
+        { privyId: `lifecycle-${crypto.randomUUID()}` },
+      ])
+      .returning();
+    const userId = owner!.id;
+    const input = {
+      ...DEMO_REPLAY,
+      side: "yes" as const,
+      stake: "10",
+      replay: true,
+    };
+    const book = {
+      ...DEMO_REPLAY.book,
+      asks: [{ price: "0.20", quantity: "10000" }],
+      bids: [{ price: "0.30", quantity: "10000" }],
+    };
+    const read = () => demoAccount(userId);
+    try {
+      const parallel = await Promise.all(
+        [0, 1].map(() =>
+          demoBuy(stranger!.id, crypto.randomUUID(), input, book),
+        ),
+      );
+      expect(parallel[0]).toBe(parallel[1]);
+      expect((await demoAccount(stranger!.id)).positions[0]).toMatchObject({
+        quantity: "100.000000",
+        cost: "20.000000",
+      });
+      const first = await demoBuy(userId, crypto.randomUUID(), input, book);
+      const secondKey = crypto.randomUUID();
+      const repeated = await Promise.all(
+        [0, 1].map(() =>
+          demoBuy(
+            userId,
+            secondKey,
+            { ...input, stake: "20" },
+            { ...book, asks: [{ price: "0.40", quantity: "10000" }] },
+          ),
+        ),
+      );
+      expect(repeated).toEqual([first, first]);
+      let account = await read();
+      expect(account.positions).toHaveLength(1);
+      expect(account.positions[0]).toMatchObject({
+        quantity: "100.000000",
+        cost: "30.000000",
+        averagePrice: "0.300000",
+      });
+      expect(account.balance).toBe("70.000000");
+      const saleKey = crypto.randomUUID();
+      await Promise.all(
+        [0, 1].map(() =>
+          sellDemoPosition(
+            userId,
+            first,
+            saleKey,
+            book,
+            "7.5",
+            undefined,
+            "25",
+          ),
+        ),
+      );
+      account = await read();
+      expect(account.positions[0]).toMatchObject({
+        state: "open",
+        quantity: "75.000000",
+        cost: "22.500000",
+        saleProceeds: "7.500000",
+        realizedCost: "7.500000",
+      });
+      expect(account.balance).toBe("77.500000");
+      await rejects(
+        sellDemoPosition(
+          userId,
+          first,
+          crypto.randomUUID(),
+          book,
+          "0",
+          undefined,
+          "76",
+        ),
+        "available holding",
+      );
+      await rejects(
+        sellDemoPosition(
+          userId,
+          first,
+          crypto.randomUUID(),
+          book,
+          "100",
+          undefined,
+          "10",
+        ),
+        "price changed",
+      );
+      await rejects(
+        sellDemoPosition(
+          stranger!.id,
+          first,
+          crypto.randomUUID(),
+          book,
+          "0",
+          undefined,
+          "10",
+        ),
+        "not found",
+      );
+      expect(
+        await demoBuy(
+          userId,
+          crypto.randomUUID(),
+          { ...input, stake: "5" },
+          book,
+        ),
+      ).toBe(first);
+      expect((await read()).positions[0]).toMatchObject({
+        quantity: "100.000000",
+        cost: "27.500000",
+        averagePrice: "0.275000",
+      });
+      const closeKey = crypto.randomUUID();
+      await Promise.all(
+        [0, 1].map(() =>
+          sellDemoPosition(
+            userId,
+            first,
+            closeKey,
+            book,
+            "30",
+            undefined,
+            "100",
+          ),
+        ),
+      );
+      account = await read();
+      expect(account.positions[0]).toMatchObject({
+        state: "sold",
+        quantity: "125.000000",
+        cost: "35.000000",
+        saleProceeds: "37.500000",
+      });
+      expect(account.balance).toBe("102.500000");
+      const cashId = await demoBuy(userId, crypto.randomUUID(), input, book);
+      expect(cashId).not.toBe(first);
+      await settleDemoPosition(userId, cashId, "yes", "replay");
+      await rejects(cashDemoReward(stranger!.id, cashId), "not found");
+      await Promise.all([
+        cashDemoReward(userId, cashId),
+        cashDemoReward(userId, cashId),
+      ]);
+      account = await read();
+      expect(account.balance).toBe("142.500000");
+      expect(
+        account.positions.find((p) => p.id === cashId)?.reward,
+      ).toMatchObject({ state: "claimed", delivery: "cash" });
+      await rejects(
+        allocateDemoReward(userId, cashId, crypto.randomUUID(), [
+          {
+            name: "Card",
+            image: null,
+            source: "collectorcrypt",
+            sourceId: "test",
+            sourceUrl: "https://collectorcrypt.com",
+            cost: "50",
+            wallet: "test-wallet",
+          },
+        ]),
+        "already selected",
+      );
+      const grailId = await demoBuy(
+        userId,
+        crypto.randomUUID(),
+        { ...input, ...DEMO_GRAIL_REPLAY, rehearsal: "grail" },
+        { ...book, symbol: DEMO_GRAIL_REPLAY.book.symbol },
+      );
+      const cardId = await demoBuy(userId, crypto.randomUUID(), input, book);
+      expect(grailId).not.toBe(cardId);
+      const noId = await demoBuy(
+        userId,
+        crypto.randomUUID(),
+        { ...input, side: "no" },
+        book,
+      );
+      expect(noId).not.toBe(cardId);
+      await Promise.all(
+        [0, 1].map(() => settleDemoPosition(userId, grailId, "yes", "replay")),
+      );
+      const grail = (await read()).positions.find((p) => p.id === grailId)!;
+      expect(grail.grailHolding).toMatchObject({
+        symbol: "JENSEN",
+        quantity: demoGrailQuantity("50"),
+        cost: "50.000000",
+      });
+      expect(grail.reward).toMatchObject({
+        state: "claimed",
+        delivery: "grail",
+      });
+      await rejects(cashDemoReward(userId, grailId), "before selecting");
+      await settleDemoPosition(userId, noId, "yes", "replay");
+      expect(
+        (await read()).positions.find((p) => p.id === noId)?.grailHolding,
+      ).toBeUndefined();
+    } finally {
+      for (const user of [owner!, stranger!]) {
+        for (const table of [settlements, positions, orders, fundingIntents])
+          await db.delete(table).where(eq(table.userId, user.id));
+        await db.delete(users).where(eq(users.id, user.id));
       }
     }
   },

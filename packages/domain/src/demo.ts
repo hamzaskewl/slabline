@@ -45,6 +45,16 @@ export type DemoPosition = {
   quantity: string;
   cost: string;
   replay: boolean;
+  rehearsal?: "grail";
+  soldQuantity?: string;
+  realizedCost?: string;
+  grailHolding?: {
+    symbol: string;
+    quantity: string;
+    cost: string;
+    priceUsd: string;
+    purchasedAt: string;
+  };
   createdAt: string;
   rewardMarket?: Market;
   artwork?: { src: string; label: string }[];
@@ -60,6 +70,7 @@ export type DemoPosition = {
     cardSpend: string;
     remainder: string;
     topUp?: string;
+    delivery?: "cash" | "grail";
   };
 };
 export type DemoCollectible = {
@@ -276,4 +287,41 @@ export function explicitResolution(
     if (result) return result;
   }
   return null;
+}
+
+// Archived public Grail quote for a repeatable rehearsal. No live swap is claimed.
+export const DEMO_GRAIL = {
+  symbol: "JENSEN",
+  name: "Jensen Huang",
+  chainId: 4663,
+  address: "0xa6b0e654bdefc8cff8e9b0c90388768be404d921",
+  priceUsd: "0.000239255317",
+  image:
+    "https://grailxyz-public.s3.us-east-2.amazonaws.com/images/cdac69a6-2a10-42fd-9285-c79fc33b6bfe.webp",
+  url: "https://grail.xyz/trade/jensen",
+  observedOn: "2026-11-19",
+  slabSearchUrl:
+    "https://api.collectorcrypt.com/marketplace?step=100&marketplaceSource=CC&orderBy=listedPriceDesc&search=Jensen",
+  matchingSlabs: 0,
+};
+// Actual archived Gemini event identity; depth is explicitly illustrative.
+// The catalog check above returned zero rows with no next cursor.
+export const DEMO_GRAIL_REPLAY = {
+  eventTicker: "NVDA260225",
+  eventTitle: "What will NVIDIA say on next earnings call?",
+  label: "Omniverse",
+  artwork: [{ src: DEMO_GRAIL.image, label: DEMO_GRAIL.name }],
+  book: {
+    ...DEMO_REPLAY.book,
+    symbol: "GEMI-NVDA260225-OMNIVERSE",
+    asks: [{ price: "0.25", quantity: "10000" }],
+    bids: [{ price: "0.20", quantity: "10000" }],
+    source: "fixture",
+    updatedAt: "2026-11-19T07:14:55.000Z",
+  } satisfies Book,
+};
+export function demoGrailQuantity(budget: string) {
+  return money(
+    (units(budget) * 10n ** 12n) / BigInt(DEMO_GRAIL.priceUsd.replace(".", "")),
+  );
 }
