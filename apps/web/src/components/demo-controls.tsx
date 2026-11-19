@@ -173,7 +173,7 @@ export function DemoOrder({
                 );
                 setReceipt(
                   position
-                    ? `${Number(position.quantity).toLocaleString()} shares added · ${usd(position.cost)}`
+                    ? `${Number(position.quantity).toLocaleString()} shares held · ${usd(position.cost)}`
                     : "Trade saved",
                 );
                 setReview(false);
