@@ -12,16 +12,12 @@ export function RewardBrowser({
   team,
   payout,
   onSelect,
-  onAuto,
-  automatic,
 }: {
   cards: Listing[];
   selected: Listing;
   team?: string;
   payout: string | null;
   onSelect: (mint: string) => void;
-  onAuto: () => void;
-  automatic: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [player, setPlayer] = useState("all");
@@ -47,13 +43,7 @@ export function RewardBrowser({
   return (
     <>
       <div className="reward-browse-controls">
-        <button
-          className="reward-auto"
-          aria-pressed={automatic}
-          onClick={onAuto}
-        >
-          {automatic ? "Auto match" : "Use auto match"}
-        </button>
+        <span className="reward-browse-label">Explore cards</span>
         <div className="reward-card-arrows">
           <button
             aria-label="Previous card"
