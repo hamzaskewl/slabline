@@ -408,6 +408,12 @@ function DemoMintActions({
   const wallet = wallets.find((w) => w.address === item.wallet);
   if (view.state === "cancelled")
     return <p role="status">Reservation refunded.</p>;
+  if (view.state === "confirmed")
+    return (
+      <p role="status">
+        Card received. <Link href="/collection">View collection</Link>
+      </p>
+    );
   return (
     <div className="demo-mint-actions">
       {view.state === "submitted" && (
@@ -588,9 +594,9 @@ export function DemoClaim({
             >
               Verify wallet
             </Button>
-          ) : (
+          ) : !item ? (
             <Button
-              disabled={a.busy || !!item}
+              disabled={a.busy}
               onClick={() =>
                 void a.run(async () => {
                   setItem(
@@ -606,13 +612,9 @@ export function DemoClaim({
                 })
               }
             >
-              {a.busy
-                ? "Preparing…"
-                : item
-                  ? "Card reserved"
-                  : "Collect this card"}
+              {a.busy ? "Preparing…" : "Collect this card"}
             </Button>
-          )}
+          ) : null}
           {item && (
             <DemoMintActions
               item={item}
