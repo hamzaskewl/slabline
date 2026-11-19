@@ -1,29 +1,46 @@
 "use client";
+import { useSlablineAuth } from "./sign-in-dialog";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePrivateRead } from "@/lib/use-private-read";
 import { relayFormat } from "@collectible/domain";
-import { usePrivy, useConnectWallet } from "@privy-io/react-auth";
+import { useConnectWallet } from "@privy-io/react-auth";
 import { useWallets, useSignMessage } from "@privy-io/react-auth/solana";
 import { Button } from "./ui/button";
 import { useNetwork } from "./network-settings";
 import { Wallet, ShieldCheck, ArrowUpRight } from "lucide-react";
 
-export function AuthButton() {
-  const { ready, authenticated, login, logout } = usePrivy();
+export function AuthButton({ header = false }: { header?: boolean }) {
+  const { ready, authenticated, login, logout } = useSlablineAuth();
+  if (header && !authenticated)
+    return (
+      <div className="header-auth-actions">
+        <Button size="sm" variant="ghost" disabled={!ready} onClick={login}>
+          Log in
+        </Button>
+        <Button
+          size="sm"
+          className="auth-signup"
+          disabled={!ready}
+          onClick={login}
+        >
+          Sign up
+        </Button>
+      </div>
+    );
   return (
     <Button
       size="sm"
       disabled={!ready}
-      onClick={() => (authenticated ? void logout() : login())}
+      onClick={(event) => (authenticated ? void logout() : login(event))}
     >
-      {authenticated ? "Sign out" : "Log in / Sign up"}
+      {authenticated ? "Sign out" : "Log in"}
     </Button>
   );
 }
 export function ConnectedWalletPanel() {
   const { network } = useNetwork();
-  const { authenticated, login, getAccessToken, user } = usePrivy();
+  const { authenticated, login, getAccessToken, user } = useSlablineAuth();
   const { wallets } = useWallets();
   const { connectWallet } = useConnectWallet();
   const { signMessage } = useSignMessage();

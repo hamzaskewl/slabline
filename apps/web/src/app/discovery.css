@@ -649,7 +649,8 @@
     font-size: 21px;
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 760px),
+  (pointer: coarse) and (max-height: 540px) and (max-width: 1000px) {
   .app-shell .discovery-heading {
     display: flex;
     gap: 12px;
@@ -697,22 +698,38 @@
   }
   .app-shell .prediction-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: 0;
+    gap: 12px;
   }
   .app-shell .prediction-card {
-    padding: 16px 0;
+    padding: 16px 14px 10px;
     min-height: 0;
   }
   .app-shell .prediction-card-heading {
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+  }
+  .app-shell .prediction-card-title {
+    overflow-wrap: anywhere;
+  }
+  .app-shell .prediction-outcomes {
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .app-shell .outcome-label > span:last-child {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+  }
+  .app-shell .market-skeleton {
+    border: 1px solid var(--rule);
+    border-radius: 16px;
   }
   .app-shell .prediction-outcome > .outcome-yes,
   .app-shell .prediction-outcome > .outcome-no {
-    min-height: 40px;
+    min-height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 72px;
+    min-width: 68px;
   }
   .app-shell .prediction-card-footer .icon-button {
     min-width: 40px;
@@ -790,7 +807,8 @@
 .app-shell .prediction-card-footer > .card-category {
   display: inline-flex;
 }
-@media (max-width: 760px) {
+@media (max-width: 760px),
+  (pointer: coarse) and (max-height: 540px) and (max-width: 1000px) {
   .featured-chart .outcome-legend {
     display: none;
   }
@@ -844,5 +862,32 @@
 @media (prefers-reduced-motion: reduce) {
   .market-switch-thumb {
     transition: none;
+  }
+}
+
+@media (max-width: 760px),
+  (pointer: coarse) and (max-height: 540px) and (max-width: 1000px) {
+  .app-shell .outcome-label .market-art {
+    width: 28px;
+    height: 28px;
+  }
+  .app-shell .outcome-label .market-art.team-pair {
+    width: 40px;
+  }
+  .app-shell .prediction-card-footer .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+@media (max-width: 359px) {
+  .app-shell .prediction-outcome {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app-shell .prediction-outcome .outcome-label {
+    grid-column: 1 / -1;
+  }
+  .discovery-actions {
+    flex-wrap: wrap;
   }
 }

@@ -1,7 +1,8 @@
 "use client";
+import { useSlablineAuth } from "./sign-in-dialog";
 import { Select } from "./ui/select";
 import { useEffect, useRef, useState } from "react";
-import { usePrivy, useWallets, useConnectWallet } from "@privy-io/react-auth";
+import { useWallets, useConnectWallet } from "@privy-io/react-auth";
 import { useWallets as useSolanaWallets } from "@privy-io/react-auth/solana";
 import { createWalletClient, custom } from "viem";
 import { ArrowRight } from "lucide-react";
@@ -23,7 +24,7 @@ type Capabilities = {
 };
 const short = (s: string) => `${s.slice(0, 7)}…${s.slice(-5)}`;
 export default function RelayFunding() {
-  const { authenticated, login, getAccessToken, user } = usePrivy(),
+  const { authenticated, login, getAccessToken, user } = useSlablineAuth(),
     { wallets } = useWallets(),
     { wallets: solanaWallets } = useSolanaWallets(),
     { connectWallet } = useConnectWallet();
