@@ -359,7 +359,13 @@ export function DemoPortfolio({
   );
 }
 
-function DemoMintActions({ item }: { item: DemoCollectible }) {
+function DemoMintActions({
+  item,
+  onCancel,
+}: {
+  item: DemoCollectible;
+  onCancel?: () => void;
+}) {
   const a = useDemoAction(),
     { wallets } = useWallets(),
     { signTransaction } = useSignTransaction();
@@ -398,6 +404,8 @@ function DemoMintActions({ item }: { item: DemoCollectible }) {
     };
   }, [view.state, item.id, a.authenticated, a.network, a.user?.id]);
   const wallet = wallets.find((w) => w.address === item.wallet);
+  if (view.state === "cancelled")
+    return <p role="status">Reservation refunded.</p>;
   return (
     <div className="demo-mint-actions">
       {view.state === "submitted" && (
@@ -478,7 +486,13 @@ function DemoMintActions({ item }: { item: DemoCollectible }) {
           disabled={a.busy}
           onClick={() =>
             void a.run(async () => {
-              await a.request({ action: "refund", id: item.id });
+              const result = await a.request<DemoAccountView>({
+                action: "refund",
+                id: item.id,
+              });
+              const saved = result.collectibles.find((c) => c.id === item.id);
+              if (saved) update(saved);
+              onCancel?.();
             })
           }
         >
@@ -597,7 +611,15 @@ export function DemoClaim({
                   : "Collect this card"}
             </Button>
           )}
-          {item && <DemoMintActions item={item} />}
+          {item && (
+            <DemoMintActions
+              item={item}
+              onCancel={() => {
+                setItem(null);
+                key.current = crypto.randomUUID();
+              }}
+            />
+          )}
         </>
       )}
       {a.error && (
