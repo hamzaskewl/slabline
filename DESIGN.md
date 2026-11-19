@@ -11,8 +11,30 @@ colors:
   ice-blue: "#80c9ff"
   ice-blue-hover: "#b1ddff"
   positive: "#58d6a7"
+  positive-hover: "#84e4be"
   negative: "#f0818b"
+  discovery-border: "#354656"
+  field-border: "#405268"
+  selected-slate: "#293b4d"
+  result-hover: "#1c2b39"
+  tab-muted: "#abbaca"
+  result-muted: "#a5b6c7"
+  helper-text: "#b7c6d5"
+  action-text: "#c3d0dd"
 typography:
+  profile-display:
+    fontFamily: '"Inter Variable", Inter, Arial, sans-serif'
+    fontSize: "clamp(30px, 5vw, 48px)"
+    fontWeight: 650
+  profile-initial:
+    fontSize: "36px"
+  profile-bio:
+    fontSize: "18px"
+    lineHeight: 1.6
+  discovery-summary:
+    fontSize: "16px"
+  metadata:
+    fontSize: "12px"
   headline:
     fontFamily: '"Inter Variable", Inter, Arial, sans-serif'
     fontSize: "24px"
@@ -34,11 +56,13 @@ typography:
     fontWeight: 600
 rounded:
   control: "7px"
+  field-result: "8px"
   icon-control: "10px"
   preview: "12px"
   panel: "14px"
   market-card: "15px"
   share-dialog: "18px"
+  pill: "999px"
 spacing:
   compact: "8px"
   control-gap: "10px"
@@ -55,6 +79,29 @@ components:
     padding: "9px 16px"
   button-primary-hover:
     backgroundColor: "{colors.ice-blue-hover}"
+  button-claim:
+    backgroundColor: "{colors.positive}"
+    textColor: "{colors.graphite}"
+    typography: "{typography.label}"
+    rounded: "{rounded.pill}"
+    padding: "7px 18px"
+  button-claim-hover:
+    backgroundColor: "{colors.positive-hover}"
+  navigation-pill:
+    backgroundColor: "transparent"
+    typography: "{typography.label}"
+    rounded: "{rounded.pill}"
+    padding: "7px 15px"
+  search-dropdown:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.panel}"
+    padding: "12px"
+  profile-field:
+    backgroundColor: "{colors.graphite}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.field-result}"
+    padding: "10px 12px"
   button-outline:
     backgroundColor: "transparent"
     textColor: "#e7e9ee"
@@ -89,7 +136,7 @@ components:
 
 Slabline is an Operate interface: evaluate a market, understand a depth-based payout, and inspect attainable collectible listings. Dense, aligned information sits on dark graphite surfaces, with restrained ice-blue controls and a text-free split-slab identity. Inter and tabular figures keep amounts comparable; subject imagery makes the market and collectible recognizable.
 
-Gemini Predictions and Polymarket Crypto were the user's original layout references: horizontal navigation, compact market cards, a narrow filter rail, and a separate detail ticket. Slabline's approved branding and composition now govern the visual system. User-pinned references live under `design/slabline`; the approved composition is binding, and exact data takes precedence over miniature generated text. There is no marketing hero or olive/cream palette. This documentation merges the incumbent interface guidance with the built share system; it does not reopen alternative visual directions.
+Gemini Predictions and Polymarket Crypto were the user's original layout references. Slabline's approved branding and composition now govern the visual system: horizontal navigation, compact market cards, grouped discovery controls, and a separate detail ticket. User-pinned references live under `design/slabline`; the approved composition is binding, and exact data takes precedence over miniature generated text. There is no marketing hero or olive/cream palette.
 
 **Key Characteristics:**
 
@@ -108,11 +155,13 @@ Ice Blue identifies the brand mark and primary account controls, selected naviga
 
 ### Secondary
 
-Positive mint and Negative rose distinguish successful and lost share states. Incumbent outcome controls retain green/red semantic treatments; state text remains present alongside color.
+Positive mint and Negative rose distinguish successful and lost share states. Mint also identifies the compact Claim action, with Positive Hover on interaction. Incumbent outcome controls retain green/red semantic treatments; state text remains present alongside color.
 
 ### Neutral
 
 Graphite anchors the page and share canvas. Surface contains market cards and the share dialog; Raised separates hover states. Border draws quiet dividers. Text carries primary information and Muted carries labels, context, and supporting amounts.
+
+The discovery slate variants are intentional: Selected Slate distinguishes tabs and initial avatars, Result Hover highlights suggestions, and Discovery Border and Field Border strengthen floating surfaces and editable fields. Tab Muted, Result Muted, Helper Text, and Action Text provide contextual text contrast within that same cool palette.
 
 **The Semantic Accent Rule.** Preserve status wording alongside outcome color; an accent alone must not imply a confirmed payout or collectible receipt.
 
@@ -122,13 +171,17 @@ Use Inter Variable with Inter, Arial, and sans-serif fallbacks throughout the in
 
 The general hierarchy is recorded in frontmatter. Share-dialog headings are 26px on desktop and 24px on phones. Event titles may use a larger responsive size where content needs it; do not turn the exchange into a display-type landing page.
 
+Search uses compact metadata beside semibold result titles. Discovery summaries step up from body text; public profiles use a larger initial, a responsive display name, and a comfortably spaced bio capped at 65ch. These contextual sizes are intentional members of the Inter hierarchy.
+
 The PNG renderer bundles local Inter Medium (500) and the approved 650 outlines; the latter are registered as 600 for the renderer's supported weight steps. Its market title wraps to two lines, starting at 42px and fitting toward 32px. Amounts start at 80px and fit using the same font's measured advances. Descriptive labels can truncate; numeric facts must retain their full value.
 
 **The Exact Figures Rule.** Fit financial text to its allotted space using the bundled font metrics; do not abbreviate or alter a value to imitate generated reference lettering.
 
 ## Layout
 
-The first working surface is persistent navigation and a searchable market list, then selected event/chart, order ticket, and collectible preview. Desktop browsing retains compact three-column market cards and a narrow filter rail. Detail separates the chart from its ticket; phones stack these in task order with a compact header and bottom navigation. Avoid routine refresh timestamps and repetitive provider captions in browsing; expose concise update errors and keep practice/test and transaction states visible.
+The first working surface is persistent navigation and a searchable market list, then selected event/chart, order ticket, and collectible preview. Desktop browsing retains compact three-column market cards, with sort, status, filters, and refresh grouped at the right of the discovery heading. Detail separates the chart from its ticket; phones stack these in task order with a compact header and bottom navigation. Avoid routine refresh timestamps and repetitive provider captions in browsing; expose concise update errors and keep practice/test and transaction states visible.
+
+At 760px and below, global search occupies its own full-width header row and discovery controls wrap onto a left-aligned row. The search dropdown fits the viewport; its market suggestions scroll independently while tabs and the See all results footer remain visible. Portfolio contains positions and the collection. Compact green Claim actions align left, with other position actions and Share at the right; phone reward rows place Claim on its own left-aligned row. Profile fields use two columns on desktop and one on phones.
 
 The share trigger sits immediately right of the position value with a 44px square hit area. The desktop share dialog is centered, at most 760px wide, with 28px padding and a viewport-limited scrolling interior. Its preview always contains the entire 1200 × 630 PNG. Beneath it: profile visibility, target selection, copy/download/link actions, then platform actions and feedback.
 
@@ -140,11 +193,13 @@ The exported card is a fixed 1200 × 630 composition: event artwork/title above 
 
 The interface primarily uses tonal layering and one-pixel borders. Share overlays dim the surrounding page with `#000a`; the dialog is distinguished by its surface, border, and stacking order, without an added box shadow. Its entrance uses a short 120ms ease-out fade and 6px vertical settle. The profile switch uses the same duration; both stop animating under reduced-motion preferences.
 
+Discovery select menus and the filter popover retain localized drop shadows (`0 12px 32px #0006` and `0 16px 40px #0008`). Search uses a stronger slate border and stacking order without a shadow.
+
 The export's approved background uses large split-slab geometry, a quiet lower grid, and an ice-blue corner. These are authored brand material, not general-purpose decoration to add to every panel.
 
 ## Shapes
 
-Controls use compact rounded corners; market cards and larger panels have broader curvature. The share preview is softly rounded and the desktop dialog is more generously rounded. The mobile sheet has 20px upper corners and square lower corners. Status pills and the profile switch remain fully rounded.
+Controls use compact rounded corners; market cards and larger panels have broader curvature. Search rows, artwork frames, and profile fields share the field-result radius. Arrow navigation, faucet links, discovery controls, and account actions use bordered pills. The share preview is softly rounded and the desktop dialog is more generously rounded. The mobile sheet has 20px upper corners and square lower corners. Status pills and the profile switch remain fully rounded.
 
 The canonical mark is the two-piece split-slab vector in `apps/web/public/brand` and `SlablineMark`. Preserve its 100:140 proportions and diagonal split. It appears at 28px high in the header, 20px in the quiet footer, and 56px in the chart as neutral gray at 10% opacity. The export footer uses its own 32px mark. Do not replace this geometry with a generic slab icon or render a word inside it.
 
@@ -158,6 +213,16 @@ Primary buttons use ice blue on graphite. Outline buttons carry a slate border, 
 
 Desktop navigation is horizontal with an active underline; the phone layout uses bottom navigation and horizontal category browsing. Market cards are compact bordered surfaces, with recognizable outcome artwork and readable values. Keep Gemini's matching outcome imagery, including sneakers and helmets, contained in its assigned frame. The trade ticket remains separate from the market chart.
 
+### Search and discovery
+
+Markets and Profiles tabs sit above search results. Markets show up to six provider-artwork suggestions with title, category, and right-aligned volume; queries rank by relevance with volume as a tie-breaker, and empty queries rank by volume. Keep the bordered See all results arrow pill outside the scrolling suggestions. Arrow keys move through results, left/right keys change tabs, and Escape closes the dropdown and returns focus to the input. Loading copy stays neutral (`Searching…`).
+
+Sort and status use compact bordered selects beside the Filters pill. Trending weights volume by market age; Liquidity is visibly disabled when provider values are unavailable. Status offers Active, Resolved, and All statuses. The filter panel groups category/topic fields, player-prop and favorites switches, then Reset filters and Done. Search includes player props and disables that switch while a query is present.
+
+### Portfolio actions and public profiles
+
+Claim is a compact mint pill, never a full-width banner; its left alignment preserves the action hierarchy beside quieter right-aligned controls. Collection belongs inside Portfolio. Public profile editing is a bordered panel with a heading, Create/Edit profile action, labeled fields, and explicit Publish/Save feedback. Publishing is opt-in: the `/username` page presents an initial avatar, display name, handle, and bio; holdings and wallets stay private. An account without a published profile retains the Create profile state.
+
 ### Position share dialog
 
 A labeled share icon opens a modal with an accessible title, description, close control, and live status/error messages. The preview precedes settings and actions. Profile visibility switches between the chosen identity and Anonymous. Target selection remains distinct from the confirmed-collected receipt state. Clipboard or compose failures provide download/link recovery; opening the dialog itself does not publish a public link or open a social composer.
@@ -166,7 +231,7 @@ A labeled share icon opens a modal with an accessible title, description, close 
 
 The server template combines the approved background with actual snapshot fields and provider-supplied subject/slab artwork. Slab photos use contain sizing; missing artwork gets a truthful unavailable state. A selection is labeled SLAB while open and SLAB WON on a winning position; confirmed ownership uses COLLECTED only when the snapshot records that state. A won position alone does not mean a collectible was received.
 
-Open shares say payout if correct; finalized states use their own labels. Per the final user direction, exports omit currency/environment qualifiers, fee notes, capture time and receipt footnotes. Amounts retain the dollar symbol; average entry rounds to exactly two decimals using exact arithmetic. Snapshot data retains its original precision, environment and fee semantics. Financial figures, costs, average entry and shares come from the snapshot rather than the reference image.
+The selected outcome leads the share facts column. Open shares say payout if correct; finalized states use their own labels. Per the final user direction, exports omit currency/environment qualifiers, fee notes, capture time and receipt footnotes. Amounts retain the dollar symbol; average entry rounds to exactly two decimals using exact arithmetic. Snapshot data retains its original precision, environment and fee semantics. Financial figures, costs, average entry and shares come from the snapshot rather than the reference image.
 
 **The One Snapshot Rule.** Preview, copy, download, and public presentation reuse the prepared PNG. Publication is explicit; the published bytes and chosen profile visibility remain immutable rather than changing with a later catalog or account update.
 
