@@ -147,7 +147,7 @@
 
 .pull-field {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 .pull-field input,
@@ -290,9 +290,6 @@
   padding-inline-start: 16px;
   color: #b7c6d5;
   font-size: 13px;
-}
-.pull-catalog-preview button {
-  margin-top: 8px;
 }
 
 .pull-side-options {
@@ -1046,5 +1043,58 @@
 @media (prefers-reduced-motion: reduce) {
   .pull-reveal-market {
     animation: none;
+  }
+}
+
+/* Keep result summaries, market cards, and confirmation facts on the shared spacing scale. */
+.pull-theme-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.pull-catalog-preview {
+  display: grid;
+  gap: 16px;
+}
+.pull-selected-outcome {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pull-selected-outcome .market-art {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+.pull-confirmation-facts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  padding-block: 8px;
+}
+.pull-confirmation-facts dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pull-confirmation-facts dd {
+  margin-top: 8px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.pull-trade-selection {
+  gap: 20px;
+  padding-block: 20px;
+}
+@media (max-width: 480px) {
+  .pull-confirmation-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .pull-confirmation-facts > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  .pull-confirmation-facts dd {
+    margin-top: 0;
   }
 }

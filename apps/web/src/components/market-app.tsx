@@ -74,7 +74,7 @@ import { useLiveBook } from "@/lib/use-live-book";
 import { retainMarketSnapshot } from "@/lib/market-snapshot";
 import { SnapshotStatus } from "./snapshot-status";
 import { MarketArt } from "./market-art";
-import { NetworkSettings, useNetwork } from "./network-settings";
+import { useNetwork } from "./network-settings";
 const DemoOrder = dynamic(
   () => import("./demo-controls").then((m) => m.DemoOrder),
   { ssr: false },
@@ -339,22 +339,25 @@ export function MarketApp({
                 >
                   Predictions
                 </Link>
-                {navigation.slice(1).map(({ href, label, icon: Icon }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    aria-current={
-                      section === label.toLowerCase() ? "page" : undefined
-                    }
-                  >
-                    <Icon size={15} aria-hidden="true" />{" "}
-                    {label === "Profile" ? (
-                      <span className="sr-only">Profile</span>
-                    ) : (
-                      label
-                    )}
-                  </Link>
-                ))}
+                {navigation
+                  .slice(1)
+                  .filter((item) => item.href !== "/profile")
+                  .map(({ href, label, icon: Icon }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      aria-current={
+                        section === label.toLowerCase() ? "page" : undefined
+                      }
+                    >
+                      <Icon size={15} aria-hidden="true" />{" "}
+                      {label === "Profile" ? (
+                        <span className="sr-only">Profile</span>
+                      ) : (
+                        label
+                      )}
+                    </Link>
+                  ))}
               </nav>
             ) : (
               <MarketSearch
@@ -383,7 +386,6 @@ export function MarketApp({
               />
             )}
             <div className="topbar-actions">
-              <NetworkSettings />
               <div className="header-account">
                 <WalletEntry configured={!!status.data?.privyConfigured} />
               </div>
@@ -454,22 +456,25 @@ export function MarketApp({
                   </button>
                 ))}
               <div className="account-navigation">
-                {navigation.slice(1).map((n) => (
-                  <Link
-                    key={n.href}
-                    href={n.href}
-                    className={
-                      section === n.label.toLowerCase() ? "active" : ""
-                    }
-                  >
-                    <n.icon size={15} aria-hidden="true" />{" "}
-                    {n.label === "Profile" ? (
-                      <span className="sr-only">Profile</span>
-                    ) : (
-                      n.label
-                    )}
-                  </Link>
-                ))}
+                {navigation
+                  .slice(1)
+                  .filter((item) => item.href !== "/profile")
+                  .map((n) => (
+                    <Link
+                      key={n.href}
+                      href={n.href}
+                      className={
+                        section === n.label.toLowerCase() ? "active" : ""
+                      }
+                    >
+                      <n.icon size={15} aria-hidden="true" />{" "}
+                      {n.label === "Profile" ? (
+                        <span className="sr-only">Profile</span>
+                      ) : (
+                        n.label
+                      )}
+                    </Link>
+                  ))}
               </div>
             </nav>
           )}

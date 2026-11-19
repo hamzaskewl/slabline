@@ -9,6 +9,7 @@ import { useWallets } from "@privy-io/react-auth/solana";
 import { units, type PullOpening, type PullTheme } from "@collectible/domain";
 import { usePrivateRead } from "@/lib/use-private-read";
 import { usdc } from "@/lib/utils";
+import { Select } from "./ui/select";
 import { Button } from "./ui/button";
 import { useDemoAction } from "./demo-controls";
 import { useNetwork } from "./network-settings";
@@ -470,7 +471,8 @@ function SignedInPull({
                 {walletPaid && wallets.length > 1 && (
                   <label className="pull-field">
                     <span>Solana Devnet wallet</span>
-                    <select
+                    <Select
+                      aria-label="Solana wallet"
                       value={wallet?.address}
                       onChange={(event) =>
                         setSelectedWallet(event.target.value)
@@ -479,7 +481,7 @@ function SignedInPull({
                       {wallets.map((entry) => (
                         <option key={entry.address}>{entry.address}</option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
                 )}
                 {walletPaid && !wallet ? (

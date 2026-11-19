@@ -119,7 +119,7 @@ export function PullBoard({
             {action(
               {
                 tier,
-                theme: canonicalPullTheme(theme),
+                theme: canonicalPullTheme(theme, catalog.markets),
                 edition: ((rotation % packCount) + packCount) % packCount,
                 artwork,
               },
@@ -196,7 +196,7 @@ function PackOdds({ tier }: { tier: PullTier }) {
   );
 }
 
-function PullThemePicker({
+export function PullThemePicker({
   theme,
   onChange,
   disabled,
@@ -211,15 +211,21 @@ function PullThemePicker({
     <fieldset disabled={disabled}>
       <legend>Market theme</legend>
       <div className="pull-theme-options">
-        {(["team", "player"] as const).map((kind) => (
+        {(["team", "player", "all"] as const).map((kind) => (
           <label className="pull-choice" key={kind}>
             <input
               type="radio"
               name="pull-theme-kind"
               checked={theme.kind === kind}
-              onChange={() => onChange({ kind, label: "" })}
+              onChange={() =>
+                onChange(kind === "all" ? { kind } : { kind, label: "" })
+              }
             />
-            {kind === "team" ? "Team" : "Player"}
+            {kind === "team"
+              ? "Team"
+              : kind === "player"
+                ? "Player"
+                : "All markets"}
           </label>
         ))}
       </div>
@@ -241,27 +247,30 @@ function PullThemePicker({
           />
         </label>
       )}
-      {theme.kind === "team" && teams.length > 0 && (
-        <div className="pull-team-options" aria-label="Available teams">
-          {teams
-            .filter(
-              (team) =>
-                !theme.label ||
-                team.toLowerCase().includes(theme.label.toLowerCase()) ||
-                (canonicalPullTheme(theme) as { label: string }).label === team,
-            )
-            .map((team) => (
-              <button
-                type="button"
-                key={team}
-                aria-pressed={theme.label === team}
-                onClick={() => onChange({ kind: "team", label: team })}
-              >
-                {team}
-              </button>
-            ))}
-        </div>
-      )}
+      {theme.kind === "team" &&
+        theme.label.trim().length > 0 &&
+        teams.length > 0 && (
+          <div className="pull-team-options" aria-label="Available teams">
+            {teams
+              .filter(
+                (team) =>
+                  team.toLowerCase().includes(theme.label.toLowerCase()) ||
+                  (canonicalPullTheme(theme) as { label: string }).label ===
+                    team,
+              )
+              .slice(0, 8)
+              .map((team) => (
+                <button
+                  type="button"
+                  key={team}
+                  aria-pressed={theme.label === team}
+                  onClick={() => onChange({ kind: "team", label: team })}
+                >
+                  {team}
+                </button>
+              ))}
+          </div>
+        )}
     </fieldset>
   );
 }

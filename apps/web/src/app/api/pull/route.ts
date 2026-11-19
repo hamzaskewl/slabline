@@ -6,6 +6,7 @@ import {
 } from "@solana/kit";
 import {
   activeMarket,
+  pullThemeOutcomes,
   demoPositionContext,
   marketOutcomes,
   units,
@@ -284,17 +285,17 @@ async function prediction(eventTicker: string, symbol: string) {
   if (
     !event ||
     (market.source !== "live" && market.source !== "cache") ||
-    market.stale ||
     !contract ||
-    !acceptingContract(event, symbol) ||
-    !depth.book ||
-    depth.book.symbol !== symbol
+    !acceptingContract(event, symbol)
   )
     throw new ApiError(
       409,
-      "This market is closed or its depth is unavailable. Choose an active outcome.",
+      "This prediction is no longer open. Choose another market.",
     );
+  if (!depth.book || depth.book.symbol !== symbol || depth.book.stale)
+    throw new ApiError(503, "Prices are still loading. Please try again.");
   return {
+    market: event,
     eventTicker: event.ticker ?? eventTicker,
     eventTitle: event.title,
     label: contract.label,
@@ -407,6 +408,15 @@ export async function POST(request: Request) {
     if (opening.state !== "ready" || !opening.budget)
       throw new ApiError(409, "This pack has no available buying budget.");
     const current = await prediction(input.eventTicker, input.symbol);
+    if (
+      !pullThemeOutcomes(current.market, opening.theme).some(
+        (outcome) => outcome.symbol === input.symbol,
+      )
+    )
+      throw new ApiError(
+        409,
+        "Choose a prediction for this pack’s selected team or player.",
+      );
     const entry = { stake: opening.budget, side: input.side, replay: false };
     if (input.action === "quote")
       return response({

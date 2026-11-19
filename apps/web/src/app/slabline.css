@@ -970,7 +970,7 @@ input {
 }
 .exchange-navigation .pull-nav-entry {
   color: #b1ddff;
-  background: #1c2b39;
+  background: transparent;
 }
 .board-navigation a,
 .account-navigation a {
