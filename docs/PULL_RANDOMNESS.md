@@ -2,11 +2,11 @@
 
 Pull & Predict's MagicBlock mode requests randomness on Solana devnet. MagicBlock verifies the oracle's cryptographic proof before calling the app's receipt program, which records 32 result bytes on-chain. The app reads the finalized receipt to draw from the opening's committed odds and card valuations. The 2% edge is an expected-value calculation over that inventory. [MagicBlock Solana VRF](https://docs.magicblock.gg/pages/verifiable-randomness-functions-vrfs/introduction/solana-vrf)
 
-| Account                     | Address                                                |
-| --------------------------- | ------------------------------------------------------ |
-| MagicBlock Solana VRF       | `Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz`          |
-| MagicBlock base-layer queue | `Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh`         |
-| Pull receipt program        | App deployment address in `PULL_MAGICBLOCK_PROGRAM_ID` |
+| Account                     | Address                                        |
+| --------------------------- | ---------------------------------------------- |
+| MagicBlock Solana VRF       | `Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz`  |
+| MagicBlock base-layer queue | `Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh` |
+| Pull receipt program        | `H8FMsd2jGRQomPQ9iFEhNsYif3Uko1WBoFbsNognWRWx` |
 
 The receipt program invokes MagicBlock's scoped, regular-fee VRF request. Only the MagicBlock PDA scoped to this program may sign the callback. Each receipt is derived from the wallet and a 32-byte seed, and can accept a result once. The receipt includes the payer, seed, fulfillment state and random bytes. The request pays up to 500,000 devnet lamports in VRF fees plus receipt rent and Solana transaction fees. The receipt program rolls back any request that exceeds that VRF fee cap. [Scoped VRF wire format](https://github.com/magicblock-labs/solana-vrf/blob/692f98912cf028a95b28fd7879c310cde559fdb2/api/src/instruction.rs) · [MagicBlock fee constants](https://github.com/magicblock-labs/solana-vrf/blob/692f98912cf028a95b28fd7879c310cde559fdb2/api/src/consts.rs)
 
@@ -46,3 +46,11 @@ bun packages/integrations/scripts/magicblock-devnet-smoke.ts
 The live devnet queue is owned by MagicBlock's VRF program. A finalized MagicBlock transaction confirmed that the deployed VRF program accepts scoped regular requests. The app smoke test requires a deployed receipt program and a funded devnet wallet. [Finalized MagicBlock devnet request](https://explorer.solana.com/tx/2NvmohJWzBmU6Unm8p8sb7jpRtT8sqUtoz2Apj6Ut9ow7N6mdC12sMW2ya2BbDitu5MvNHZPzQMtkHG7HQQ3pCgK?cluster=devnet)
 
 Phygitals describes public VRF for its own packs. Its authenticated purchase API verifies payment and fulfills purchases using Phygitals' own draw, stock and odds. Pull & Predict uses MagicBlock directly for its own committed pack inventory. [Phygitals pack flow](https://www.phygitals.com/how-it-works) · [Phygitals public API](https://www.phygitals.com/docs/public-api)
+
+## Verified deployment — November 19, 2026
+
+The consumer compiled to Solana SBF and deployed to devnet as `H8FMsd2jGRQomPQ9iFEhNsYif3Uko1WBoFbsNognWRWx`. [Deployment transaction](https://explorer.solana.com/tx/5z91AikWKxXhSxjJuyh5D3EWfqMNGx1DuGuYxE7tjo3rTFUFeqBvhgjso9UEPv3LjeXX1MGntSUXnJUZqmFWLzsd?cluster=devnet).
+
+A real wallet-signed request successfully fulfilled. The adapter independently verified the finalized receipt owner, seed, payer and random bytes at request slot 524109745. [Request transaction](https://explorer.solana.com/tx/3UDESGSfvnrc4oA4vFv1E2WuN74imaDMrpuYzNnLhRNhK8WbJfQk8iUcMW294cuSdFUUwFEuUaoicvoLLLRYY4Rk?cluster=devnet). [Fulfilled receipt](https://explorer.solana.com/address/3vZvxg4vQcJqsygDD2nE4nSGCHCEr6c1tZcEMypkzQJc?cluster=devnet).
+
+The dedicated devnet deployer is `2vLk2UgyYMBbWS7sgHHAYZxPDGgEu71GCfZuCmPfxFjH`. Its keypair and the consumer program keypair are stored in Railway web-service variables `PULL_DEVNET_DEPLOYER_KEYPAIR_JSON` and `PULL_DEVNET_PROGRAM_KEYPAIR_JSON`. These are deployment credentials only; application requests remain signed by users. Neither keypair belongs in client code or Git. Configuration was saved with deployment skipped until the feature release.
