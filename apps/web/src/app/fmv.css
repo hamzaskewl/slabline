@@ -92,11 +92,77 @@
 .fmv-tooltip-comparison[data-tone="red"] {
   color: #f79c96;
 }
-.fmv-tooltip-meta {
-  display: block;
-  margin-top: 10px;
-  color: #a7b5c3;
+.card-price-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.card-price-row .card-fmv {
+  margin: 0 0 0 auto;
+  align-self: flex-end;
+  flex-shrink: 0;
+  padding: 3px 5px;
+  gap: 4px;
+  font-size: 10px;
+  line-height: 18px;
+}
+.card-price-row .card-fmv > strong {
   font-size: 11px;
+}
+.card-price-row .card-fmv > svg {
+  width: 11px;
+  height: 11px;
+}
+.card-price-row > div > strong,
+.card-price-row > .listing-price {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.card-price.card-price-row {
+  flex-wrap: nowrap;
+}
+.card-price.card-price-row > div {
+  min-width: 0;
+  flex: 1;
+}
+.card-price.card-price-row > div > strong {
+  font-size: 16px;
+  white-space: nowrap;
+}
+.card-price.card-price-row small {
+  font-size: 9px;
+  white-space: nowrap;
+}
+.card-price-row .reward-ask {
+  margin: 0;
+  font-size: 18px;
+  white-space: nowrap;
+}
+.reward-browser-card-copy {
+  min-width: 0;
+  flex: 1;
+}
+@media (max-width: 640px) {
+  .card-price-row > div > strong,
+  .card-price-row > .listing-price {
+    font-size: 16px;
+  }
+  .card-price-row .card-fmv {
+    gap: 4px;
+    padding-inline: 5px;
+    font-size: 9px;
+  }
+  .card-price-row .card-fmv > strong {
+    font-size: 10px;
+  }
+  .card-price-row .card-fmv > svg {
+    width: 11px;
+    height: 11px;
+  }
 }
 .fmv-tooltip-arrow {
   fill: #485765;
