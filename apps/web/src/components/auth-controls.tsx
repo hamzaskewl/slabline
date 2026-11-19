@@ -7,7 +7,7 @@ import { usePrivy, useConnectWallet } from "@privy-io/react-auth";
 import { useWallets, useSignMessage } from "@privy-io/react-auth/solana";
 import { Button } from "./ui/button";
 import { useNetwork } from "./network-settings";
-import { Wallet, ShieldCheck } from "lucide-react";
+import { Wallet, ShieldCheck, ArrowUpRight } from "lucide-react";
 
 export function AuthButton() {
   const { ready, authenticated, login, logout } = usePrivy();
@@ -124,17 +124,19 @@ export function ConnectedWalletPanel() {
                 <div className="wallet-actions">
                   <a
                     href="https://faucet.solana.com/"
+                    className="button button-outline button-pill"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Get SOL ↗
+                    Get SOL <ArrowUpRight size={15} aria-hidden="true" />
                   </a>
                   <a
                     href="https://faucet.circle.com/"
+                    className="button button-outline button-pill"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Get USDC ↗
+                    Get USDC <ArrowUpRight size={15} aria-hidden="true" />
                   </a>
                 </div>
               )}

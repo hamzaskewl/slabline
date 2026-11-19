@@ -277,11 +277,7 @@ export function Discovery({
         ) : !visible.length ? (
           <div className="empty-state">
             <Search size={28} />
-            <h2>
-              {searching
-                ? "Searching all active markets…"
-                : "No matching markets"}
-            </h2>
+            <h2>{searching ? "Searching markets…" : "No matching markets"}</h2>
             <p>
               {searching
                 ? "Checking Gemini for events beyond the saved catalog."

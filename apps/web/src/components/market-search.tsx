@@ -68,8 +68,9 @@ export function MarketSearch({
       }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
-          setOpen(false);
+          e.preventDefault();
           root.current?.querySelector("input")?.focus();
+          setOpen(false);
         }
         if (e.key === "ArrowDown" || e.key === "ArrowUp") {
           e.preventDefault();
@@ -149,40 +150,43 @@ export function MarketSearch({
             ))}
           </div>
           <div
+            className="search-panel"
             role="tabpanel"
             id={`${id}-results`}
             aria-labelledby={`${id}-${tab}`}
           >
             {tab === "markets" ? (
               <>
-                {results.map((m) => (
-                  <Link
-                    className="search-result"
-                    key={m.id}
-                    href={`/markets/${encodeURIComponent(m.ticker ?? m.id)}`}
-                    onClick={() => setOpen(false)}
-                  >
-                    <span className="search-art">
-                      <MarketArt market={m} />
-                    </span>
-                    <span className="search-result-copy">
-                      <strong>{m.title}</strong>
-                      <span>{m.subcategory ?? m.category}</span>
-                    </span>
-                    <span className="search-volume">
-                      {m.volume == null ? "—" : eventVolume(m.volume)}
-                    </span>
-                  </Link>
-                ))}
-                {loading ? (
-                  <p role="status" className="search-message">
-                    Searching…
-                  </p>
-                ) : (
-                  !results.length && (
-                    <p className="search-message">No matching markets.</p>
-                  )
-                )}
+                <div className="search-suggestions">
+                  {results.map((m) => (
+                    <Link
+                      className="search-result"
+                      key={m.id}
+                      href={`/markets/${encodeURIComponent(m.ticker ?? m.id)}`}
+                      onClick={() => setOpen(false)}
+                    >
+                      <span className="search-art">
+                        <MarketArt market={m} />
+                      </span>
+                      <span className="search-result-copy">
+                        <strong>{m.title}</strong>
+                        <span>{m.subcategory ?? m.category}</span>
+                      </span>
+                      <span className="search-volume">
+                        {m.volume == null ? "—" : eventVolume(m.volume)}
+                      </span>
+                    </Link>
+                  ))}
+                  {loading ? (
+                    <p role="status" className="search-message">
+                      Searching…
+                    </p>
+                  ) : (
+                    !results.length && (
+                      <p className="search-message">No matching markets.</p>
+                    )
+                  )}
+                </div>
                 <button
                   className="button button-outline button-pill search-all"
                   type="submit"
