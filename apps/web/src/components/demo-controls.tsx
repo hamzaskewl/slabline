@@ -173,7 +173,7 @@ export function DemoOrder({
           <p className="trade-confirmation" aria-live="polite">
             {review
               ? `Up to ${usd(stake)} · ${Number(shares).toLocaleString()} estimated shares`
-              : "Demo trade · no real funds"}
+              : null}
           </p>
         </>
       )}
@@ -496,7 +496,6 @@ export function PositionRow({
         <h3>{p.label}</h3>
         <p>
           {Number(p.quantity).toLocaleString()} shares · {usd(p.cost)} paid
-          {p.replay ? " · Replay" : ""}
         </p>
       </div>
       <div className="position-result">
@@ -735,7 +734,7 @@ export function DemoMintActions({
   if (view.state === "confirmed")
     return (
       <p role="status">
-        Card received. <Link href="/collection">View collection</Link>
+        Card received. <Link href="/portfolio">View portfolio</Link>
       </p>
     );
   return (

@@ -282,7 +282,10 @@ const server = Bun.serve({
       );
     }
     if (url.pathname === "/markets") {
-      const result = await savedMarkets();
+      const state = url.searchParams.get("status") ?? "active";
+      if (state !== "active" && state !== "resolved" && state !== "all")
+        return new Response("Invalid market status", { status: 400 });
+      const result = await savedMarkets(state);
       const search = (url.searchParams.get("search") ?? "")
         .slice(0, 100)
         .trim()
@@ -293,7 +296,7 @@ const server = Bun.serve({
         // Prediction discovery must not wait on a separate collectible provider.
         // A sports event may have no matching reward; never invent a related player.
         ...(search
-          ? await searchCatalog(search, category, result)
+          ? await searchCatalog(search, category, result, state)
           : {
               data: discoveryMarkets(result.data)
                 .map(marketPreview)

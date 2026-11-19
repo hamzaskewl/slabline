@@ -125,10 +125,7 @@ export function PortfolioChart({
               ? "—"
               : usd(currentValue)}
         </strong>
-        <span>
-          {hover?.time ??
-            (points.length < 2 ? "Current balance" : "Account value · at cost")}
-        </span>
+        {hover?.time && <span>{hover.time}</span>}
       </div>
       <div className="portfolio-chart-plot">
         <img

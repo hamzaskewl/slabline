@@ -222,7 +222,7 @@ export function ShareCard({
       {rows.map(([label, v], i) => (
         <div
           key={label}
-          style={box(factsX, 254 + i * 44, factsWidth, {
+          style={box(factsX, 306 + i * 44, factsWidth, {
             justifyContent: "space-between",
             gap: 12,
             fontSize: fitSize(`${label}  ${v}`, factsWidth, 23, 12, 650),
@@ -233,7 +233,13 @@ export function ShareCard({
           <span style={{ fontWeight: 600 }}>{v}</span>
         </div>
       ))}
-      <Line x={factsX} y={444} width={factsWidth} size={18} color="#8E9CAC">
+      <Line
+        x={factsX}
+        y={246}
+        width={factsWidth}
+        size={fitSize(s.market.selectedOutcome, factsWidth, 28, 16, 650)}
+        style={{ fontWeight: 600 }}
+      >
         {clip(s.market.selectedOutcome, 48)}
       </Line>
       {s.slab && (

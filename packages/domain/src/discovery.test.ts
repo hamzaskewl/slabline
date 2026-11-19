@@ -6,6 +6,7 @@ import {
   marketPreview,
   outcomeImages,
   sortMarkets,
+  marketStatusMatches,
   type Market,
 } from "./index";
 const market = (
@@ -23,6 +24,63 @@ const market = (
   children: [],
   description: "",
   closesAt: null,
+});
+test("search ranks exact and title matches ahead of volume, then volume within a match tier", () => {
+  const broad = {
+    ...market("b", "Basketball Champion", "1000000"),
+    searchText: "San Antonio",
+  };
+  const low = market("l", "San Antonio vs Boston", "10");
+  const high = market("h", "San Antonio vs Dallas", "100");
+  const exact = market("e", "San Antonio", "1");
+  expect(
+    sortMarkets([broad, low, high, exact], "relevance", "San Antonio").map(
+      (m) => m.id,
+    ),
+  ).toEqual(["e", "h", "l", "b"]);
+});
+test("discovery sorts real metrics and puts missing values last", () => {
+  const older = {
+    ...market("o", "Older", "100"),
+    createdAt: "2026-01-01T00:00:00Z",
+    liquidity: "200",
+    closesAt: "2026-12-01T00:00:00Z",
+  };
+  const newer = {
+    ...market("n", "Newer", "50"),
+    createdAt: "2026-02-01T00:00:00Z",
+    liquidity: "50",
+    closesAt: "2026-11-01T00:00:00Z",
+  };
+  const missing = market("m", "Missing", "1000");
+  const input = [missing, older, newer];
+  expect(sortMarkets(input, "newest").map((m) => m.id)).toEqual([
+    "n",
+    "o",
+    "m",
+  ]);
+  expect(sortMarkets(input, "liquidity").map((m) => m.id)).toEqual([
+    "o",
+    "n",
+    "m",
+  ]);
+  expect(sortMarkets(input, "closing").map((m) => m.id)).toEqual([
+    "n",
+    "o",
+    "m",
+  ]);
+  expect(
+    sortMarkets(input, "trending", "", Date.parse("2026-02-02T00:00:00Z")).map(
+      (m) => m.id,
+    ),
+  ).toEqual(["n", "o", "m"]);
+  expect(marketStatusMatches({ ...older, status: "settled" }, "resolved")).toBe(
+    true,
+  );
+  expect(marketStatusMatches({ ...older, status: "closed" }, "resolved")).toBe(
+    false,
+  );
+  expect(marketStatusMatches({ ...older, status: "closed" }, "all")).toBe(true);
 });
 test("discovery ranks numerical volume descending, preserving zero and unknown volumes", () => {
   const input = [

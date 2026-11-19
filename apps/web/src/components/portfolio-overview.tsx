@@ -32,11 +32,6 @@ export function PortfolioOverview({
             <strong className="portfolio-total">
               {balance === undefined ? "—" : usd(compact ? balance : total!)}
             </strong>
-            <p>
-              {compact
-                ? "Demo USD · available to trade"
-                : "Demo account · at cost"}
-            </p>
           </div>
           <div className="portfolio-summary-actions">{actions}</div>
         </div>

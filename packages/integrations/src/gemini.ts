@@ -37,6 +37,8 @@ type RawEvent = {
   title: string;
   category?: string;
   volume?: string | number | null;
+  liquidity?: string | null;
+  createdAt?: string | null;
   subcategory?: { name?: string | null } | null;
   status?: string;
   imageUrl?: string | null;
@@ -54,6 +56,8 @@ const event: z.ZodType<RawEvent> = z.lazy(() =>
     title: z.string(),
     category: z.string().optional(),
     volume: z.union([z.string(), z.number()]).nullish(),
+    liquidity: z.string().nullish(),
+    createdAt: z.string().nullish(),
     subcategory: z.object({ name: z.string().nullish() }).nullish(),
     status: z.string().optional(),
     imageUrl: z.string().nullable().optional(),
@@ -77,6 +81,8 @@ export function normalizeEvent(raw: RawEvent): Market {
     ticker: raw.ticker,
     title: raw.title,
     category: raw.category ?? "Other",
+    liquidity: raw.liquidity ?? null,
+    createdAt: raw.createdAt ?? null,
     volume:
       raw.volume != null && /^\d+(?:\.\d+)?$/.test(String(raw.volume))
         ? String(raw.volume)
@@ -130,13 +136,22 @@ export function geminiClient() {
 export async function listMarkets(
   search?: string,
   category?: string,
+  state: "active" | "resolved" | "all" = "active",
 ): Promise<Market[]> {
   const client = await geminiClient();
+  const status: (
+    "active" | "settled" | "invalid" | "closed" | "under_review" | "approved"
+  )[] =
+    state === "resolved"
+      ? ["settled", "invalid"]
+      : state === "all"
+        ? ["active", "settled", "invalid", "closed", "under_review", "approved"]
+        : ["active"];
   // Provider title search finds events omitted by the general category feed.
   if (search)
     return collectMarketPages((offset, limit) =>
       client.predictions.listEvents({
-        status: ["active"],
+        status,
         search,
         limit,
         offset,
@@ -149,12 +164,11 @@ export async function listMarkets(
     ? [category]
     : z
         .object({ categories: z.array(z.string()) })
-        .parse(await client.predictions.getCategories({ status: ["active"] }))
-        .categories;
+        .parse(await client.predictions.getCategories({ status })).categories;
   return collectMarketCategories(categories, (category, offset, limit) =>
     client.predictions.listEvents(
       {
-        status: ["active"],
+        status,
         limit,
         offset,
         ...(category ? { category: [category] } : {}),

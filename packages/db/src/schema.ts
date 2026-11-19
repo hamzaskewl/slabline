@@ -54,6 +54,15 @@ export const users = pgTable("users", {
   privyId: text("privy_id").notNull().unique(),
   createdAt: created(),
 });
+export const publicProfiles = pgTable("public_profiles", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id),
+  username: text("username").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  bio: text("bio").notNull().default(""),
+  updatedAt: created(),
+});
 export const walletLinks = pgTable("wallet_links", {
   id: id(),
   userId: uuid("user_id")

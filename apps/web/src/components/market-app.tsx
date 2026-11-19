@@ -57,6 +57,8 @@ import { Button } from "@/components/ui/button";
 import { usd } from "@/lib/utils";
 import { GrailCatalog } from "./grail-catalog";
 import { Discovery } from "./discovery";
+import { MarketSearch } from "./market-search";
+import type { MarketStatusFilter } from "@collectible/domain";
 import { SlablineMark } from "./slabline-mark";
 import { OutcomeDetail } from "./outcome-detail";
 import { RewardTarget } from "./reward-target";
@@ -97,13 +99,16 @@ const ConnectedWalletPanel = dynamic(
   () => import("./auth-controls").then((m) => m.ConnectedWalletPanel),
   { ssr: false },
 );
+const ProfileEditor = dynamic(
+  () => import("./profile-editor").then((m) => m.ProfileEditor),
+  { ssr: false },
+);
 const RelayFunding = dynamic(() => import("./relay-funding"), { ssr: false });
 const navigation = [
   { label: "Markets", href: "/", icon: Compass },
   { label: "Rewards", href: "/rewards", icon: Gift },
   { label: "Portfolio", href: "/portfolio", icon: BarChart3 },
   { label: "Wallet", href: "/wallet", icon: Wallet },
-  { label: "Collection", href: "/collection", icon: Layers3 },
 ];
 type PracticeOrder = {
   id: string;
@@ -147,6 +152,8 @@ export function MarketApp({
     [menuOpen, setMenuOpen] = useState(false);
   const [orders, setOrders] = useState<PracticeOrder[]>([]),
     [notice, setNotice] = useState("");
+  const [marketStatus, setMarketStatus] =
+    useState<MarketStatusFilter>("active");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
     setSearch(new URLSearchParams(window.location.search).get("q") ?? "");
@@ -159,7 +166,7 @@ export function MarketApp({
     return () => clearTimeout(timer);
   }, [search]);
   const marketQuery = api.markets.useQuery(
-    { search: "" },
+    { search: "", status: marketStatus },
     {
       refetchInterval: (q) => (q.state.data?.refreshing ? 2000 : 15000),
       structuralSharing: (previous, incoming) =>
@@ -167,14 +174,13 @@ export function MarketApp({
           previous as ProviderResult<Market[]> | undefined,
           incoming as ProviderResult<Market[]>,
         ),
-      enabled: section === "markets" && !selectedId && !practice,
+      enabled: !selectedId && !replay && !practice,
     },
   );
   const searchQuery = api.markets.useQuery(
-    { search: debouncedSearch },
+    { search: debouncedSearch, status: marketStatus },
     {
-      enabled:
-        section === "markets" && !selectedId && !practice && !!debouncedSearch,
+      enabled: !selectedId && !replay && !practice && !!debouncedSearch,
       staleTime: 30000,
     },
   );
@@ -288,14 +294,24 @@ export function MarketApp({
                 <Link href="/rewards">Rewards</Link>
                 <Link href="/portfolio">Portfolio</Link>
                 <Link href="/wallet">Wallet</Link>
-                <Link href="/collection">Collection</Link>
               </nav>
             ) : (
-              <form
-                className="global-search"
-                role="search"
-                onSubmit={(e) => {
-                  e.preventDefault();
+              <MarketSearch
+                value={search}
+                onChange={(value) => {
+                  setSearch(value);
+                  setCategory("All markets");
+                }}
+                markets={
+                  debouncedSearch && searchQuery.data
+                    ? searchQuery.data.data
+                    : markets
+                }
+                loading={
+                  !!search.trim() &&
+                  (search.trim() !== debouncedSearch || searchQuery.isFetching)
+                }
+                onSubmit={() => {
                   if (section !== "markets")
                     router.push(`/?q=${encodeURIComponent(search.trim())}`);
                   else {
@@ -303,19 +319,7 @@ export function MarketApp({
                     setDebouncedSearch(search.trim());
                   }
                 }}
-              >
-                <Search size={18} />
-                <input
-                  aria-label="Search markets"
-                  placeholder="Search markets..."
-                  value={search}
-                  maxLength={100}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setCategory("All markets");
-                  }}
-                />
-              </form>
+              />
             )}
             <div className="topbar-actions">
               <NetworkSettings />
@@ -397,13 +401,11 @@ export function MarketApp({
                         ? "Wallet"
                         : section === "portfolio"
                           ? "Portfolio"
-                          : section === "collection"
-                            ? "Collection"
-                            : "Physical redemption"}
+                          : "Physical redemption"}
                 </h1>
               </div>
-              <Link href="/" className="text-link">
-                Markets <ArrowUpRight size={16} />
+              <Link href="/" className="button button-outline button-pill">
+                Explore markets <ArrowUpRight size={16} />
               </Link>
             </div>
           ) : null}
@@ -424,6 +426,8 @@ export function MarketApp({
             <>
               {!selectedId && !practice && !replay ? (
                 <Discovery
+                  status={marketStatus}
+                  setStatus={setMarketStatus}
                   onPractice={() => setPractice(true)}
                   search={search}
                   query={debouncedSearch}
@@ -470,7 +474,10 @@ export function MarketApp({
                     className="detail-breadcrumb"
                     aria-label="Back to markets"
                   >
-                    <Link href="/">
+                    <Link
+                      href="/"
+                      className="button button-outline button-pill"
+                    >
                       <ArrowLeft size={16} aria-hidden="true" />
                       All markets
                     </Link>
@@ -573,6 +580,7 @@ export function MarketApp({
                   </>
                 )
               ) : null}
+              {status.data?.privyConfigured && <ProfileEditor />}
             </>
           ) : section === "wallet" ? (
             <>
@@ -600,21 +608,6 @@ export function MarketApp({
                 <RelayFunding />
               ) : null}
             </>
-          ) : section === "collection" ? (
-            status.isPending ? (
-              <p role="status">Loading wallet connection…</p>
-            ) : status.data?.privyConfigured ? (
-              network === "devnet" ? (
-                <DemoPortfolio collection />
-              ) : (
-                <WalletCollection />
-              )
-            ) : (
-              <Empty
-                title="Wallet connection unavailable"
-                detail="Please try again shortly."
-              />
-            )
           ) : (
             <div className="redeem-flow panel">
               <h2>Physical redemption</h2>

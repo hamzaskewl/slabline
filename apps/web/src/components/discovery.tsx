@@ -7,6 +7,8 @@ import {
   eventVolume,
   isPlayerProp,
   marketMatches,
+  marketStatusMatches,
+  type MarketStatusFilter,
   sortMarkets,
   type Market,
   type MarketSort,
@@ -31,7 +33,11 @@ export function Discovery({
   setSearch,
   onPractice,
   snapshot,
+  status,
+  setStatus,
 }: {
+  status: MarketStatusFilter;
+  setStatus: (status: MarketStatusFilter) => void;
   markets: Market[];
   catalog: Market[];
   category: string;
@@ -47,7 +53,7 @@ export function Discovery({
   snapshot?: ProviderResult<Market[]>;
 }) {
   const [limit, setLimit] = useState(24);
-  const [sort, setSort] = useState<MarketSort>("volume");
+  const [sort, setSort] = useState<MarketSort>("relevance");
   const [league, setLeague] = useState("");
   const [includeProps, setIncludeProps] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -68,7 +74,7 @@ export function Discovery({
   }, []);
   useEffect(
     () => setLimit(24),
-    [search, category, league, sort, includeProps, favoritesOnly],
+    [search, category, league, sort, status, includeProps, favoritesOnly],
   );
   useEffect(() => {
     setLeague("");
@@ -100,13 +106,16 @@ export function Discovery({
             (category === "All markets" || m.category === category) &&
             (!league || m.subcategory === league) &&
             marketMatches(m, query) &&
+            marketStatusMatches(m, status) &&
             (includeProps || !!query || !isPlayerProp(m)) &&
             (!favoritesOnly || favorites.includes(m.id)),
         ),
         sort,
+        query,
       ),
     [
       markets,
+      status,
       category,
       league,
       query,
@@ -126,7 +135,8 @@ export function Discovery({
     setLeague("");
     setFavoritesOnly(false);
     setIncludeProps(false);
-    setSort("volume");
+    setSort("relevance");
+    setStatus("active");
   };
   const toggleFavorite = (id: string) => {
     const next = favorites.includes(id)
@@ -160,7 +170,8 @@ export function Discovery({
         {!search.trim() &&
           category === "All markets" &&
           !league &&
-          !favoritesOnly && <FeaturedMarkets markets={catalog} />}
+          !favoritesOnly &&
+          status === "active" && <FeaturedMarkets markets={catalog} />}
         <div className="discovery-heading">
           <h1>{search.trim() ? "Search results" : category}</h1>
           <label className="discovery-search">
@@ -186,6 +197,11 @@ export function Discovery({
             )}
           </label>
           <DiscoveryControls
+            hasLiquidity={markets.some(
+              (m) => m.liquidity != null && /^\d+(?:\.\d+)?$/.test(m.liquidity),
+            )}
+            status={status}
+            setStatus={setStatus}
             sort={sort}
             setSort={setSort}
             category={category}
@@ -214,18 +230,21 @@ export function Discovery({
           ) : loading && !markets.length ? (
             <span>Loading markets…</span>
           ) : (
-            <span>
+            <strong>
               {visible.length.toLocaleString()}{" "}
               {visible.length === 1 ? "market" : "markets"}
-              {query ? ` matching “${query}”` : ""}
-            </span>
+              {query ? ` for “${query}”` : ""}
+            </strong>
           )}
           {(search.trim() ||
             category !== "All markets" ||
             league ||
-            favoritesOnly) && (
+            favoritesOnly ||
+            status !== "active" ||
+            includeProps ||
+            sort !== "relevance") && (
             <button onClick={clear}>
-              Clear search and filters <X size={13} />
+              Clear filters <X size={15} />
             </button>
           )}
         </div>

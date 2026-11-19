@@ -7,6 +7,7 @@ export * from "./collector-crypt";
 export * from "./orderbook";
 export * from "./reward-preview";
 export * from "./discovery";
+export * from "./profiles";
 export * from "./team-cards";
 export * from "./demo";
 import { marketSearchText, marketTeams } from "./discovery";
@@ -49,6 +50,8 @@ export type Market = {
   title: string;
   category: string;
   volume?: string | null;
+  liquidity?: string | null;
+  createdAt?: string | null;
   startsAt?: string | null;
   subcategory?: string | null;
   sportsMarket?: { type: string; subject?: string; sport?: string } | null;

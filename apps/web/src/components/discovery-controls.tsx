@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Popover, Select, Switch } from "radix-ui";
 import { useEffect, useId, useState } from "react";
-import type { MarketSort } from "@collectible/domain";
+import type { MarketSort, MarketStatusFilter } from "@collectible/domain";
 
 export function MarketSelect({
   label,
@@ -21,7 +21,7 @@ export function MarketSelect({
 }: {
   label: string;
   value: string;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; disabled?: boolean }[];
   onChange: (value: string) => void;
   sort?: boolean;
 }) {
@@ -53,6 +53,7 @@ export function MarketSelect({
                 className="market-select-option"
                 value={option.value}
                 key={option.value}
+                disabled={option.disabled}
               >
                 <Select.ItemText>{option.label}</Select.ItemText>
                 <Select.ItemIndicator>
@@ -96,6 +97,9 @@ function FilterSwitch({
 }
 
 export function DiscoveryControls({
+  hasLiquidity,
+  status,
+  setStatus,
   sort,
   setSort,
   category,
@@ -113,6 +117,9 @@ export function DiscoveryControls({
   retry,
   reset,
 }: {
+  hasLiquidity: boolean;
+  status: MarketStatusFilter;
+  setStatus: (value: MarketStatusFilter) => void;
   sort: MarketSort;
   setSort: (sort: MarketSort) => void;
   category: string;
@@ -141,12 +148,34 @@ export function DiscoveryControls({
         onChange={(value) => setSort(value as MarketSort)}
         sort
         options={[
+          {
+            value: "relevance",
+            label: search.trim() ? "Relevance" : "Recommended",
+          },
+          { value: "trending", label: "Trending" },
+          {
+            value: "liquidity",
+            label: hasLiquidity ? "Liquidity" : "Liquidity unavailable",
+            disabled: !hasLiquidity,
+          },
           { value: "volume", label: "Volume" },
-          { value: "closing", label: "Expiry date" },
+          { value: "newest", label: "Newest" },
+          { value: "competitive", label: "Competitive" },
+          { value: "closing", label: "Ending soon" },
           { value: "name", label: "Alphabetical" },
         ]}
       />
-      {category !== "All markets" && (
+      <MarketSelect
+        label="Event status"
+        value={status}
+        onChange={(v) => setStatus(v as MarketStatusFilter)}
+        options={[
+          { value: "active", label: "Active" },
+          { value: "resolved", label: "Resolved" },
+          { value: "all", label: "All statuses" },
+        ]}
+      />
+      {
         <Popover.Root open={open} onOpenChange={setOpen}>
           <Popover.Trigger asChild>
             <button
@@ -227,7 +256,7 @@ export function DiscoveryControls({
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>
-      )}
+      }
       <button
         className="icon-button discovery-refresh"
         aria-label="Refresh markets"
