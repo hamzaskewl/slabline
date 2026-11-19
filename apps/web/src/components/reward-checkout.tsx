@@ -19,7 +19,7 @@ import {
   type Valuation,
 } from "@collectible/domain";
 import { usePrivateRead } from "@/lib/use-private-read";
-import { usd, usdc } from "@/lib/utils";
+import { usd } from "@/lib/utils";
 import { useDemoAction } from "./demo-controls";
 import { Select } from "./ui/select";
 import { Button } from "./ui/button";

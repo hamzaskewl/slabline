@@ -1580,7 +1580,9 @@ function RewardCatalog({
               </Select>
             </label>
             <label>
-              Min price · USDC
+              <span>
+                Min price <UsdcIcon />
+              </span>
               <input
                 type="number"
                 inputMode="decimal"
@@ -1591,7 +1593,9 @@ function RewardCatalog({
               />
             </label>
             <label>
-              Max price · USDC
+              <span>
+                Max price <UsdcIcon />
+              </span>
               <input
                 type="number"
                 inputMode="decimal"
