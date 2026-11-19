@@ -131,7 +131,12 @@ export function RewardTarget({
         aria-atomic="true"
       >
         <div className="reward-target-image">
-          <CardImage src={card.frontImage} alt={card.name} eager />
+          <CardImage
+            src={card.frontImage}
+            alt={card.name}
+            sizes="(max-width: 600px) 92px, 220px"
+            eager
+          />
         </div>
         <div className="reward-card-copy">
           <h3>{card.name}</h3>
