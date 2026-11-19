@@ -10,6 +10,9 @@ import {
 import { Button } from "./ui/button";
 import { usd, usdc } from "@/lib/utils";
 import { usePullCatalog } from "./pull-catalog";
+import { packCount, PullPackCarousel } from "./pull-pack-carousel";
+import { ChevronDown } from "lucide-react";
+import type { PackPresentation } from "./pull-cinematic";
 
 export function PullBoard({
   balance,
@@ -22,26 +25,33 @@ export function PullBoard({
   balance?: string;
   busy?: boolean;
   mode?: "demo-csprng" | "magicblock-devnet";
-  action: (tier: PullTier, theme: PullTheme, eligible: boolean) => ReactNode;
+  action: (pack: PackPresentation, eligible: boolean) => ReactNode;
   opening?: ReactNode;
   history?: ReactNode;
 }) {
   const [tier, setTier] = useState<PullTier>(25);
+  const [rotation, setRotation] = useState(0);
   const [theme, setTheme] = useState<PullTheme>({ kind: "all" });
   const catalog = usePullCatalog(theme);
   const hasTheme = theme.kind === "all" || !!theme.label.trim();
   const hasMatches =
     hasTheme && !catalog.searching && catalog.markets.length > 0;
   const eligible = hasMatches && !catalog.delayed;
+  const preview = hasMatches ? catalog.markets[0] : undefined;
+  const artwork =
+    theme.kind === "all"
+      ? undefined
+      : theme.kind === "team"
+        ? (preview?.teams?.find((team) =>
+            team.label.toLowerCase().includes(theme.label.trim().toLowerCase()),
+          )?.imageUrl ?? preview?.imageUrl)
+        : preview?.imageUrl;
   return (
     <section className="pull-workspace" aria-labelledby="pull-title">
       <header className="pull-heading">
         <div>
           <h1 id="pull-title">Pull &amp; Predict</h1>
-          <p>
-            Open a pack to reveal a budget, then spend it on a prediction you
-            choose.
-          </p>
+          <p>Open a pack. Reveal your prediction budget.</p>
         </div>
         <span className="pull-mode">Devnet demo</span>
       </header>
@@ -67,13 +77,23 @@ export function PullBoard({
                       type="radio"
                       name="pull-tier"
                       checked={tier === price}
-                      onChange={() => setTier(price)}
+                      onChange={() => {
+                        setTier(price);
+                        setRotation(0);
+                      }}
                     />
                     ${price}
                   </label>
                 ))}
               </div>
             </fieldset>
+            <PullPackCarousel
+              key={tier}
+              tier={tier}
+              disabled={busy}
+              rotation={rotation}
+              onTurn={(step) => setRotation((current) => current + step)}
+            />
             <PullThemePicker
               theme={theme}
               onChange={setTheme}
@@ -113,18 +133,28 @@ export function PullBoard({
                   </PullRetry>
                 )}
             </div>
-            <div className="pull-odds-inline">
-              <h3>Pack odds</h3>
+            <details className="pull-odds-inline pull-compact-odds">
+              <summary>
+                Pack odds <ChevronDown size={15} aria-hidden="true" />
+              </summary>
               <PackOdds tier={tier} />
-            </div>
+            </details>
             {mode && (
-              <p className="pull-muted">
+              <p className="pull-muted pull-randomness-label">
                 {mode === "magicblock-devnet"
-                  ? "MagicBlock VRF draw on Solana Devnet. Your wallet pays the devnet request fee."
-                  : "Practice draw using server randomness."}
+                  ? "MagicBlock VRF · Wallet pays Devnet fee"
+                  : "Practice draw · Server randomness"}
               </p>
             )}
-            {action(tier, theme, eligible)}
+            {action(
+              {
+                tier,
+                theme,
+                edition: ((rotation % packCount) + packCount) % packCount,
+                artwork,
+              },
+              eligible,
+            )}
           </section>
         </div>
         <aside>

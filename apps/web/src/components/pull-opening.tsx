@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import {
   activeMarket,
   marketOutcomes,
@@ -19,17 +18,6 @@ import { usePullCatalog } from "./pull-catalog";
 import type { PullActions } from "./pull-account";
 import { PullRetry } from "./pull-board";
 
-const PullRandomness = dynamic(
-  () => import("./pull-randomness").then((module) => module.PullRandomness),
-  {
-    loading: () => (
-      <p className="pull-muted" role="status">
-        Loading the saved devnet draw…
-      </p>
-    ),
-  },
-);
-
 type Quote = ReturnType<typeof quoteDepth>;
 type Side = "yes" | "no";
 const allMarkets = { kind: "all" } as const;
@@ -37,9 +25,13 @@ const allMarkets = { kind: "all" } as const;
 export function PullOpeningPanel({
   opening,
   actions,
+  inPresentation,
+  onResume,
 }: {
   opening: PullOpening;
   actions: PullActions;
+  inPresentation?: boolean;
+  onResume: () => void;
 }) {
   return (
     <section className="pull-panel pull-stack" aria-labelledby="opening-title">
@@ -50,7 +42,20 @@ export function PullOpeningPanel({
         <span className="pull-muted">${opening.tier} pack</span>
       </div>
       {opening.state === "pending" ? (
-        <PullRandomness opening={opening} actions={actions} />
+        <div className="pull-stack">
+          <p className="pull-muted" role="status">
+            Draw pending · MagicBlock VRF on Solana Devnet
+          </p>
+          {!inPresentation && (
+            <Button
+              className="pull-action"
+              disabled={actions.busy}
+              onClick={onResume}
+            >
+              Resume opening
+            </Button>
+          )}
+        </div>
       ) : (
         <>
           <div className="pull-stack" role="status">
