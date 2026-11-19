@@ -38,5 +38,5 @@ export async function POST(request: Request) {
       message,
       expiresAt: expiresAt.toISOString(),
     });
-  });
+  }, request);
 }

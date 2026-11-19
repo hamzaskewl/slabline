@@ -2,7 +2,7 @@
 
 UBC 2026 hackathon prototype. Source of truth: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-Public market discovery, Gemini WebSocket books through SSE, exact depth estimates, actual slab catalog images, separate Phygitals packs, cart planning and explicitly simulated positions are implemented. The dark discovery interface follows the user's Gemini/Polymarket references. No end-to-end live purchase or funding is claimed.
+Public market discovery, Gemini WebSocket books through SSE, exact depth estimates, slab images and Grail vault data are implemented. Settings selects Mainnet or Devnet. Devnet has an authenticated, persistent $100 demo ledger, top-ups, paper positions, official-result settlement and a repeatable recorded-book replay. Collectibles use user-signed Metaplex Core creation on Solana devnet. Mainnet Gemini execution and funding remain gated.
 
 ## Development
 
@@ -38,7 +38,7 @@ Collector Crypt devnet tools are under About → Transaction tools. Listings use
 
 ## Account reads
 
-Wallet and Portfolio use authenticated Gemini connection readiness. Approval and granted read scopes are checked before private SDK calls; no fabricated balances or orders appear while approval is pending. Open orders, positions and settlements are read-only.
+Mainnet Wallet and Portfolio use authenticated Gemini connection readiness. Approval and granted read scopes are checked before private SDK calls. Devnet uses a separate demo ledger; replay positions can be completed explicitly, while normal paper positions settle only on Gemini's published resolution. Wallet reads and proofs are scoped to the selected Solana network.
 
 Verified Solana wallets show separate SOL/native USDC balances. USDC defaults to Circle's native mint for the active network; mismatched overrides are rejected. Collection uses budgeted DAS reads, 24 assets per page, a 60-second server cache and an observed timestamp. Indexer failures remain errors rather than empty-wallet claims. Collection metadata is wallet inventory, not evidence of physical redemption eligibility. Private client queries are scoped to the signed-in user and cleared when unused.
 
@@ -48,4 +48,4 @@ Every major implementation step is a branch and pull request, checked before mer
 
 Identity configuration: [docs/IDENTITY_SETUP.md](docs/IDENTITY_SETUP.md). Integration evidence and exact blockers: [docs/INTEGRATION_VERIFICATION.md](docs/INTEGRATION_VERIFICATION.md). Railway settings: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Security boundaries: [docs/SECURITY.md](docs/SECURITY.md).
 
-The app remains useful without credentials. It reports provider outages and unknown FMV/fees rather than inventing data. Practice is a named fixture selected explicitly, never an automatic live-data fallback.
+The app remains useful without credentials. It reports provider outages and unknown FMV/fees rather than inventing data. The `/demo` replay is selected explicitly and uses a recorded Gemini book plus an archived card image; it never becomes a fallback for live execution.

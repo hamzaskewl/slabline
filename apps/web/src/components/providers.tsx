@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpLink } from "@trpc/client";
 import { api } from "@/lib/trpc";
+import { NetworkProvider } from "./network-settings";
 import dynamic from "next/dynamic";
 const AuthProvider = dynamic(() => import("./auth-provider"), { ssr: false });
 export function Providers({ children }: { children: ReactNode }) {
@@ -23,5 +24,9 @@ export function Providers({ children }: { children: ReactNode }) {
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </api.Provider>
   );
-  return appId ? <AuthProvider appId={appId}>{content}</AuthProvider> : content;
+  return (
+    <NetworkProvider>
+      {appId ? <AuthProvider appId={appId}>{content}</AuthProvider> : content}
+    </NetworkProvider>
+  );
 }

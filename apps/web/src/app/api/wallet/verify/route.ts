@@ -84,5 +84,5 @@ export async function POST(request: Request) {
       });
     });
     return Response.json({ verified: true, address: challenge.address });
-  });
+  }, request);
 }

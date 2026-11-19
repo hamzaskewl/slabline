@@ -18,5 +18,5 @@ export async function GET(request: Request) {
     return Response.json(await getSolanaBalances(wallet), {
       headers: { "Cache-Control": "private, no-store" },
     });
-  });
+  }, request);
 }

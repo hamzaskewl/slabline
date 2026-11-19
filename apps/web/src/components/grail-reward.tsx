@@ -1,5 +1,11 @@
 "use client";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useNetwork } from "./network-settings";
+const DemoClaim = dynamic(
+  () => import("./demo-controls").then((m) => m.DemoClaim),
+  { ssr: false },
+);
 import {
   indicativeTokens,
   type GrailToken,
@@ -80,6 +86,7 @@ export function GrailReward({
   payout?: string | null;
   side?: "yes" | "no";
 }) {
+  const { network } = useNetwork();
   const query = api.grailReward.useQuery(
     { chain: token.chainId, address: token.address },
     { staleTime: 30000, refetchInterval: 60000 },
@@ -160,6 +167,17 @@ export function GrailReward({
                   <span>
                     {r.vaulted} vaulted · {r.available} available
                   </span>
+                  {network === "devnet" &&
+                    process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
+                    r.available > 0 &&
+                    data.priceUsd && (
+                      <DemoClaim
+                        source="grail"
+                        sourceId={token.id}
+                        reserveId={r.id}
+                        name={r.name}
+                      />
+                    )}
                 </div>
               </div>
             ))}

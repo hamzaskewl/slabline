@@ -213,6 +213,18 @@ setInterval(async () => {
   }
 }, 5000);
 
+let demoSettlementBusy = false;
+setInterval(async () => {
+  if (demoSettlementBusy || !process.env.DATABASE_URL) return;
+  demoSettlementBusy = true;
+  try {
+    await (await import("@collectible/integrations")).reconcileDemoPositions();
+  } catch {
+    console.warn("Demo settlement recovery unavailable");
+  } finally {
+    demoSettlementBusy = false;
+  }
+}, 60000);
 startMarketRefresh();
 const server = Bun.serve({
   port: Number(process.env.PORT ?? 4001),
@@ -310,6 +322,7 @@ const server = Bun.serve({
         const session = await subscribe(url.searchParams.get("symbol") ?? "");
         return Response.json({
           book: session.book,
+          observedAt: new Date().toISOString(),
           error: session.book ? null : "Waiting for Gemini book snapshot",
         });
       } catch {

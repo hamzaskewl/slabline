@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 import {
   asksForSide,
+  DEMO_REPLAY,
+  DEMO_REPLAY_CARD,
   cents,
   quoteDepth,
   units,
@@ -56,6 +58,19 @@ import { useLiveBook } from "@/lib/use-live-book";
 import { retainMarketSnapshot } from "@/lib/market-snapshot";
 import { SnapshotStatus } from "./snapshot-status";
 import { MarketArt } from "./market-art";
+import { NetworkSettings, useNetwork } from "./network-settings";
+const DemoOrder = dynamic(
+  () => import("./demo-controls").then((m) => m.DemoOrder),
+  { ssr: false },
+);
+const DemoPortfolio = dynamic(
+  () => import("./demo-controls").then((m) => m.DemoPortfolio),
+  { ssr: false },
+);
+const DemoClaim = dynamic(
+  () => import("./demo-controls").then((m) => m.DemoClaim),
+  { ssr: false },
+);
 const PriceChart = dynamic(() => import("./price-chart"), {
   ssr: false,
   loading: () => <div className="chart-loading">Loading chart…</div>,
@@ -111,6 +126,8 @@ export function MarketApp({
   initialStake?: string;
 }) {
   const router = useRouter();
+  const { network } = useNetwork();
+  const replay = section === "demo";
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       void navigator.serviceWorker
@@ -157,7 +174,10 @@ export function MarketApp({
   );
   const rewardQuery = api.rewards.useQuery(undefined, {
     staleTime: 60000,
-    enabled: section === "rewards" || (section === "markets" && !!selectedId),
+    enabled:
+      replay ||
+      section === "rewards" ||
+      (section === "markets" && !!selectedId),
     refetchInterval: 60000,
   });
   const status = api.status.useQuery();
@@ -181,21 +201,45 @@ export function MarketApp({
       localStorage.removeItem("cm-practice-v1");
     }
   }, []);
-  const detailView = section === "markets" && (!!selectedId || practice);
+  const detailView =
+    replay || (section === "markets" && (!!selectedId || practice));
   const markets = practice ? [PRACTICE_MARKET] : (marketQuery.data?.data ?? []);
   const visible = markets.filter(
     (m) =>
       (category === "All markets" || m.category === category || practice) &&
       `${m.title} ${m.category}`.toLowerCase().includes(search.toLowerCase()),
   );
-  const selected = practice
-    ? PRACTICE_MARKET
-    : selectedId
-      ? (selectedQuery.data?.data ??
-        flatten(markets).find(
-          (m) => m.id === selectedId || m.ticker === selectedId,
-        ))
-      : visible[0];
+  const selected = replay
+    ? ({
+        id: DEMO_REPLAY.eventTicker,
+        ticker: DEMO_REPLAY.eventTicker,
+        title: DEMO_REPLAY.eventTitle,
+        category: "Sports",
+        subcategory: "Pro Basketball",
+        status: "active",
+        imageUrl: null,
+        description: "Recorded Gemini market replay",
+        closesAt: null,
+        children: [],
+        contracts: [
+          {
+            symbol: DEMO_REPLAY.book.symbol,
+            label: DEMO_REPLAY.label,
+            status: "active",
+            lastPrice: null,
+            quantityIncrement: "1",
+            priceIncrement: "0.01",
+          },
+        ],
+      } satisfies Market)
+    : practice
+      ? PRACTICE_MARKET
+      : selectedId
+        ? (selectedQuery.data?.data ??
+          flatten(markets).find(
+            (m) => m.id === selectedId || m.ticker === selectedId,
+          ))
+        : visible[0];
   const cards = rewardQuery.data?.data.cards ?? [];
   const tokens = rewardQuery.data?.data.tokens ?? [];
   const simulate = (order: Omit<PracticeOrder, "id" | "createdAt">) => {
@@ -216,7 +260,9 @@ export function MarketApp({
   return (
     <div
       className={
-        section === "markets" ? "app-shell prediction-surface" : "app-shell"
+        section === "markets" || replay
+          ? "app-shell prediction-surface"
+          : "app-shell"
       }
     >
       <a className="skip-link" href="#main">
@@ -270,7 +316,7 @@ export function MarketApp({
               </form>
             )}
             <div className="topbar-actions">
-              <span className="mode-badge">SIMULATED</span>
+              <NetworkSettings />
               <div className="header-account">
                 <WalletEntry configured={!!status.data?.privyConfigured} />
               </div>
@@ -330,20 +376,15 @@ export function MarketApp({
                 {n.label}
               </Link>
             ))}
-            <button
-              className="practice-link"
-              onClick={() => {
-                setPractice(!practice);
-                setCategory("All markets");
-                setSearch("");
-              }}
-            >
-              {practice ? "Live catalog" : "Practice"} <ChevronDown size={12} />
-            </button>
+            {network === "devnet" && (
+              <Link className="practice-link" href="/demo">
+                Replay
+              </Link>
+            )}
           </nav>
         </header>
         <main id="main">
-          {section !== "markets" ? (
+          {section !== "markets" && !replay ? (
             <div className="page-heading">
               <div>
                 <h1>
@@ -378,9 +419,9 @@ export function MarketApp({
               </button>
             </div>
           ) : null}
-          {section === "markets" ? (
+          {section === "markets" || replay ? (
             <>
-              {!selectedId && !practice ? (
+              {!selectedId && !practice && !replay ? (
                 <Discovery
                   onPractice={() => setPractice(true)}
                   search={search}
@@ -454,7 +495,17 @@ export function MarketApp({
                         ].join(":")}
                         market={selected}
                         practice={practice}
-                        cards={cards}
+                        replay={replay}
+                        cards={
+                          replay
+                            ? [
+                                DEMO_REPLAY_CARD,
+                                ...cards.filter(
+                                  (c) => c.mint !== DEMO_REPLAY_CARD.mint,
+                                ),
+                              ]
+                            : cards
+                        }
                         tokens={tokens}
                         rewardsLoading={rewardQuery.isLoading}
                         rewardsError={
@@ -510,45 +561,13 @@ export function MarketApp({
             </>
           ) : section === "portfolio" ? (
             <>
-              {status.data?.privyConfigured ? <PrivateAccount /> : null}
-              <div className="section-heading">
-                <div>
-                  <h2>Practice positions</h2>
-                </div>
-              </div>
-              {orders.length ? (
-                <div className="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Contract</th>
-                        <th>Side</th>
-                        <th>Practice stake</th>
-                        <th>Simulated quantity</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orders.map((o) => (
-                        <tr key={o.id}>
-                          <td>{o.symbol}</td>
-                          <td>{o.side.toUpperCase()}</td>
-                          <td>{usd(o.stake)}</td>
-                          <td>{o.contracts}</td>
-                          <td>
-                            <span className="mode-badge">SIMULATED</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <Empty
-                  title="No practice positions yet"
-                  detail="Choose the practice market to try a simulated fill."
-                />
-              )}
+              {status.data?.privyConfigured ? (
+                network === "devnet" ? (
+                  <DemoPortfolio />
+                ) : (
+                  <PrivateAccount />
+                )
+              ) : null}
             </>
           ) : section === "wallet" ? (
             <>
@@ -564,15 +583,27 @@ export function MarketApp({
                   </p>
                 </details>
               </div>
-              {status.data?.privyConfigured ? <PrivateAccount compact /> : null}
+              {status.data?.privyConfigured ? (
+                network === "devnet" ? (
+                  <DemoPortfolio compact />
+                ) : (
+                  <PrivateAccount compact />
+                )
+              ) : null}
               {status.data?.privyConfigured ? <ConnectedWalletPanel /> : null}
-              {status.data?.privyConfigured ? <RelayFunding /> : null}
+              {status.data?.privyConfigured && network === "mainnet" ? (
+                <RelayFunding />
+              ) : null}
             </>
           ) : section === "collection" ? (
             status.isPending ? (
               <p role="status">Loading wallet connection…</p>
             ) : status.data?.privyConfigured ? (
-              <WalletCollection />
+              network === "devnet" ? (
+                <DemoPortfolio collection />
+              ) : (
+                <WalletCollection />
+              )
             ) : (
               <Empty
                 title="Wallet connection unavailable"
@@ -677,6 +708,7 @@ function Empty({
 function MarketDetail({
   market,
   practice,
+  replay = false,
   cards,
   tokens,
   onSimulate,
@@ -689,6 +721,7 @@ function MarketDetail({
 }: {
   market: Market;
   practice: boolean;
+  replay?: boolean;
   cards: Listing[];
   tokens: GrailToken[];
   onSimulate: (o: Omit<PracticeOrder, "id" | "createdAt">) => void;
@@ -699,6 +732,7 @@ function MarketDetail({
   rewardsLoading: boolean;
   rewardsError: string | null;
 }) {
+  const { network } = useNetwork();
   const contracts = useMemo(() => marketOutcomes(market), [market]);
   const [selectedSymbol, setSelectedSymbol] = useState(
       initialSymbol ?? contracts[initialOutcome]?.symbol,
@@ -712,8 +746,10 @@ function MarketDetail({
     [review, setReview] = useState(false);
   const contract = contracts.find((c) => c.symbol === selectedSymbol);
   const symbol = contract?.symbol;
-  const live = useLiveBook(symbol, practice);
-  const { book, latestTrade, stale } = live;
+  const live = useLiveBook(replay ? undefined : symbol, practice);
+  const { book, latestTrade, stale } = replay
+    ? { book: DEMO_REPLAY.book, latestTrade: null, stale: false }
+    : live;
   const livePrice = (s: "yes" | "no") =>
     !book || stale ? null : (asksForSide(book, s)[0]?.price ?? null);
   const charted = contracts.slice(0, 3);
@@ -723,7 +759,7 @@ function MarketDetail({
     setSelectedSymbol(id);
     setSide(nextSide);
     setReview(false);
-    if (!practice) {
+    if (!practice && !replay) {
       const url = new URL(window.location.href);
       url.searchParams.delete("outcome");
       url.searchParams.set("contract", id);
@@ -897,7 +933,11 @@ function MarketDetail({
         <aside className="order-ticket panel" id="prediction-ticket">
           <h2 className="prediction-title">
             The prediction{" "}
-            <span title="Live trading is disabled">Estimate</span>
+            {replay ? (
+              <span>Replay · recorded book</span>
+            ) : network === "mainnet" ? (
+              <span>Estimate</span>
+            ) : null}
           </h2>
           <p className="ticket-event">{market.title}</p>
           <label className="ticket-outcome">
@@ -931,7 +971,7 @@ function MarketDetail({
           </div>
           <p id="quote-note" className="sr-only">
             Estimates use available depth before fees. A losing prediction pays
-            zero. Live trading is disabled.
+            zero.
           </p>
           {!practice && (!book || stale) && (
             <p className="snapshot-status" role="status">
@@ -984,6 +1024,21 @@ function MarketDetail({
               Max
             </button>
           </div>
+          {process.env.NEXT_PUBLIC_PRIVY_APP_ID && symbol && (
+            <DemoOrder
+              eventTicker={market.ticker ?? market.id}
+              symbol={symbol}
+              side={side}
+              stake={String(Number(stake))}
+              shares={quote?.contracts ?? null}
+              replay={replay}
+            />
+          )}
+          {network === "mainnet" && (
+            <p className="snapshot-status">
+              Gemini trading connection pending.
+            </p>
+          )}
           {practice ? (
             <>
               <Button
@@ -1050,6 +1105,7 @@ function MarketDetail({
           key={`${symbol}:${side}`}
           stake={stake}
           stakeRevision={stakeRevision}
+          replay={replay}
           loading={rewardsLoading}
           error={rewardsError}
           cards={possibleMatches}
@@ -1070,6 +1126,8 @@ function MarketDetail({
 }
 
 function CardTile({ card }: { card: Listing }) {
+  const { network } = useNetwork();
+  const [collect, setCollect] = useState(false);
   const [back, setBack] = useState(false),
     [failed, setFailed] = useState(false);
   const image = back ? card.backImage : card.frontImage;
@@ -1108,7 +1166,7 @@ function CardTile({ card }: { card: Listing }) {
       </div>
       <div className="card-information">
         <span className="card-category">
-          {card.year} {card.category} · {card.network}
+          {card.year} {card.category}
         </span>
         <h3>{card.name}</h3>
         {card.set ? <p>{card.set}</p> : null}
@@ -1121,6 +1179,22 @@ function CardTile({ card }: { card: Listing }) {
             <strong>{usd(card.ask)}</strong>
           </div>
         </div>
+        {network === "devnet" &&
+          process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
+          (collect ? (
+            <DemoClaim
+              source="collectorcrypt"
+              sourceId={card.mint}
+              name={card.name}
+            />
+          ) : (
+            <button
+              className="reward-browse-button"
+              onClick={() => setCollect(true)}
+            >
+              Collect card
+            </button>
+          ))}
       </div>
     </article>
   );

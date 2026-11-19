@@ -22,8 +22,9 @@ export default function About() {
       <section>
         <h2>Availability</h2>
         <p>
-          Trading, transfers and card checkout are currently unavailable.
-          Practice orders are simulated and saved on this device.
+          Trading, transfers and card checkout are currently unavailable. Devnet
+          balances and positions are saved to your account. Replay markets use
+          recorded books.
         </p>
         <p>
           Grail purchases use your connected EVM wallet and direct Uniswap

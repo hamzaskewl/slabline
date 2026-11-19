@@ -1,5 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+const DemoClaim = dynamic(
+  () => import("./demo-controls").then((m) => m.DemoClaim),
+  { ssr: false },
+);
 import { Layers3 } from "lucide-react";
 import {
   payoutTarget,
@@ -29,6 +34,7 @@ export function RewardTarget({
   payout,
   stake,
   stakeRevision,
+  replay = false,
   onStake,
   loading,
   error,
@@ -42,6 +48,7 @@ export function RewardTarget({
   payout: string | null;
   stake: string;
   stakeRevision: number;
+  replay?: boolean;
   onStake: (value: string) => void;
   loading?: boolean;
   error?: string | null;
@@ -194,6 +201,13 @@ export function RewardTarget({
           </span>
         )}
       </button>
+      {replay && process.env.NEXT_PUBLIC_PRIVY_APP_ID && (
+        <DemoClaim
+          source="collectorcrypt"
+          sourceId={card.mint}
+          name={card.name}
+        />
+      )}
       <details className="reward-assumptions">
         <summary>Fees & availability</summary>
         <p>

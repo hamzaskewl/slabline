@@ -7,6 +7,7 @@ import {
   grailMarket,
 } from "@collectible/integrations";
 import { GrailTrading } from "@/components/grail-trading";
+import { NetworkSettings } from "@/components/network-settings";
 
 export default async function TokenPage({
   params,
@@ -35,6 +36,7 @@ export default async function TokenPage({
       <nav>
         <Link href="/rewards">‹ Rewards</Link>
         <Link href="/wallet">Wallet</Link>
+        <NetworkSettings />
       </nav>
       <GrailTrading
         token={token}

@@ -24,5 +24,5 @@ export async function GET(request: Request) {
         "Collection unavailable. Verify this wallet in Wallet, then retry. Indexer or credit limits may also prevent this read.",
       );
     }
-  });
+  }, request);
 }

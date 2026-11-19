@@ -8,6 +8,7 @@ export * from "./orderbook";
 export * from "./reward-preview";
 export * from "./discovery";
 export * from "./team-cards";
+export * from "./demo";
 import { marketSearchText, marketTeams } from "./discovery";
 import { relatedCards } from "./rewards";
 

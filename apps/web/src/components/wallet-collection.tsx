@@ -6,11 +6,13 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import type { WalletCollection as Collection } from "@collectible/domain";
 import { privateRead, usePrivateRead } from "@/lib/use-private-read";
 import { Button } from "./ui/button";
+import { useNetwork } from "./network-settings";
 type Links = {
   network: "devnet" | "mainnet";
   wallets: { address: string; network: string }[];
 };
 export function WalletCollection() {
+  const { network } = useNetwork();
   const { ready, authenticated, user, login, getAccessToken } = usePrivy();
   const links = usePrivateRead<Links>("/api/wallet/links");
   const [selected, setSelected] = useState("");
@@ -27,6 +29,7 @@ export function WalletCollection() {
         `/api/wallet/collection?address=${encodeURIComponent(wallet)}&page=${pageParam}`,
         await getAccessToken(),
         signal,
+        network,
       ),
     getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
     staleTime: 60000,
