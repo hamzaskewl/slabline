@@ -21,6 +21,7 @@ import { hasListedCards } from "@/lib/card-availability";
 import { SnapshotStatus } from "./snapshot-status";
 import { MarketArt } from "./market-art";
 import { FeaturedMarkets } from "./featured-markets";
+import { Button } from "./ui/button";
 import { DiscoveryControls } from "./discovery-controls";
 import { LiveBadge } from "./live-badge";
 import { useMarketClock } from "@/lib/use-market-clock";
@@ -205,15 +206,47 @@ export function Discovery({
             <FeaturedMarkets markets={catalog} cards={cards} />
           )}
         <div className="discovery-heading">
-          <h1>
-            {search.trim() ? (
-              "Search results"
-            ) : category === "Live" ? (
-              <LiveBadge />
-            ) : (
-              category
+          <div className="discovery-title">
+            <h1>
+              {search.trim() ? (
+                "Search results"
+              ) : category === "Live" ? (
+                <LiveBadge />
+              ) : (
+                category
+              )}
+              <span
+                className="discovery-count"
+                aria-label={
+                  searching || (loading && !markets.length)
+                    ? "Loading market count"
+                    : `${visible.length.toLocaleString()} markets`
+                }
+              >
+                (
+                {searching || (loading && !markets.length)
+                  ? "…"
+                  : visible.length.toLocaleString()}
+                )
+              </span>
+            </h1>
+            {(search.trim() ||
+              category !== "All markets" ||
+              league ||
+              favoritesOnly ||
+              status !== "active" ||
+              includeProps ||
+              sort !== "relevance") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="discovery-clear-filters"
+                onClick={clear}
+              >
+                <X size={14} aria-hidden="true" /> Clear filters
+              </Button>
             )}
-          </h1>
+          </div>
           <label className="discovery-search">
             <Search size={17} />
             <input
@@ -268,29 +301,12 @@ export function Discovery({
             }}
           />
         </div>
-        <div className="discovery-summary" role="status" aria-live="polite">
-          {searching ? (
-            <span>Searching Gemini…</span>
-          ) : loading && !markets.length ? (
-            <span>Loading markets…</span>
-          ) : (
-            <strong>
-              {visible.length.toLocaleString()}{" "}
-              {visible.length === 1 ? "market" : "markets"}
-              {query ? ` for “${query}”` : ""}
-            </strong>
-          )}
-          {(search.trim() ||
-            category !== "All markets" ||
-            league ||
-            favoritesOnly ||
-            status !== "active" ||
-            includeProps ||
-            sort !== "relevance") && (
-            <button onClick={clear}>
-              Clear filters <X size={15} />
-            </button>
-          )}
+        <div className="sr-only" role="status" aria-live="polite">
+          {searching
+            ? "Searching markets…"
+            : loading && !markets.length
+              ? "Loading markets…"
+              : `${visible.length.toLocaleString()} ${visible.length === 1 ? "market" : "markets"}${query ? ` for “${query}”` : ""}`}
         </div>
         <SnapshotStatus result={snapshot} />
         {saveError && (
