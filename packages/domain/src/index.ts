@@ -10,7 +10,7 @@ export * from "./discovery";
 export * from "./profiles";
 export * from "./team-cards";
 export * from "./demo";
-import { marketSearchText, marketTeams } from "./discovery";
+import { marketSearchText, marketTeams, competitiveValue } from "./discovery";
 import { relatedCards } from "./rewards";
 
 export const decimal = z.string().regex(/^\d+(\.\d{1,6})?$/);
@@ -65,6 +65,7 @@ export type Market = {
   // Discovery responses carry a compact preview; full outcomes remain on /market.
   outcomeCount?: number;
   searchText?: string;
+  competition?: number | null;
 };
 const palette = [
   "#0f9ee7",
@@ -134,6 +135,9 @@ export function marketPreview(market: Market): Market {
     children: [],
     outcomeCount: contracts.length,
     searchText: marketSearchText(market),
+    competition: Number.isFinite(competitiveValue(market))
+      ? competitiveValue(market)
+      : null,
   };
 }
 export type Listing = {

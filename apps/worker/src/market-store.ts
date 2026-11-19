@@ -171,6 +171,27 @@ function result<T>(
 export async function savedMarkets(
   status: MarketStatusFilter = "active",
 ): Promise<ProviderResult<Market[]>> {
+  if (status === "all") {
+    const [active, resolved] = await Promise.all([
+      savedMarkets("active"),
+      savedMarkets("resolved"),
+    ]);
+    return {
+      data: [
+        ...new Map(
+          [...active.data, ...resolved.data].map((m) => [m.id, m]),
+        ).values(),
+      ],
+      source:
+        active.data.length || resolved.data.length ? "cache" : "unavailable",
+      observedAt:
+        [active.observedAt, resolved.observedAt].filter(Boolean).sort()[0] ??
+        "",
+      refreshing: active.refreshing || resolved.refreshing,
+      stale: active.stale || resolved.stale,
+      error: active.error || resolved.error,
+    };
+  }
   const r = await (status === "active" ? catalogs : archiveCatalogs).read(
     status === "active" ? catalogKey : `gemini:markets:v1:${status}`,
     status === "active"

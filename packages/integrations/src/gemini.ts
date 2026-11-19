@@ -138,15 +138,17 @@ export async function listMarkets(
   category?: string,
   state: "active" | "resolved" | "all" = "active",
 ): Promise<Market[]> {
+  if (state === "all") {
+    const groups = await Promise.all([
+      listMarkets(search, category, "active"),
+      listMarkets(search, category, "resolved"),
+    ]);
+    return [...new Map(groups.flat().map((m) => [m.id, m])).values()];
+  }
   const client = await geminiClient();
-  const status: (
-    "active" | "settled" | "invalid" | "closed" | "under_review" | "approved"
-  )[] =
-    state === "resolved"
-      ? ["settled", "invalid"]
-      : state === "all"
-        ? ["active", "settled", "invalid", "closed", "under_review", "approved"]
-        : ["active"];
+  // Live listEvents rejects invalid despite that enum appearing in the SDK.
+  const status: ("active" | "settled")[] =
+    state === "resolved" ? ["settled"] : ["active"];
   // Provider title search finds events omitted by the general category feed.
   if (search)
     return collectMarketPages((offset, limit) =>

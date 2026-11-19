@@ -26,7 +26,8 @@ const decimalValue = (value?: string | null) =>
   Number.isFinite(Number(value))
     ? Number(value)
     : -1;
-function competitiveValue(m: Market) {
+export function competitiveValue(m: Market): number {
+  if (m.competition != null) return m.competition;
   const prices = [
     ...m.contracts,
     ...m.children.flatMap((c) => c.contracts),
@@ -34,7 +35,7 @@ function competitiveValue(m: Market) {
     const p = decimalValue(c.buyYes ?? c.lastPrice);
     return p >= 0 && p <= 1 ? [Math.abs(0.5 - p)] : [];
   });
-  return prices.length ? Math.min(...prices) : Infinity;
+  return Math.min(...prices, ...m.children.map(competitiveValue), Infinity);
 }
 export function marketRelevance(m: Market, query: string) {
   const q = normalizeMarketSearch(query);
