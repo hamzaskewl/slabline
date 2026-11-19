@@ -177,11 +177,11 @@ async function prepareTransaction(
       !(receiptAccount.owner === system && receiptAccount.data[0] === "")
     )
       throw new UserError(
-        "A Devnet request already exists. Resume the draw to verify it.",
+        "A Devnet request already exists. Check Your packs to view it.",
       );
     if (fee === null || plan.requestFeeLamports !== "500000")
       throw new UserError(
-        "The Devnet fee could not be verified. Resume the saved draw to try again.",
+        "The Devnet fee could not be verified. Please try again.",
       );
     const rentShortfall =
       rent > (receiptAccount?.lamports ?? 0n)
@@ -190,7 +190,7 @@ async function prepareTransaction(
     const required = BigInt(plan.requestFeeLamports) + fee + rentShortfall;
     if (balance < required)
       throw new UserError(
-        `Add at least ${sol(required - balance)} Devnet SOL to the request wallet, then resume this draw.`,
+        `Add at least ${sol(required - balance)} Devnet SOL to the request wallet, then open your pack.`,
       );
   }
   return {
@@ -240,7 +240,7 @@ function inspectSigned(
     )
   )
     throw new UserError(
-      "The wallet changed the reviewed request. Resume to try again.",
+      "The wallet changed the reviewed request. Please try again.",
     );
   return getBase58Decoder().decode(signature);
 }
@@ -305,7 +305,7 @@ export function PullRandomness({
   const { wallets } = useWallets();
   const { connectWallet } = useConnectWallet();
   const { signTransaction } = useSignTransaction();
-  const [signature, setSignature] = useState("");
+  const [signature, setSignature] = useState(opening.requestSignature ?? "");
   const [status, setStatus] = useState("");
   const controller = useRef<AbortController | null>(null);
   const started = useRef(false);
@@ -405,7 +405,7 @@ export function PullRandomness({
           )
         )
           throw new UserError(
-            "Add Devnet SOL to the request wallet, then resume this draw.",
+            "Add Devnet SOL to the request wallet, then open your pack.",
           );
         // A transport failure can have delivered the exact signed message.
         // Check its status before requesting any replacement signature.
@@ -414,7 +414,11 @@ export function PullRandomness({
 
     async function draw() {
       setStatus("Checking the saved draw…");
-      let request = loadRequest(opening.id);
+      let request =
+        loadRequest(opening.id) ??
+        (opening.requestSignature
+          ? { signature: opening.requestSignature }
+          : null);
       let prepared = await prepare();
       let recovered = !!prepared.recoveredSignature;
       if (prepared.recoveredSignature) {
@@ -475,7 +479,7 @@ export function PullRandomness({
       if (!request) {
         if (!wallet)
           throw new UserError(
-            "Connect the original request wallet to resume this draw.",
+            "Connect the wallet you selected to open this pack.",
           );
         if (!prepared.solanaRequest)
           throw new UserError(
@@ -488,14 +492,14 @@ export function PullRandomness({
           signal,
         );
         signal.throwIfAborted();
-        setStatus("Approve the Devnet request in your wallet…");
+        setStatus("Approve opening in your wallet…");
         const signed = await signTransaction({
           wallet,
           transaction: reviewed.transaction,
           chain: "solana:devnet",
         }).catch(() => {
           throw new UserError(
-            "The wallet request was not approved. Resume when you’re ready to sign.",
+            "Opening cancelled. Your wallet request was not approved.",
           );
         });
         request = {
@@ -508,12 +512,18 @@ export function PullRandomness({
           blockhash: reviewed.blockhash,
           expiry: reviewed.expiry,
         };
-        // If the modal closed during a wallet prompt, keep the signature to
-        // resume later without broadcasting from the closed experience.
+        // Closing before submission abandons the draft, including a wallet
+        // signature returned after the dialog has already closed.
+        signal.throwIfAborted();
+        await actions.request({
+          action: "submit",
+          id: opening.id,
+          requestSignature: request.signature,
+        });
         storeRequest(opening.id, request);
         signal.throwIfAborted();
         setSignature(request.signature);
-        setStatus("Submitting the Devnet request…");
+        setStatus("Submitting your opening…");
         await send(request);
       }
 
@@ -530,7 +540,7 @@ export function PullRandomness({
             storeRequest(opening.id, null);
             setSignature("");
             throw new UserError(
-              "The Devnet request expired or failed. Resume this same draw to try again.",
+              "The Devnet request expired or failed. Please try again.",
             );
           }
           request = { signature: checked.recoveredSignature };
@@ -540,9 +550,7 @@ export function PullRandomness({
         if (state === "finalized" && (await verify(request.signature))) return;
         await wait(signal);
       }
-      setStatus(
-        "The draw is still pending on Devnet. You can resume it in your opening history.",
-      );
+      setStatus("Your draw is still processing. Find it in Your packs.");
     }
 
     void actions
@@ -565,9 +573,16 @@ export function PullRandomness({
         } catch (error) {
           if (signal.aborted) return;
           setStatus("");
+          if (!loadRequest(opening.id) && !opening.requestSignature) {
+            const cancelled = await actions.request<{
+              opening: PullOpening;
+              balance?: string;
+            }>({ action: "cancel", id: opening.id });
+            actions.save(cancelled.opening, cancelled.balance);
+          }
           if (error instanceof UserError) throw error;
           throw new UserError(
-            "The Devnet draw is temporarily unavailable. Your paid opening is saved; resume it to try again.",
+            "Devnet is temporarily unavailable. Submitted packs are saved in Your packs.",
           );
         }
       })
@@ -584,13 +599,26 @@ export function PullRandomness({
   ]);
 
   useEffect(() => {
-    if (!autoStart || actions.busy || started.current) return;
+    if (
+      !autoStart ||
+      actions.busy ||
+      started.current ||
+      (!wallet && !opening.requestSignature && !loadRequest(opening.id))
+    )
+      return;
     const task = window.setTimeout(() => {
       started.current = true;
       start();
     }, 0);
     return () => window.clearTimeout(task);
-  }, [actions.busy, autoStart, start]);
+  }, [
+    actions.busy,
+    autoStart,
+    start,
+    wallet,
+    opening.id,
+    opening.requestSignature,
+  ]);
 
   return (
     <div className="pull-stack">
@@ -607,7 +635,7 @@ export function PullRandomness({
       {!actions.busy && (
         <>
           <Button className="pull-action" onClick={start}>
-            Resume draw
+            {signature ? "Check opening" : `Open $${opening.tier}`}
           </Button>
           {!wallet && (
             <Button
@@ -616,30 +644,10 @@ export function PullRandomness({
                 void connectWallet({ walletChainType: "solana-only" })
               }
             >
-              Connect request wallet
+              Connect wallet
             </Button>
           )}
         </>
-      )}
-      {(opening.payer || signature) && (
-        <details className="pull-muted">
-          <summary>Devnet request details</summary>
-          {opening.payer && (
-            <p className="pull-wallet">
-              Request wallet <code>{opening.payer}</code>
-            </p>
-          )}
-          {signature && (
-            <a
-              className="pull-proof-link"
-              href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View transaction
-            </a>
-          )}
-        </details>
       )}
     </div>
   );

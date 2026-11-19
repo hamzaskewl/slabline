@@ -10,9 +10,16 @@ const PullAccount = dynamic(
     loading: () => <p role="status">Loading your pack account…</p>,
   },
 );
-
-export function PullPredict({ configured }: { configured?: boolean }) {
-  if (configured) return <PullAccount />;
+export function PullPredict({
+  configured,
+  view = "shop",
+  openingId,
+}: {
+  configured?: boolean;
+  view?: "shop" | "packs";
+  openingId?: string;
+}) {
+  if (configured) return <PullAccount view={view} openingId={openingId} />;
   return (
     <PullBoard
       action={() => (

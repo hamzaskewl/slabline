@@ -17,14 +17,14 @@ Opening variance and position risk are distinct. Neither 98% return nor the mini
 
 ## Flow and persistence
 
-1. Choose a pack and browse/search available market themes (all, team, player). Use actual active provider markets; no invented markets or fabricated liquidity.
+1. Choose a pack and search by team or player. Available teams are selectable, city/nickname aliases resolve to canonical team names, and player searches include all outcome labels, including compact MVP previews. Show provider market cards with artwork, odds and volume, five at a time.
 2. Review price and every reward probability before purchase. Authenticate and use the existing persistent demo account for practice purchases.
 3. Persist the opening ID, owner, pack version, price, randomness method, and unique seed before requesting randomness; reserve/debit once in a database transaction.
-4. Reveal the budget only from the recorded draw. Reload, request retry, wallet retry, or quote failure must not generate another draw or charge.
-5. Choose an eligible market and outcome, review a fresh executable depth quote, and confirm purchase using the segregated budget. Preserve unspent remainder; reject stale or unavailable execution without consuming the award.
+4. Abandoned unsigned drafts cancel and release their reservation exactly once. Record a signed request before broadcasting under the same account lock used by cancellation. Submitted draws remain recoverable; a lost response must retain its purchase key. Only server-verified failure/expiry permits replacing a submitted request. Reveal up to three matching markets before the recorded budget, with skip and reduced-motion support.
+5. Continue to `/pull-predict/packs?opening=…` to see the unlocked budget and matching markets sorted by volume. The Your packs link and opening history recover this page after refresh. Choose an outcome directly from a card, review a fresh executable depth quote, and confirm purchase using the segregated budget. Preserve unspent remainder; reject stale or unavailable execution without consuming the award.
 6. Record the resulting ordinary demo position so portfolio sales and settlement use existing behavior. Retain a recoverable receipt and opening history.
 
-A theme is a discovery filter, not permission to substitute a different market or side. Insufficient matching markets produce a useful empty state and broader search option. Mainnet funding remains gated; demo balances are never presented as actual USDC.
+A theme is a discovery filter, not permission to substitute a different market or side. Insufficient matching markets produce a useful empty state; clearing the additional market search restores all matches for the selected team/player. Legacy all-market packs remain usable. Mainnet funding remains gated; demo balances are never presented as actual USDC.
 
 ## Randomness
 

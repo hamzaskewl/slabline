@@ -27,6 +27,9 @@ export function PredictNavigation({ pull }: { pull: boolean }) {
               Pull &amp; Predict
             </Link>
           </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href="/pull-predict/packs">Your packs</Link>
+          </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

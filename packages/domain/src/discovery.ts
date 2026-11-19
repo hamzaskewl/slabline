@@ -159,6 +159,8 @@ export function sortMarkets(
 }
 export const normalizeMarketSearch = (text: string) =>
   text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/\bnfl\b/g, "pro football")
     .replace(/\bnba\b/g, "pro basketball")

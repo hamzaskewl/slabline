@@ -24,6 +24,9 @@ import {
   pullAward,
   pullOpening,
   pullPendingRequest,
+  cancelPull,
+  submitPullRequest,
+  clearFailedPullRequest,
 } from "./pull";
 
 test("opening odds have exactly 98% expected buying budget at every pack price", () => {
@@ -49,6 +52,92 @@ test("opening odds have exactly 98% expected buying budget at every pack price",
   expect(pullOutcome(9999).multiplier).toBe("4");
   expect(() => pullOutcome(10000)).toThrow();
 });
+test.skipIf(!process.env.DATABASE_URL)(
+  "cancelled drafts refund once; submission and cancellation cannot both win",
+  async () => {
+    const db = getDb();
+    const [owner] = await db
+      .insert(users)
+      .values({ privyId: `pull-cancel-${crypto.randomUUID()}` })
+      .returning();
+    const userId = owner!.id;
+    const config = {
+      source: "magicblock-devnet",
+      payer: "test-wallet",
+      programId: "test-program",
+    } as const;
+    const theme = { kind: "team", label: "San Antonio Spurs" } as const;
+    try {
+      const draft = await openPull(
+        userId,
+        crypto.randomUUID(),
+        25,
+        config,
+        theme,
+      );
+      expect((await pullAccount(userId)).balance).toBe("75.000000");
+      await Promise.all([
+        cancelPull(userId, draft.id),
+        cancelPull(userId, draft.id),
+      ]);
+      expect(await pullAccount(userId)).toEqual({
+        balance: "100.000000",
+        openings: [],
+      });
+      await expect(
+        submitPullRequest(userId, draft.id, "late-signature"),
+      ).rejects.toThrow("cancelled");
+
+      const paid = await openPull(
+        userId,
+        crypto.randomUUID(),
+        25,
+        config,
+        theme,
+      );
+
+      await submitPullRequest(userId, paid.id, "submitted-signature", "1000");
+      expect((await cancelPull(userId, paid.id)).state).toBe("pending");
+      expect((await pullAccount(userId)).balance).toBe("75.000000");
+
+      await clearFailedPullRequest(userId, paid.id, "wrong-signature");
+      expect((await cancelPull(userId, paid.id)).state).toBe("pending");
+
+      await clearFailedPullRequest(userId, paid.id, "submitted-signature");
+      await cancelPull(userId, paid.id);
+      expect((await pullAccount(userId)).balance).toBe("100.000000");
+
+      const racing = await openPull(
+        userId,
+        crypto.randomUUID(),
+        25,
+        config,
+        theme,
+      );
+      await Promise.allSettled([
+        cancelPull(userId, racing.id),
+        submitPullRequest(userId, racing.id, "racing-signature"),
+      ]);
+
+      const result = await pullOpening(userId, racing.id);
+      const account = await pullAccount(userId);
+      expect(
+        result.state === "cancelled"
+          ? !result.requestSignature && account.balance === "100.000000"
+          : result.requestSignature === "racing-signature" &&
+              account.balance === "75.000000",
+      ).toBe(true);
+    } finally {
+      await db
+        .delete(pullOpenings)
+        .where(inArray(pullOpenings.userId, [userId]));
+      await db
+        .delete(fundingIntents)
+        .where(inArray(fundingIntents.userId, [userId]));
+      await db.delete(users).where(inArray(users.id, [userId]));
+    }
+  },
+);
 
 test("MagicBlock mapping accepts each bucket exactly six times and skips rejected candidates", () => {
   const counts = new Uint8Array(10000);

@@ -32,11 +32,6 @@ export function PullPackFace({
         <SlablineMark height={18} />
         <strong>${tier}</strong>
       </span>
-      {index !== undefined && (
-        <span className="pull-pack-index">
-          {String(index + 1).padStart(2, "0")}
-        </span>
-      )}
     </>
   );
 }
@@ -154,12 +149,6 @@ export function PullPackCarousel({
           <ChevronRight size={20} aria-hidden="true" />
         </button>
       </div>
-      <p className="pull-ring-caption">
-        <span aria-live="polite">
-          Artwork {active + 1} of {packCount}
-        </span>
-        <span>Cosmetic choice · Same odds</span>
-      </p>
     </div>
   );
 }

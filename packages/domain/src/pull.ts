@@ -37,7 +37,8 @@ export type PullOpening = {
   version: 1;
   price: string;
   tier: PullTier;
-  state: "pending" | "ready" | "redeemed";
+  state: "pending" | "ready" | "redeemed" | "cancelled";
+  requestSignature?: string | null;
   budget: string | null;
   multiplier: PullMultiplier | null;
   randomnessSource: PullRandomnessSource;

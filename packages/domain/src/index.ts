@@ -487,3 +487,4 @@ export class IntegrationBlocked extends Error {
 }
 export * from "./accounts";
 export * from "./position-share";
+export * from "./pull-search";

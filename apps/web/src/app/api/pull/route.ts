@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { address } from "@solana/kit";
+import {
+  address,
+  createSolanaRpc,
+  signature as solanaSignature,
+} from "@solana/kit";
 import {
   activeMarket,
   demoPositionContext,
@@ -13,6 +17,10 @@ import {
 } from "@collectible/domain";
 import {
   assertPullRetry,
+  cancelPull,
+  submitPullRequest,
+  clearFailedPullRequest,
+  pullSubmissionExpiry,
   createMagicBlockDevnetRandomness,
   demoBuy,
   demoBuyQuote,
@@ -64,6 +72,12 @@ const action = z.discriminatedUnion("action", [
     theme: theme.default({ kind: "all" }),
   }),
   z.object({ action: z.literal("prepare"), id }),
+  z.object({ action: z.literal("cancel"), id }),
+  z.object({
+    action: z.literal("submit"),
+    id,
+    requestSignature: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{64,88}$/),
+  }),
   z.object({
     action: z.literal("verify"),
     id,
@@ -135,7 +149,11 @@ async function prepare(userId: string, id: string) {
   try {
     const recoveredSignature =
       await randomness.recoverRequestSignature(pending);
-    if (recoveredSignature) return { recoveredSignature };
+    if (recoveredSignature) {
+      await submitPullRequest(userId, id, recoveredSignature);
+      return { recoveredSignature };
+    }
+    await clearExpiredSubmission(userId, pending.opening);
     const { seedHex, requestAddress, requestFeeLamports, instruction } =
       await randomness.prepare(pending);
     return {
@@ -154,9 +172,34 @@ async function prepare(userId: string, id: string) {
   } catch {
     throw new ApiError(
       503,
-      "Devnet randomness is unavailable. Your pending pack is saved. Retry preparing the same request.",
+      "Devnet is temporarily unavailable. Please try again.",
     );
   }
+}
+const requestRpc = () =>
+  createSolanaRpc(
+    process.env.PULL_MAGICBLOCK_DEVNET_RPC_URL ??
+      "https://api.devnet.solana.com",
+  );
+async function clearExpiredSubmission(userId: string, opening: PullOpening) {
+  if (opening.state !== "pending" || !opening.requestSignature) return;
+  const rpc = requestRpc();
+  const options = { abortSignal: AbortSignal.timeout(10000) };
+  const {
+    value: [status],
+  } = await rpc
+    .getSignatureStatuses([solanaSignature(opening.requestSignature)], {
+      searchTransactionHistory: true,
+    })
+    .send(options);
+  const expiry = await pullSubmissionExpiry(userId, opening.id);
+  const expired =
+    !status &&
+    expiry &&
+    (await rpc.getBlockHeight({ commitment: "finalized" }).send(options)) >
+      BigInt(expiry);
+  if ((status?.err && status.confirmationStatus === "finalized") || expired)
+    await clearFailedPullRequest(userId, opening.id, opening.requestSignature);
 }
 
 async function verifyOpening(
@@ -314,6 +357,36 @@ export async function POST(request: Request) {
     }
 
     const opening = await pullOpening(userId, input.id);
+    if (input.action === "cancel") {
+      if (opening.state === "pending" && !opening.requestSignature) {
+        // Recover requests made by older clients before releasing a reservation.
+        const pending = await pullPendingRequest(userId, opening.id);
+        const signature = await magicBlock(
+          pending.programId,
+        ).recoverRequestSignature(pending);
+        if (signature)
+          return openingResponse(
+            await submitPullRequest(userId, opening.id, signature),
+          );
+      }
+      return openingResponse(await cancelPull(userId, opening.id));
+    }
+    if (input.action === "submit") {
+      await clearExpiredSubmission(userId, opening);
+      // The server observes a later blockhash lifetime than the already-signed
+      // transaction. Never trust a client-provided expiry to release funds.
+      const { value: lifetime } = await requestRpc()
+        .getLatestBlockhash({ commitment: "confirmed" })
+        .send({ abortSignal: AbortSignal.timeout(10000) });
+      return openingResponse(
+        await submitPullRequest(
+          userId,
+          opening.id,
+          input.requestSignature,
+          lifetime.lastValidBlockHeight.toString(),
+        ),
+      );
+    }
     if (input.action === "prepare")
       return openingResponse(opening, await prepare(userId, opening.id));
     if (input.action === "verify")

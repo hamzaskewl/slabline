@@ -23,7 +23,12 @@ type Row = typeof pullOpenings.$inferSelect;
 type OpeningData = Pick<
   PullOpening,
   "multiplier" | "randomnessSource" | "proof" | "redemption" | "payer" | "theme"
-> & { version: 1; price: string; programId?: string | null };
+> & {
+  version: 1;
+  price: string;
+  programId?: string | null;
+  submissionExpiry?: string;
+};
 
 export type PullRandomnessConfig =
   | { source: "demo-csprng" }
@@ -37,6 +42,7 @@ function view(row: Row): PullOpening {
     price: data.price,
     tier: row.tier as PullTier,
     state: row.state as PullOpening["state"],
+    requestSignature: row.requestSignature,
     budget: row.budget,
     multiplier: data.multiplier,
     randomnessSource: data.randomnessSource,
@@ -110,7 +116,10 @@ export async function pullAccount(userId: string) {
       .from(pullOpenings)
       .where(eq(pullOpenings.userId, userId))
       .orderBy(sql`${pullOpenings.createdAt} desc`);
-    return { balance: account.amount, openings: openings.map(view) };
+    return {
+      balance: account.amount,
+      openings: openings.filter((row) => row.state !== "cancelled").map(view),
+    };
   });
 }
 
@@ -213,6 +222,8 @@ export function assertPullRetry(
   payer: string | null,
   theme: PullTheme,
 ) {
+  if (opening.state === "cancelled")
+    throw new DemoError("This opening was cancelled. Choose a new pack.", 409);
   if (
     opening.tier !== tier ||
     opening.payer !== payer ||
@@ -225,6 +236,106 @@ export function assertPullRetry(
       "This purchase key was already used for another pack.",
       409,
     );
+}
+/** Reserve the signed request before broadcasting. Cancellation uses the same
+ * account lock so an abandoned opening can never subsequently be submitted. */
+export async function submitPullRequest(
+  userId: string,
+  id: string,
+  signature: string,
+  submissionExpiry?: string,
+) {
+  return getDb().transaction(async (tx) => {
+    await lockedDemoAccount(tx, userId);
+    const [row] = await tx
+      .select()
+      .from(pullOpenings)
+      .where(ownerOpening(userId, id))
+      .for("update");
+    if (!row) throw new DemoError("Pack opening not found.", 404);
+    if (row.state === "cancelled")
+      throw new DemoError(
+        "This opening was cancelled. Choose a new pack.",
+        409,
+      );
+    if (row.state !== "pending") {
+      if (row.requestSignature === signature) return view(row);
+      throw new DemoError("This pack has already been opened.", 409);
+    }
+    if (row.requestSignature && row.requestSignature !== signature)
+      throw new DemoError(
+        "This pack already has a submitted transaction.",
+        409,
+      );
+    const [updated] = await tx
+      .update(pullOpenings)
+      .set({
+        requestSignature: signature,
+        data: {
+          ...(row.data as OpeningData),
+          ...(submissionExpiry ? { submissionExpiry } : {}),
+        },
+      })
+      .where(ownerOpening(userId, id))
+      .returning();
+    return view(updated!);
+  });
+}
+export async function pullSubmissionExpiry(userId: string, id: string) {
+  return ((await rowFor(userId, id)).data as OpeningData).submissionExpiry;
+}
+/** Called only after the API proves this exact signature failed or expired. */
+export async function clearFailedPullRequest(
+  userId: string,
+  id: string,
+  signature: string,
+) {
+  return getDb().transaction(async (tx) => {
+    await lockedDemoAccount(tx, userId);
+    const [row] = await tx
+      .select()
+      .from(pullOpenings)
+      .where(ownerOpening(userId, id))
+      .for("update");
+    if (!row) throw new DemoError("Pack opening not found.", 404);
+    if (row.state !== "pending" || row.requestSignature !== signature)
+      return view(row);
+    const [updated] = await tx
+      .update(pullOpenings)
+      .set({ requestSignature: null })
+      .where(ownerOpening(userId, id))
+      .returning();
+    return view(updated!);
+  });
+}
+/** Only an unsigned draft can release its reserved demo cash. Submitted or
+ * fulfilled openings stay recoverable, including ambiguous network failures. */
+export async function cancelPull(userId: string, id: string) {
+  return getDb().transaction(async (tx) => {
+    const account = await lockedDemoAccount(tx, userId);
+    const [row] = await tx
+      .select()
+      .from(pullOpenings)
+      .where(ownerOpening(userId, id))
+      .for("update");
+    if (!row) throw new DemoError("Pack opening not found.", 404);
+    if (row.state !== "pending" || row.requestSignature) return view(row);
+    const [updated] = await tx
+      .update(pullOpenings)
+      .set({ state: "cancelled" })
+      .where(ownerOpening(userId, id))
+      .returning();
+    await tx
+      .update(fundingIntents)
+      .set({
+        amount: money(
+          units(account.amount) + units((row.data as OpeningData).price),
+        ),
+        version: account.version + 1,
+      })
+      .where(eq(fundingIntents.id, account.id));
+    return view(updated!);
+  });
 }
 
 export async function fulfillPull(

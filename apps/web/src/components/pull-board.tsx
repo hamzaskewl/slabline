@@ -1,4 +1,7 @@
 "use client";
+import Link from "next/link";
+import { PullMarketCards } from "./pull-market-cards";
+import { canonicalPullTheme, pullTeam } from "@collectible/domain";
 
 import { useState, type ReactNode } from "react";
 import {
@@ -31,7 +34,7 @@ export function PullBoard({
 }) {
   const [tier, setTier] = useState<PullTier>(25);
   const [rotation, setRotation] = useState(0);
-  const [theme, setTheme] = useState<PullTheme>({ kind: "all" });
+  const [theme, setTheme] = useState<PullTheme>({ kind: "team", label: "" });
   const catalog = usePullCatalog(theme);
   const hasTheme = theme.kind === "all" || !!theme.label.trim();
   const hasMatches =
@@ -42,8 +45,13 @@ export function PullBoard({
     theme.kind === "all"
       ? undefined
       : theme.kind === "team"
-        ? (preview?.teams?.find((team) =>
-            team.label.toLowerCase().includes(theme.label.trim().toLowerCase()),
+        ? (preview?.teams?.find(
+            (team) =>
+              (pullTeam(theme.label) &&
+                pullTeam(team.label)?.name === pullTeam(theme.label)?.name) ||
+              team.label
+                .toLowerCase()
+                .includes(theme.label.trim().toLowerCase()),
           )?.imageUrl ?? preview?.imageUrl)
         : preview?.imageUrl;
   return (
@@ -53,7 +61,9 @@ export function PullBoard({
           <h1 id="pull-title">Pull &amp; Predict</h1>
           <p>Open a pack. Reveal your prediction budget.</p>
         </div>
-        <span className="pull-mode">Devnet demo</span>
+        <div className="pull-page-links">
+          <Link href="/pull-predict/packs">Your packs</Link>
+        </div>
       </header>
       <div className="pull-grid">
         <div>
@@ -65,7 +75,7 @@ export function PullBoard({
             <div className="pull-panel-heading">
               <h2 id="pack-title">Choose a pack</h2>
               {balance !== undefined && (
-                <span className="pull-muted">{usdc(balance)} demo cash</span>
+                <span className="pull-muted">{usdc(balance)} balance</span>
               )}
             </div>
             <fieldset disabled={busy}>
@@ -97,8 +107,24 @@ export function PullBoard({
             <PullThemePicker
               theme={theme}
               onChange={setTheme}
+              teams={catalog.teams}
               disabled={busy}
             />
+            <details className="pull-odds-inline pull-compact-odds">
+              <summary>
+                Pack odds <ChevronDown size={15} aria-hidden="true" />
+              </summary>
+              <PackOdds tier={tier} />
+            </details>
+            {action(
+              {
+                tier,
+                theme: canonicalPullTheme(theme),
+                edition: ((rotation % packCount) + packCount) % packCount,
+                artwork,
+              },
+              eligible,
+            )}
             <div className="pull-catalog-preview" aria-live="polite">
               <p className="pull-muted">
                 {theme.kind !== "all" && !theme.label.trim()
@@ -110,15 +136,15 @@ export function PullBoard({
                       : hasMatches
                         ? `${catalog.markets.length} matching ${catalog.markets.length === 1 ? "market" : "markets"}`
                         : catalog.delayed
-                          ? "No matches in the saved catalog. Try another search or choose All markets."
-                          : "No matching markets. Try another search or choose All markets."}
+                          ? "No matches in the saved catalog. Try another team or player."
+                          : "No matching markets. Try another team or player."}
               </p>
               {hasMatches && theme.kind !== "all" && (
-                <ul>
-                  {catalog.markets.slice(0, 3).map((market) => (
-                    <li key={market.id}>{market.title}</li>
-                  ))}
-                </ul>
+                <PullMarketCards
+                  key={`${theme.kind}:${theme.label}`}
+                  markets={catalog.markets}
+                  theme={theme}
+                />
               )}
               {catalog.delayed && !catalog.searching && (
                 <p className="pull-muted">
@@ -133,28 +159,6 @@ export function PullBoard({
                   </PullRetry>
                 )}
             </div>
-            <details className="pull-odds-inline pull-compact-odds">
-              <summary>
-                Pack odds <ChevronDown size={15} aria-hidden="true" />
-              </summary>
-              <PackOdds tier={tier} />
-            </details>
-            {mode && (
-              <p className="pull-muted pull-randomness-label">
-                {mode === "magicblock-devnet"
-                  ? "MagicBlock VRF · Wallet pays Devnet fee"
-                  : "Practice draw · Server randomness"}
-              </p>
-            )}
-            {action(
-              {
-                tier,
-                theme,
-                edition: ((rotation % packCount) + packCount) % packCount,
-                artwork,
-              },
-              eligible,
-            )}
           </section>
         </div>
         <aside>
@@ -186,11 +190,7 @@ function PackOdds({ tier }: { tier: PullTier }) {
         ))}
       </ul>
       <p className="pull-expected">
-        <strong>{usd((tier * 98) / 100)} expected budget</strong>
-      </p>
-      <p className="pull-muted">
-        98% of pack price on average. Your prediction has its own settlement
-        risk.
+        <strong>98% RTP</strong>
       </p>
     </>
   );
@@ -200,7 +200,9 @@ function PullThemePicker({
   theme,
   onChange,
   disabled,
+  teams,
 }: {
+  teams: string[];
   theme: PullTheme;
   disabled: boolean;
   onChange: (theme: PullTheme) => void;
@@ -209,21 +211,15 @@ function PullThemePicker({
     <fieldset disabled={disabled}>
       <legend>Market theme</legend>
       <div className="pull-theme-options">
-        {(["all", "team", "player"] as const).map((kind) => (
+        {(["team", "player"] as const).map((kind) => (
           <label className="pull-choice" key={kind}>
             <input
               type="radio"
               name="pull-theme-kind"
               checked={theme.kind === kind}
-              onChange={() =>
-                onChange(kind === "all" ? { kind } : { kind, label: "" })
-              }
+              onChange={() => onChange({ kind, label: "" })}
             />
-            {kind === "all"
-              ? "All markets"
-              : kind === "team"
-                ? "Team"
-                : "Player"}
+            {kind === "team" ? "Team" : "Player"}
           </label>
         ))}
       </div>
@@ -236,9 +232,35 @@ function PullThemePicker({
             onChange={(event) =>
               onChange({ kind: theme.kind, label: event.target.value })
             }
+            placeholder={
+              theme.kind === "team"
+                ? "Search teams, e.g. Spurs"
+                : "Search players, e.g. Wemby"
+            }
             maxLength={100}
           />
         </label>
+      )}
+      {theme.kind === "team" && teams.length > 0 && (
+        <div className="pull-team-options" aria-label="Available teams">
+          {teams
+            .filter(
+              (team) =>
+                !theme.label ||
+                team.toLowerCase().includes(theme.label.toLowerCase()) ||
+                (canonicalPullTheme(theme) as { label: string }).label === team,
+            )
+            .map((team) => (
+              <button
+                type="button"
+                key={team}
+                aria-pressed={theme.label === team}
+                onClick={() => onChange({ kind: "team", label: team })}
+              >
+                {team}
+              </button>
+            ))}
+        </div>
       )}
     </fieldset>
   );

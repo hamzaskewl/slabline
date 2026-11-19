@@ -7,6 +7,7 @@ import { Dialog } from "radix-ui";
 import { ArrowRight, CircleAlert, X } from "lucide-react";
 import {
   units,
+  canonicalPullTheme,
   type PullOpening,
   type PullTheme,
   type PullTier,
@@ -15,6 +16,8 @@ import { usdc } from "@/lib/utils";
 import { MarketArtwork } from "./market-artwork";
 import { SlablineMark } from "./slabline-mark";
 import { Button } from "./ui/button";
+import { usePullCatalog } from "./pull-catalog";
+import { PullMarketCard } from "./pull-market-cards";
 import { PullPackFace } from "./pull-pack-carousel";
 
 const PullRandomness = dynamic(
@@ -69,7 +72,11 @@ export function PullCinematic({
   const revealed = !!amount && (skipped || stage === "done");
   const win =
     showAmount && budget !== null && units(budget) > units(String(pack.tier));
-  const theme = pack.theme.kind === "all" ? "All markets" : pack.theme.label;
+  const canonical = canonicalPullTheme(pack.theme);
+  const theme = canonical.kind === "all" ? "Your predictions" : canonical.label;
+  const catalog = usePullCatalog(pack.theme);
+  const topMarkets = catalog.markets.slice(0, 3);
+  const [marketStep, setMarketStep] = useState(0);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -78,14 +85,24 @@ export function PullCinematic({
     }
     if (!budget || skipped) return;
     const themeTimer = window.setTimeout(() => setStage("theme"), 850);
-    const budgetTimer = window.setTimeout(() => setStage("budget"), 2500);
-    const settledTimer = window.setTimeout(() => setStage("done"), 3350);
+    const marketTimers = [850, 2150, 3450]
+      .slice(0, Math.max(1, topMarkets.length))
+      .map((delay, index) =>
+        window.setTimeout(() => setMarketStep(index), delay),
+      );
+    const budgetAt = 1000 + Math.max(1, topMarkets.length) * 1300;
+    const budgetTimer = window.setTimeout(() => setStage("budget"), budgetAt);
+    const settledTimer = window.setTimeout(
+      () => setStage("done"),
+      budgetAt + 850,
+    );
     return () => {
+      marketTimers.forEach(window.clearTimeout);
       window.clearTimeout(themeTimer);
       window.clearTimeout(budgetTimer);
       window.clearTimeout(settledTimer);
     };
-  }, [budget, skipped]);
+  }, [budget, skipped, topMarkets.length]);
 
   return (
     <Dialog.Root
@@ -151,7 +168,19 @@ export function PullCinematic({
             >
               {stage !== "pack" || showAmount ? (
                 <>
-                  {pack.artwork ? (
+                  {!showAmount && topMarkets.length > 0 ? (
+                    <div className="pull-reveal-market" key={marketStep}>
+                      <PullMarketCard
+                        theme={pack.theme}
+                        market={
+                          topMarkets[
+                            Math.min(marketStep, topMarkets.length - 1)
+                          ]!
+                        }
+                        preview
+                      />
+                    </div>
+                  ) : pack.artwork ? (
                     <MarketArtwork
                       src={pack.artwork}
                       label={theme}
@@ -206,6 +235,10 @@ export function PullCinematic({
               <Button variant="ghost" onClick={() => setSkipped(true)}>
                 Skip animation
               </Button>
+            ) : opening?.state === "cancelled" ? (
+              <p role="status">
+                Opening cancelled. Choose a new pack when you’re ready.
+              </p>
             ) : opening?.state === "pending" ? (
               <PullRandomness
                 key={opening.id}
