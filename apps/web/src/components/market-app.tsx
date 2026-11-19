@@ -384,7 +384,10 @@ export function MarketApp({
             </div>
           </nav>
         </header>
-        <main id="main">
+        <main
+          id="main"
+          className={section === "portfolio" ? "portfolio-page" : undefined}
+        >
           {section !== "markets" && !replay ? (
             <div className="page-heading">
               <div>
