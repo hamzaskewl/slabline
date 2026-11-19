@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccountRole,
   address,
+  blockhash,
   appendTransactionMessageInstruction,
   compileTransaction,
   createSolanaRpc,
@@ -13,6 +14,8 @@ import {
   getProgramDerivedAddress,
   getTransactionDecoder,
   getTransactionEncoder,
+  signature as solanaSignature,
+  type TransactionMessageBytesBase64,
   type Base64EncodedWireTransaction,
   setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
@@ -20,8 +23,8 @@ import {
 import { useConnectWallet } from "@privy-io/react-auth";
 import { useSignTransaction, useWallets } from "@privy-io/react-auth/solana";
 import type { PullOpening } from "@collectible/domain";
+import { pullRequestStatus } from "@/lib/pull-request-status";
 import { Button } from "./ui/button";
-import { PullRetry } from "./pull-board";
 import type { PullActions } from "./pull-account";
 
 type RequestPlan = {
@@ -48,7 +51,8 @@ async function prepareTransaction(
   plan: RequestPlan,
   payer: string,
   programId: string | null,
-  previousExpiry: string | null,
+  signal: AbortSignal,
+  savedLifetime?: { blockhash: string; expiry: string },
 ) {
   const program = address(plan.instruction.programAddress);
   if (
@@ -112,33 +116,17 @@ async function prepareTransaction(
       "The prepared MagicBlock request accounts could not be verified.",
     );
 
-  const options = { abortSignal: AbortSignal.timeout(15000) };
-  const [{ value: lifetime }, { value: saved }, blockHeight] =
-    await Promise.all([
-      devnetRpc.getLatestBlockhash({ commitment: "confirmed" }).send(options),
-      devnetRpc
-        .getAccountInfo(receipt, {
-          encoding: "base64",
-          commitment: "confirmed",
-        })
-        .send(options),
-      previousExpiry && /^\d+$/.test(previousExpiry)
-        ? devnetRpc.getBlockHeight({ commitment: "confirmed" }).send(options)
-        : null,
-    ]);
-  if (
-    blockHeight !== null &&
-    previousExpiry &&
-    blockHeight <= BigInt(previousExpiry)
-  ) {
-    throw new Error(
-      "The previously signed request can still land on Devnet. Check the saved draw again once its blockhash expires.",
-    );
-  }
-  if (saved && !(saved.owner === system && saved.data[0] === ""))
-    throw new Error(
-      "A receipt already exists on Devnet. Check the saved draw before preparing another request.",
-    );
+  const options = rpcOptions(signal);
+  const lifetime = savedLifetime
+    ? {
+        blockhash: blockhash(savedLifetime.blockhash),
+        lastValidBlockHeight: BigInt(savedLifetime.expiry),
+      }
+    : (
+        await devnetRpc
+          .getLatestBlockhash({ commitment: "confirmed" })
+          .send(options)
+      ).value;
   const message = appendTransactionMessageInstruction(
     {
       programAddress: program,
@@ -156,256 +144,502 @@ async function prepareTransaction(
       ),
     ),
   );
+  const compiled = compileTransaction(message);
+  const transaction = new Uint8Array(getTransactionEncoder().encode(compiled));
+  if (!savedLifetime) {
+    const [
+      { value: balance },
+      { value: receiptAccount },
+      rent,
+      { value: fee },
+    ] = await Promise.all([
+      devnetRpc
+        .getBalance(address(payer), { commitment: "confirmed" })
+        .send(options),
+      devnetRpc
+        .getAccountInfo(receipt, {
+          encoding: "base64",
+          commitment: "confirmed",
+        })
+        .send(options),
+      devnetRpc
+        .getMinimumBalanceForRentExemption(105n, { commitment: "confirmed" })
+        .send(options),
+      devnetRpc
+        .getFeeForMessage(
+          toBase64(compiled.messageBytes) as TransactionMessageBytesBase64,
+          { commitment: "confirmed" },
+        )
+        .send(options),
+    ]);
+    if (
+      receiptAccount &&
+      !(receiptAccount.owner === system && receiptAccount.data[0] === "")
+    )
+      throw new UserError(
+        "A Devnet request already exists. Resume the draw to verify it.",
+      );
+    if (fee === null || plan.requestFeeLamports !== "500000")
+      throw new UserError(
+        "The Devnet fee could not be verified. Resume the saved draw to try again.",
+      );
+    const rentShortfall =
+      rent > (receiptAccount?.lamports ?? 0n)
+        ? rent - (receiptAccount?.lamports ?? 0n)
+        : 0n;
+    const required = BigInt(plan.requestFeeLamports) + fee + rentShortfall;
+    if (balance < required)
+      throw new UserError(
+        `Add at least ${sol(required - balance)} Devnet SOL to the request wallet, then resume this draw.`,
+      );
+  }
   return {
-    transaction: new Uint8Array(
-      getTransactionEncoder().encode(compileTransaction(message)),
-    ),
+    transaction,
+    blockhash: lifetime.blockhash,
     expiry: lifetime.lastValidBlockHeight.toString(),
   };
+}
+
+class UserError extends Error {}
+
+function sol(lamports: bigint) {
+  const sol = lamports / 1_000_000_000n;
+  const fraction = (lamports % 1_000_000_000n)
+    .toString()
+    .padStart(9, "0")
+    .replace(/0+$/, "");
+  return fraction ? `${sol}.${fraction}` : sol.toString();
+}
+
+function rpcOptions(signal: AbortSignal) {
+  return { abortSignal: AbortSignal.any([signal, AbortSignal.timeout(10000)]) };
+}
+
+function toBase64(bytes: ArrayLike<number>) {
+  return btoa(String.fromCharCode(...Array.from(bytes)));
+}
+
+function fromBase64(value: string) {
+  return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+}
+
+function inspectSigned(
+  transaction: Uint8Array,
+  signed: Uint8Array,
+  payer: string,
+) {
+  const decoder = getTransactionDecoder();
+  const original = decoder.decode(transaction);
+  const decoded = decoder.decode(signed);
+  const signature = decoded.signatures[address(payer)];
+  if (
+    !signature ||
+    original.messageBytes.length !== decoded.messageBytes.length ||
+    !original.messageBytes.every(
+      (byte, index) => byte === decoded.messageBytes[index],
+    )
+  )
+    throw new UserError(
+      "The wallet changed the reviewed request. Resume to try again.",
+    );
+  return getBase58Decoder().decode(signature);
+}
+
+type SavedRequest = {
+  signature: string;
+  expiry?: string;
+  blockhash?: string;
+  signedBase64?: string;
+};
+
+function loadRequest(id: string): SavedRequest | null {
+  try {
+    const saved = localStorage.getItem(`slabline-pull-request:${id}`);
+    if (saved) {
+      const request = JSON.parse(saved) as SavedRequest;
+      if (signaturePattern.test(request.signature)) return request;
+    }
+    const signature = localStorage.getItem(`slabline-pull-signature:${id}`);
+    const expiry = localStorage.getItem(`slabline-pull-signature-expiry:${id}`);
+    if (signature && signaturePattern.test(signature))
+      return { signature, expiry: expiry ?? undefined };
+  } catch {}
+  return null;
+}
+
+function storeRequest(id: string, request: SavedRequest | null) {
+  try {
+    if (request)
+      localStorage.setItem(
+        `slabline-pull-request:${id}`,
+        JSON.stringify(request),
+      );
+    else localStorage.removeItem(`slabline-pull-request:${id}`);
+    localStorage.removeItem(`slabline-pull-signature:${id}`);
+    localStorage.removeItem(`slabline-pull-signature-expiry:${id}`);
+  } catch {}
+}
+
+function wait(signal: AbortSignal) {
+  return new Promise<void>((resolve) => {
+    if (signal.aborted) return resolve();
+    const timer = window.setTimeout(done, 2500);
+    function done() {
+      window.clearTimeout(timer);
+      signal.removeEventListener("abort", done);
+      resolve();
+    }
+    signal.addEventListener("abort", done, { once: true });
+  });
 }
 
 export function PullRandomness({
   opening,
   actions,
+  autoStart = false,
 }: {
   opening: PullOpening;
   actions: PullActions;
+  autoStart?: boolean;
 }) {
   const { wallets } = useWallets();
   const { connectWallet } = useConnectWallet();
   const { signTransaction } = useSignTransaction();
-  const storageKey = `slabline-pull-signature:${opening.id}`;
-  const expiryKey = `slabline-pull-signature-expiry:${opening.id}`;
-  const [expiry, setExpiry] = useState(() => {
-    try {
-      return localStorage.getItem(expiryKey);
-    } catch {
-      return null;
-    }
-  });
-  const [signature, setSignature] = useState(() => {
-    try {
-      return localStorage.getItem(storageKey) ?? "";
-    } catch {
-      return "";
-    }
-  });
-  const [plan, setPlan] = useState<RequestPlan>();
+  const [signature, setSignature] = useState("");
   const [status, setStatus] = useState("");
+  const controller = useRef<AbortController | null>(null);
+  const started = useRef(false);
   const wallet = wallets.find(
     (candidate) => candidate.address === opening.payer,
   );
 
-  function saveSignature(value: string) {
-    setSignature(value);
-    try {
-      localStorage.setItem(storageKey, value);
-    } catch {}
-  }
+  useEffect(
+    () => () => {
+      controller.current?.abort();
+    },
+    [],
+  );
 
-  async function check(requestSignature?: string) {
-    const result = await actions.request<{
-      opening: PullOpening;
-      balance?: string;
-    }>({
-      action: "verify",
-      id: opening.id,
-      requestSignature,
-    });
-    actions.save(result.opening, result.balance);
-    if (result.opening.state === "pending") {
-      setStatus(
-        requestSignature
-          ? "Waiting for MagicBlock fulfillment. Check the saved request again shortly."
-          : "Draw still pending. You can review the saved request or check again shortly.",
-      );
-    } else {
-      try {
-        localStorage.removeItem(storageKey);
-        localStorage.removeItem(expiryKey);
-      } catch {}
+  const start = useCallback(() => {
+    if (controller.current || actions.busy) return;
+    const work = new AbortController();
+    controller.current = work;
+    const { signal } = work;
+
+    async function verify(requestSignature: string) {
+      const result = await actions.request<{
+        opening: PullOpening;
+        balance?: string;
+      }>({
+        action: "verify",
+        id: opening.id,
+        requestSignature,
+      });
+      signal.throwIfAborted();
+      if (result.opening.state === "pending") return false;
+      storeRequest(opening.id, null);
+      actions.save(result.opening, result.balance);
+      return true;
     }
-  }
+
+    async function transactionStatus(request: SavedRequest) {
+      const {
+        value: [current],
+      } = await devnetRpc
+        .getSignatureStatuses([solanaSignature(request.signature)], {
+          searchTransactionHistory: true,
+        })
+        .send(rpcOptions(signal));
+      const finalizedHeight =
+        !current && request.expiry && /^\d+$/.test(request.expiry)
+          ? await devnetRpc
+              .getBlockHeight({ commitment: "finalized" })
+              .send(rpcOptions(signal))
+          : undefined;
+      const state = pullRequestStatus(
+        current ?? null,
+        finalizedHeight,
+        request.expiry,
+      );
+      if (state === "replace" && !current && request.blockhash) {
+        const { value: stillValid } = await devnetRpc
+          .isBlockhashValid(blockhash(request.blockhash), {
+            commitment: "finalized",
+          })
+          .send(rpcOptions(signal));
+        if (stillValid) return "unseen";
+      }
+      return state;
+    }
+
+    async function prepare() {
+      const result = await actions.request<{
+        solanaRequest?: RequestPlan;
+        recoveredSignature?: string;
+      }>({
+        action: "prepare",
+        id: opening.id,
+      });
+      signal.throwIfAborted();
+      return result;
+    }
+
+    async function send(request: SavedRequest) {
+      signal.throwIfAborted();
+      try {
+        await devnetRpc
+          .sendTransaction(
+            request.signedBase64 as Base64EncodedWireTransaction,
+            {
+              encoding: "base64",
+              preflightCommitment: "confirmed",
+              maxRetries: 1n,
+            },
+          )
+          .send(rpcOptions(signal));
+      } catch (error) {
+        signal.throwIfAborted();
+        if (
+          /insufficient (funds|lamports)|no record of a prior credit/i.test(
+            String(error),
+          )
+        )
+          throw new UserError(
+            "Add Devnet SOL to the request wallet, then resume this draw.",
+          );
+        // A transport failure can have delivered the exact signed message.
+        // Check its status before requesting any replacement signature.
+      }
+    }
+
+    async function draw() {
+      setStatus("Checking the saved draw…");
+      let request = loadRequest(opening.id);
+      let prepared = await prepare();
+      let recovered = !!prepared.recoveredSignature;
+      if (prepared.recoveredSignature) {
+        request = { signature: prepared.recoveredSignature };
+      } else if (request) {
+        if (!request.expiry || !/^\d+$/.test(request.expiry)) {
+          const { value: observed } = await devnetRpc
+            .getLatestBlockhash({ commitment: "confirmed" })
+            .send(rpcOptions(signal));
+          // Older records lacked an expiry. Wait through a full blockhash
+          // lifetime before treating an unseen request as dropped.
+          request = {
+            ...request,
+            expiry: observed.lastValidBlockHeight.toString(),
+          };
+          storeRequest(opening.id, request);
+        }
+        const state = await transactionStatus(request);
+        if (state === "replace") {
+          prepared = await prepare();
+          recovered = !!prepared.recoveredSignature;
+          request = prepared.recoveredSignature
+            ? { signature: prepared.recoveredSignature }
+            : null;
+          storeRequest(opening.id, request);
+        } else if (
+          state === "unseen" &&
+          request.signedBase64 &&
+          request.blockhash &&
+          request.expiry &&
+          opening.payer &&
+          prepared.solanaRequest
+        ) {
+          const expected = await prepareTransaction(
+            prepared.solanaRequest,
+            opening.payer,
+            opening.programId,
+            signal,
+            {
+              blockhash: request.blockhash,
+              expiry: request.expiry,
+            },
+          );
+          if (
+            inspectSigned(
+              expected.transaction,
+              fromBase64(request.signedBase64),
+              opening.payer,
+            ) !== request.signature
+          )
+            throw new UserError(
+              "The saved transaction could not be verified. Your opening is still saved.",
+            );
+          await send(request);
+        }
+      }
+
+      if (!request) {
+        if (!wallet)
+          throw new UserError(
+            "Connect the original request wallet to resume this draw.",
+          );
+        if (!prepared.solanaRequest)
+          throw new UserError(
+            "The Devnet request is unavailable. Your opening is still saved.",
+          );
+        const reviewed = await prepareTransaction(
+          prepared.solanaRequest,
+          wallet.address,
+          opening.programId,
+          signal,
+        );
+        signal.throwIfAborted();
+        setStatus("Approve the Devnet request in your wallet…");
+        const signed = await signTransaction({
+          wallet,
+          transaction: reviewed.transaction,
+          chain: "solana:devnet",
+        }).catch(() => {
+          throw new UserError(
+            "The wallet request was not approved. Resume when you’re ready to sign.",
+          );
+        });
+        request = {
+          signature: inspectSigned(
+            reviewed.transaction,
+            signed.signedTransaction,
+            wallet.address,
+          ),
+          signedBase64: toBase64(signed.signedTransaction),
+          blockhash: reviewed.blockhash,
+          expiry: reviewed.expiry,
+        };
+        // If the modal closed during a wallet prompt, keep the signature to
+        // resume later without broadcasting from the closed experience.
+        storeRequest(opening.id, request);
+        signal.throwIfAborted();
+        setSignature(request.signature);
+        setStatus("Submitting the Devnet request…");
+        await send(request);
+      }
+
+      setSignature(request.signature);
+      setStatus("Waiting for the MagicBlock draw…");
+      for (let attempt = 0; attempt < 18; attempt++) {
+        signal.throwIfAborted();
+        const state = recovered
+          ? "finalized"
+          : await transactionStatus(request);
+        if (state === "replace") {
+          const checked = await prepare();
+          if (!checked.recoveredSignature) {
+            storeRequest(opening.id, null);
+            setSignature("");
+            throw new UserError(
+              "The Devnet request expired or failed. Resume this same draw to try again.",
+            );
+          }
+          request = { signature: checked.recoveredSignature };
+          recovered = true;
+          setSignature(request.signature);
+        }
+        if (state === "finalized" && (await verify(request.signature))) return;
+        await wait(signal);
+      }
+      setStatus(
+        "The draw is still pending on Devnet. You can resume it in your opening history.",
+      );
+    }
+
+    void actions
+      .run(async () => {
+        try {
+          if (!navigator.locks) {
+            await draw();
+            return;
+          }
+          await navigator.locks.request(
+            `slabline-pull-wallet:${opening.id}`,
+            { ifAvailable: true },
+            async (lock) => {
+              if (!lock)
+                throw new UserError("This draw is active in another tab.");
+              signal.throwIfAborted();
+              await draw();
+            },
+          );
+        } catch (error) {
+          if (signal.aborted) return;
+          setStatus("");
+          if (error instanceof UserError) throw error;
+          throw new UserError(
+            "The Devnet draw is temporarily unavailable. Your paid opening is saved; resume it to try again.",
+          );
+        }
+      })
+      .finally(() => {
+        if (controller.current === work) controller.current = null;
+      });
+  }, [
+    actions,
+    opening.id,
+    opening.payer,
+    opening.programId,
+    signTransaction,
+    wallet,
+  ]);
+
+  useEffect(() => {
+    if (!autoStart || actions.busy || started.current) return;
+    const task = window.setTimeout(() => {
+      started.current = true;
+      start();
+    }, 0);
+    return () => window.clearTimeout(task);
+  }, [actions.busy, autoStart, start]);
 
   return (
     <div className="pull-stack">
-      <p className="pull-muted" role="status">
-        Draw pending · MagicBlock VRF on Solana Devnet
-      </p>
-      {opening.payer && (
-        <p className="pull-wallet">
-          Request wallet <code>{opening.payer}</code>
-        </p>
-      )}
-      {!signature &&
-        (wallet ? (
-          !plan ? (
-            <Button
-              className="pull-action"
-              disabled={actions.busy}
-              onClick={() =>
-                void actions.run(async () => {
-                  const prepared = await actions.request<{
-                    solanaRequest?: RequestPlan;
-                    recoveredSignature?: string;
-                  }>({ action: "prepare", id: opening.id });
-                  if (prepared.recoveredSignature) {
-                    saveSignature(prepared.recoveredSignature);
-                    await check(prepared.recoveredSignature);
-                  } else if (prepared.solanaRequest) {
-                    setPlan(prepared.solanaRequest);
-                  } else {
-                    throw new Error(
-                      "The devnet randomness request is unavailable.",
-                    );
-                  }
-                })
-              }
-            >
-              Review randomness request
-            </Button>
-          ) : (
-            <>
-              <dl className="pull-facts">
-                <div>
-                  <dt>MagicBlock request fee</dt>
-                  <dd>{plan.requestFeeLamports} lamports</dd>
-                </div>
-                <div>
-                  <dt>Devnet receipt</dt>
-                  <dd>
-                    <code>{plan.requestAddress}</code>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Slabline devnet program</dt>
-                  <dd>
-                    <code>{plan.instruction.programAddress}</code>
-                  </dd>
-                </div>
-              </dl>
-              <p className="pull-muted">
-                Solana also charges transaction fees and account rent. This
-                request generates your pack draw.
-              </p>
-              <Button
-                className="pull-action"
-                disabled={actions.busy}
-                onClick={() =>
-                  void actions.run(async () => {
-                    setPlan(undefined);
-                    const { transaction, expiry: nextExpiry } =
-                      await prepareTransaction(
-                        plan,
-                        wallet.address,
-                        opening.programId,
-                        expiry,
-                      );
-                    const signed = await signTransaction({
-                      wallet,
-                      transaction,
-                      chain: "solana:devnet",
-                    });
-                    const decoder = getTransactionDecoder();
-                    const original = decoder.decode(transaction);
-                    const signedTransaction = decoder.decode(
-                      signed.signedTransaction,
-                    );
-                    const signatureBytes =
-                      signedTransaction.signatures[address(wallet.address)];
-                    if (
-                      !signatureBytes ||
-                      original.messageBytes.length !==
-                        signedTransaction.messageBytes.length ||
-                      !original.messageBytes.every(
-                        (byte, index) =>
-                          byte === signedTransaction.messageBytes[index],
-                      )
-                    )
-                      throw new Error(
-                        "The wallet changed the prepared randomness transaction.",
-                      );
-                    const requestSignature =
-                      getBase58Decoder().decode(signatureBytes);
-                    saveSignature(requestSignature);
-                    setExpiry(nextExpiry);
-                    try {
-                      localStorage.setItem(expiryKey, nextExpiry);
-                    } catch {}
-                    const encoded = btoa(
-                      String.fromCharCode(...signed.signedTransaction),
-                    ) as Base64EncodedWireTransaction;
-                    await devnetRpc
-                      .sendTransaction(encoded, {
-                        encoding: "base64",
-                        preflightCommitment: "confirmed",
-                      })
-                      .send({ abortSignal: AbortSignal.timeout(15000) });
-                    await check(requestSignature);
-                  })
-                }
-              >
-                Sign devnet request
-              </Button>
-            </>
-          )
-        ) : (
-          <PullRetry
-            onClick={() =>
-              void connectWallet({ walletChainType: "solana-only" })
-            }
-          >
-            Connect request wallet
-          </PullRetry>
-        ))}
-      <label className="pull-field">
-        <span>Devnet request signature</span>
-        <input
-          placeholder="Paste a submitted transaction signature"
-          value={signature}
-          maxLength={88}
-          disabled={actions.busy}
-          onChange={(event) => {
-            setSignature(event.target.value.trim());
-            setStatus("");
-          }}
-        />
-      </label>
-      <Button
-        variant="outline"
-        className="pull-action"
-        disabled={
-          actions.busy || (!!signature && !signaturePattern.test(signature))
-        }
-        onClick={() =>
-          void actions.run(async () => {
-            if (signature) saveSignature(signature);
-            await check(signature || undefined);
-          })
-        }
-      >
-        Check saved draw
-      </Button>
-      {signaturePattern.test(signature) && (
-        <a
-          className="pull-proof-link"
-          href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          View devnet request transaction
-        </a>
-      )}
-      {!!signature && (
-        <p className="pull-muted">
-          Check this signature before preparing a replacement. If the
-          transaction was dropped, clear the field and review the request again.
-        </p>
-      )}
       {status && (
         <p className="pull-muted" role="status">
           {status}
         </p>
+      )}
+      {actions.error && (
+        <p className="pull-error" role="alert">
+          {actions.error}
+        </p>
+      )}
+      {!actions.busy && (
+        <>
+          <Button className="pull-action" onClick={start}>
+            Resume draw
+          </Button>
+          {!wallet && (
+            <Button
+              variant="outline"
+              onClick={() =>
+                void connectWallet({ walletChainType: "solana-only" })
+              }
+            >
+              Connect request wallet
+            </Button>
+          )}
+        </>
+      )}
+      {(opening.payer || signature) && (
+        <details className="pull-muted">
+          <summary>Devnet request details</summary>
+          {opening.payer && (
+            <p className="pull-wallet">
+              Request wallet <code>{opening.payer}</code>
+            </p>
+          )}
+          {signature && (
+            <a
+              className="pull-proof-link"
+              href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View transaction
+            </a>
+          )}
+        </details>
       )}
     </div>
   );
