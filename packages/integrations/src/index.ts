@@ -17,3 +17,5 @@ export * from "./evm-trading";
 export * from "./wallet-collection";
 export * from "./demo";
 export * from "./demo-nft";
+export * from "./pull";
+export * from "./magicblock-randomness";

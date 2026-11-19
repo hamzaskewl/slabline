@@ -61,6 +61,7 @@ import { Discovery } from "./discovery";
 import { MarketSearch } from "./market-search";
 import { LiveBadge } from "./live-badge";
 import type { MarketStatusFilter } from "@collectible/domain";
+import { PredictNavigation } from "./predict-navigation";
 import { SlablineMark } from "./slabline-mark";
 import { OutcomeDetail } from "./outcome-detail";
 import { RewardTarget } from "./reward-target";
@@ -119,6 +120,12 @@ const ProfileEditor = dynamic(
   { ssr: false },
 );
 const RelayFunding = dynamic(() => import("./relay-funding"), { ssr: false });
+const PullPredict = dynamic(
+  () => import("./pull-predict").then((m) => m.PullPredict),
+  {
+    loading: () => <p role="status">Loading Pull &amp; Predict…</p>,
+  },
+);
 const navigation = [
   { label: "Markets", href: "/", icon: Compass },
   { label: "Rewards", href: "/rewards", icon: Gift },
@@ -158,6 +165,7 @@ export function MarketApp({
   const router = useRouter();
   const { network } = useNetwork();
   const replay = section === "demo";
+  const pull = section === "pull-predict";
   const scenario = rehearsal === "grail" ? DEMO_GRAIL_REPLAY : DEMO_REPLAY;
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
@@ -309,7 +317,10 @@ export function MarketApp({
     );
   };
   return (
-    <div className="app-shell prediction-surface" ref={navigationRef}>
+    <div
+      className={`app-shell prediction-surface ${pull ? "pull-app" : ""}`}
+      ref={navigationRef}
+    >
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -321,9 +332,7 @@ export function MarketApp({
               <span>Slabline</span>
             </Link>
             <span className="brand-divider" />
-            <Link href="/" className="predict-link">
-              Predict <ChevronDown size={13} />
-            </Link>
+            <PredictNavigation pull={pull} />
             {detailView || section !== "markets" ? (
               <nav className="board-navigation" aria-label="Market navigation">
                 <Link
@@ -384,77 +393,81 @@ export function MarketApp({
               </button>
             </div>
           </div>
-          <nav
-            className={`exchange-navigation ${detailView || section !== "markets" ? "board-secondary" : ""} ${menuOpen ? "menu-expanded" : ""}`}
-            aria-label="Main navigation"
-          >
-            <Link
-              href="/"
-              onClick={() => {
-                setCategory("All markets");
-                setMarketStatus("active");
-                setSearch("");
-                setPractice(false);
-              }}
-              className={
-                section === "markets" && category === "All markets"
-                  ? "active"
-                  : ""
-              }
+          {!pull && (
+            <nav
+              className={`exchange-navigation ${detailView || section !== "markets" ? "board-secondary" : ""} ${menuOpen ? "menu-expanded" : ""}`}
+              aria-label="Main navigation"
             >
-              <Zap size={14} /> All markets
-            </Link>
-            <Link
-              href="/?category=live"
-              className={
-                section === "markets" && category === "Live" ? "active" : ""
-              }
-              onClick={() => {
-                setCategory("Live");
-                setMarketStatus("active");
-                setSearch("");
-                setPractice(false);
-              }}
-            >
-              <LiveBadge />
-            </Link>
-            {[...new Set(markets.map((m) => m.category))]
-              .filter((c) => c !== "Live")
-              .sort((a, b) =>
-                a === "Sports" ? -1 : b === "Sports" ? 1 : a.localeCompare(b),
-              )
-              .map((c) => (
-                <button
-                  key={c}
-                  className={
-                    section === "markets" && category === c ? "active" : ""
-                  }
-                  onClick={() => {
-                    setCategory(c);
-                    if (section !== "markets") window.location.href = "/";
-                  }}
-                >
-                  {c}
-                </button>
-              ))}
-            <div className="account-navigation">
-              {navigation.slice(1).map((n) => (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  className={section === n.label.toLowerCase() ? "active" : ""}
-                >
-                  {n.label}
-                </Link>
-              ))}
-            </div>
-          </nav>
+              <Link
+                href="/"
+                onClick={() => {
+                  setCategory("All markets");
+                  setMarketStatus("active");
+                  setSearch("");
+                  setPractice(false);
+                }}
+                className={
+                  section === "markets" && category === "All markets"
+                    ? "active"
+                    : ""
+                }
+              >
+                <Zap size={14} /> All markets
+              </Link>
+              <Link
+                href="/?category=live"
+                className={
+                  section === "markets" && category === "Live" ? "active" : ""
+                }
+                onClick={() => {
+                  setCategory("Live");
+                  setMarketStatus("active");
+                  setSearch("");
+                  setPractice(false);
+                }}
+              >
+                <LiveBadge />
+              </Link>
+              {[...new Set(markets.map((m) => m.category))]
+                .filter((c) => c !== "Live")
+                .sort((a, b) =>
+                  a === "Sports" ? -1 : b === "Sports" ? 1 : a.localeCompare(b),
+                )
+                .map((c) => (
+                  <button
+                    key={c}
+                    className={
+                      section === "markets" && category === c ? "active" : ""
+                    }
+                    onClick={() => {
+                      setCategory(c);
+                      if (section !== "markets") window.location.href = "/";
+                    }}
+                  >
+                    {c}
+                  </button>
+                ))}
+              <div className="account-navigation">
+                {navigation.slice(1).map((n) => (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    className={
+                      section === n.label.toLowerCase() ? "active" : ""
+                    }
+                  >
+                    {n.label}
+                  </Link>
+                ))}
+              </div>
+            </nav>
+          )}
         </header>
         <main
           id="main"
           className={section === "portfolio" ? "portfolio-page" : undefined}
         >
-          {section !== "markets" && !replay ? (
+          {section !== "markets" && !replay && !pull ? (
             <div className="page-heading">
               <div>
                 <h1>
@@ -484,7 +497,9 @@ export function MarketApp({
               </button>
             </div>
           ) : null}
-          {section === "markets" || replay ? (
+          {pull ? (
+            <PullPredict configured={status.data?.privyConfigured} />
+          ) : section === "markets" || replay ? (
             <>
               {!selectedId && !practice && !replay ? (
                 <Discovery

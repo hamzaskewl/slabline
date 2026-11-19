@@ -900,3 +900,60 @@ input {
 .ticket-held-summary > :last-child {
   margin-left: auto;
 }
+
+.predict-menu-trigger {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.predict-menu-trigger:hover,
+.predict-menu-trigger[data-state="open"] {
+  background: var(--slabline-raised);
+}
+
+.predict-menu {
+  z-index: 30;
+  min-width: 155px;
+  padding: 5px;
+  border: 1px solid #354656;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px #0006;
+}
+
+.predict-menu a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+}
+
+.predict-menu a[data-highlighted] {
+  background: var(--slabline-raised);
+}
+
+.predict-menu a[aria-current="page"] {
+  color: var(--lime);
+}
+
+@media (max-width: 390px) {
+  .app-shell .predict-menu-trigger {
+    padding-inline: 3px;
+    font-size: 12px;
+  }
+}

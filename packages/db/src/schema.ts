@@ -216,6 +216,28 @@ export const orderItems = pgTable(
   (t) => [uniqueIndex("order_mint_unique").on(t.orderId, t.mint)],
 );
 export const positions = operation("positions");
+export const pullOpenings = pgTable(
+  "pull_openings",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    clientKey: uuid("client_key").notNull(),
+    tier: integer("tier").notNull(),
+    state: text("state").notNull(),
+    seedHex: text("seed_hex").unique(),
+    requestSignature: text("request_signature").unique(),
+    budget: amount("budget"),
+    positionId: uuid("position_id").references(() => positions.id),
+    data: jsonb("data").notNull(),
+    createdAt: created(),
+  },
+  (t) => [
+    uniqueIndex("pull_openings_owner_key_idx").on(t.userId, t.clientKey),
+    index("pull_openings_owner_time_idx").on(t.userId, t.createdAt),
+  ],
+);
 export const settlements = operation("settlements");
 export const onchainEvents = pgTable("onchain_events", {
   signature: text("signature").primaryKey(),

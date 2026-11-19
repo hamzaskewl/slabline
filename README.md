@@ -4,6 +4,14 @@ UBC 2026 hackathon prototype. Source of truth: [ARCHITECTURE.md](ARCHITECTURE.md
 
 Public market discovery, Gemini WebSocket books through SSE, exact depth estimates, slab images and Grail vault data are implemented. Settings selects Mainnet or Devnet. Devnet has an authenticated, persistent $100 demo ledger, top-ups, paper positions, official-result settlement and a repeatable recorded-book replay. Collectibles use user-signed Metaplex Core creation on Solana devnet. Mainnet Gemini execution and funding remain gated.
 
+## Pull & Predict
+
+The Predict menu opens a separate `/pull-predict` workspace. $25, $50, $100 and $200 packs award a position-buying budget with 62% odds of 0.6×, 28% of 1.2×, 6.4% of 2× and 3.6% of 4×. Expected budget is 98% of price: a 2% gross opening edge before costs. Users search teams, players or all markets, then choose a market and outcome after the reveal. A fresh depth quote precedes redemption; positions use the existing demo portfolio and any unused budget returns to demo cash.
+
+Run database migrations before enabling this flow. Purchase keys, account locks and persistent opening records protect against duplicate debits and redemption. Mainnet purchases remain disabled. The default `PULL_RANDOMNESS=demo-csprng` is explicitly labeled server-generated practice randomness, not onchain VRF.
+
+For MagicBlock on Solana devnet, deploy the consumer in `programs/pull-randomness`, configure `PULL_MAGICBLOCK_PROGRAM_ID`, and set `PULL_RANDOMNESS=magicblock-devnet`. MagicBlock's VRF program is `Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz`; its devnet queue is `Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh`. The consumer binds each request to a payer and saved seed, accepts only the scoped MagicBlock callback signer, and records one immutable result. The app independently reads finalized receipts before awarding a budget. The consumer is deployed on devnet as `H8FMsd2jGRQomPQ9iFEhNsYif3Uko1WBoFbsNognWRWx`; a real request and finalized fulfillment were verified on November 19, 2026. Setup and verification status: [MagicBlock randomness](docs/PULL_RANDOMNESS.md). Product specification: [Pull & Predict](docs/PULL_PREDICT_SPEC.md).
+
 ## Development
 
 Position shares use the existing Privy and PostgreSQL configuration. Run `bun run db:migrate` before using sharing (migration 0004), and set `APP_URL` to the web origin. The share icon beside a position value opens a private PNG preview. Copy link and platform actions publish an immutable snapshot at `/share/[token]`; its image route serves the exact prepared PNG. Opening the dialog or copying/downloading its image does not publish a link.
