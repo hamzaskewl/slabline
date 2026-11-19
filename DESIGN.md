@@ -164,7 +164,7 @@ A labeled share icon opens a modal with an accessible title, description, close 
 
 ### Position PNG and immutable snapshot
 
-The server template combines the approved background with actual snapshot fields and provider-supplied subject/slab artwork. Slab photos use contain sizing; missing artwork gets a truthful unavailable state. A selection is labeled SLAB; confirmed ownership uses COLLECTED only when the snapshot records that state. A won position alone does not mean a collectible was received.
+The server template combines the approved background with actual snapshot fields and provider-supplied subject/slab artwork. Slab photos use contain sizing; missing artwork gets a truthful unavailable state. A selection is labeled SLAB while open and SLAB WON on a winning position; confirmed ownership uses COLLECTED only when the snapshot records that state. A won position alone does not mean a collectible was received.
 
 Open shares say payout if correct; finalized states use their own labels. Per the final user direction, exports omit currency/environment qualifiers, fee notes, capture time and receipt footnotes. Amounts retain the dollar symbol; average entry rounds to exactly two decimals using exact arithmetic. Snapshot data retains its original precision, environment and fee semantics. Financial figures, costs, average entry and shares come from the snapshot rather than the reference image.
 
@@ -177,7 +177,7 @@ Open shares say payout if correct; finalized states use their own labels. Per th
 - **Do** preserve the canonical split-slab proportions and the header, footer, and watermark roles.
 - **Do** use Inter, tabular figures, graphite surfaces, and ice-blue interaction accents.
 - **Do** contain the full share preview and selected slab photo without cropping.
-- **Do** keep state labels accurate, use SLAB for selections, and reserve COLLECTED for confirmed receipts. Keep export copy concise.
+- **Do** use SLAB while open, SLAB WON for winning selections, and COLLECTED for confirmed receipts. Keep export copy concise.
 - **Do** preserve provider truth, practice/test labels, and concise recoverable errors.
 
 ### Don't:

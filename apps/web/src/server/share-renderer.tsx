@@ -252,7 +252,11 @@ export function ShareCard({
             size={17}
             style={{ justifyContent: "center" }}
           >
-            {s.slab.role === "collected" ? "COLLECTED" : "SLAB"}
+            {s.slab.role === "collected"
+              ? "COLLECTED"
+              : s.state === "won"
+                ? "SLAB WON"
+                : "SLAB"}
           </Line>
           {s.slab.frontImage ? (
             <img
