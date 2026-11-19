@@ -156,9 +156,15 @@ export function MarketApp({
     useState<MarketStatusFilter>("active");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setSearch(params.get("q") ?? "");
-    if (params.get("category") === "live") setCategory("Live");
+    const syncLocation = () => {
+      const params = new URLSearchParams(window.location.search);
+      setSearch(params.get("q") ?? "");
+      setCategory(params.get("category") === "live" ? "Live" : "All markets");
+      setMarketStatus("active");
+    };
+    syncLocation();
+    window.addEventListener("popstate", syncLocation);
+    return () => window.removeEventListener("popstate", syncLocation);
   }, []);
   useEffect(() => {
     const timer = setTimeout(
