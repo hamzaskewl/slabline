@@ -76,7 +76,6 @@ export type DemoCollectible = {
   unsignedBase64?: string;
   rewardPositionId?: string;
   topUp?: string;
-  payment?: { network: "devnet" | "mainnet"; mint: string; recipient: string };
   paymentConfirmedAt?: string;
   valuation?: Valuation | null;
   listing?: Listing;
@@ -87,7 +86,6 @@ export type DemoAccountView = {
   positions: DemoPosition[];
   collectibles: DemoCollectible[];
   history?: { time: string; value: string }[];
-  rewardTopUpEnabled?: boolean;
 };
 
 export const activeDemoPosition = (p: Pick<DemoPosition, "state" | "reward">) =>

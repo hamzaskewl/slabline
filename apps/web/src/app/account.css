@@ -939,42 +939,6 @@
   color: var(--muted);
   font-size: 12px;
 }
-.reward-wallet-funding {
-  width: 100%;
-  min-width: 0;
-  margin: 12px 0;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  font-size: 12px;
-}
-.reward-wallet-funding p {
-  margin: 0 0 10px;
-}
-.reward-funding-address,
-.reward-funding-balance {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.reward-funding-address code,
-.reward-payment-recipient code {
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
-.reward-funding-address code {
-  flex: 1 1 180px;
-}
-.reward-funding-balance {
-  margin-top: 10px;
-  color: var(--muted);
-}
-.reward-payment-recipient {
-  width: 100%;
-  font-size: 12px;
-}
 .embedded-checkout .reward-checkout-actions {
   margin-top: 12px;
 }

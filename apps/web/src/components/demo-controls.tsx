@@ -22,10 +22,9 @@ import { CardValue } from "./card-value";
 import { PortfolioOverview } from "./portfolio-overview";
 import { WalletCollection } from "./wallet-collection";
 import { usePrivateRead } from "@/lib/use-private-read";
-import { usd, usdc } from "@/lib/utils";
+import { usd } from "@/lib/utils";
 import { useNetwork } from "./network-settings";
 import { Button } from "./ui/button";
-import { RewardWalletFunding } from "./reward-wallet-funding";
 
 export function useDemoAction() {
   const auth = usePrivy(),
@@ -712,18 +711,11 @@ export function DemoMintActions({
     <div className="demo-mint-actions">
       {units(view.topUp ?? "0") > 0n &&
         ["reserved", "prepared"].includes(view.state) && (
-          <RewardWalletFunding
-            wallet={view.wallet}
-            verified={true}
-            amount={view.topUp!}
-          />
+          <p role="status">
+            This selection needs a marketplace purchase from your wallet. Remove
+            it to choose an in-budget demo reward.
+          </p>
         )}
-      {view.payment && units(view.topUp ?? "0") > 0n && (
-        <details className="reward-payment-recipient">
-          <summary>Payment destination</summary>
-          <code>{view.payment.recipient}</code>
-        </details>
-      )}
       {!wallet && (
         <Button
           variant="outline"
@@ -753,7 +745,7 @@ export function DemoMintActions({
       {["reserved", "prepared"].includes(view.state) && (
         <Button
           size="sm"
-          disabled={a.busy || !wallet}
+          disabled={a.busy || !wallet || units(view.topUp ?? "0") > 0n}
           onClick={() =>
             void a.run(async () => {
               const prepared = await a.request<DemoCollectible>({
@@ -784,7 +776,7 @@ export function DemoMintActions({
           }
         >
           {units(view.topUp ?? "0") > 0n
-            ? `Pay ${usdc(view.topUp!)} test USDC & mint`
+            ? "Purchase unavailable"
             : "Mint to wallet"}
         </Button>
       )}
