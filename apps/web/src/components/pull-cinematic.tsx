@@ -57,6 +57,7 @@ export function PullCinematic({
   onClose: (choose?: boolean) => void;
 }) {
   const title = useRef<HTMLHeadingElement>(null);
+  const walletPhase = opening?.state === "pending";
   const budget = opening?.state === "ready" ? opening.budget : null;
   const [stage, setStage] = useState<"pack" | "theme" | "budget" | "done">(
     "pack",
@@ -89,17 +90,29 @@ export function PullCinematic({
   return (
     <Dialog.Root
       open
+      modal={!walletPhase}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="pull-cinematic-overlay" />
+        {walletPhase ? (
+          <div
+            className="pull-cinematic-overlay pull-cinematic-wallet-overlay"
+            aria-hidden="true"
+          />
+        ) : (
+          <Dialog.Overlay className="pull-cinematic-overlay" />
+        )}
         <Dialog.Content
           className="pull-cinematic"
           data-stage={showAmount ? "budget" : stage}
           data-skipped={skipped || undefined}
           data-ready={!!budget}
+          onInteractOutside={(event) => {
+            // Privy's approval prompt can be a sibling portal on document.body.
+            if (walletPhase) event.preventDefault();
+          }}
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             title.current?.focus();

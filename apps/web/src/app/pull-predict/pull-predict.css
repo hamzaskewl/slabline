@@ -878,3 +878,7 @@
     animation: none;
   }
 }
+
+.pull-cinematic-wallet-overlay {
+  pointer-events: none;
+}
