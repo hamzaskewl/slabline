@@ -163,11 +163,13 @@ export function DemoSellOrder({
           ? "Log in to sell"
           : a.busy
             ? "Selling…"
-            : snapshot.isPending
-              ? "Loading position…"
-              : !position
-                ? `No ${side === "yes" ? "Yes" : "No"} shares to sell`
-                : `Sell ${side === "yes" ? "Yes" : "No"}`}
+            : a.network !== "devnet"
+              ? "Selling unavailable"
+              : snapshot.isPending
+                ? "Loading position…"
+                : !position
+                  ? "No shares to sell"
+                  : `Sell ${side === "yes" ? "Yes" : "No"}`}
       </Button>
       {receipt && (
         <p className="sale-receipt" role="status">

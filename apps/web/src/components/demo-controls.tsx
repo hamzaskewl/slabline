@@ -734,7 +734,7 @@ export function MarketPositionStatus({
           <dt>{position.state === "open" ? "Shares held" : "Shares"}</dt>
           <dd>
             {Number(position.quantity).toLocaleString("en-US", {
-              maximumFractionDigits: 6,
+              maximumFractionDigits: 2,
             })}
           </dd>
         </div>
@@ -755,7 +755,7 @@ export function MarketPositionStatus({
       {position.grailHolding ? (
         <p>
           {Number(position.grailHolding.quantity).toLocaleString("en-US", {
-            maximumFractionDigits: 6,
+            maximumFractionDigits: 2,
           })}{" "}
           {position.grailHolding.symbol} received · devnet rehearsal
         </p>
