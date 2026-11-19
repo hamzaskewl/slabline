@@ -6,6 +6,7 @@ export default async function Page({
   params: Promise<{ id: string }>;
   searchParams: Promise<{
     side?: string;
+    trade?: string;
     outcome?: string;
     contract?: string;
     stake?: string;
@@ -25,6 +26,7 @@ export default async function Page({
           ? query.stake
           : "25"
       }
+      initialTrade={query.trade === "sell" ? "sell" : "buy"}
       initialSide={query.side === "no" ? "no" : "yes"}
       initialOutcome={Number.isInteger(outcome) && outcome >= 0 ? outcome : 0}
     />

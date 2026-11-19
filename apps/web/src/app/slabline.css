@@ -738,3 +738,164 @@ input {
     align-items: flex-start;
   }
 }
+
+/* Trading uses one ticket for both directions. */
+.trade-mode-tabs {
+  display: flex;
+  gap: 22px;
+  margin: 20px 0 18px;
+  border-bottom: 1px solid var(--rule);
+}
+.trade-mode-tabs button {
+  padding: 0 0 10px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-size: 16px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.trade-mode-tabs button[aria-pressed="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--lime);
+}
+.trade-mode-tabs button:focus-visible,
+.sell-presets button:focus-visible,
+.sell-amount input:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 4px;
+}
+.sell-order {
+  margin-top: 28px;
+  min-width: 0;
+}
+.sell-amount {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.sell-amount label,
+.sell-amount > span {
+  font-size: 16px;
+  font-weight: 600;
+}
+.sell-amount input,
+.sell-amount > strong {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  text-align: right;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 650;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.sell-amount input:disabled {
+  opacity: 1;
+  color: var(--muted);
+}
+.sell-presets {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 16px 0 26px;
+}
+.sell-presets button {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--slabline-raised);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sell-presets button[aria-pressed="true"]:not(:disabled) {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+.sell-presets button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.sale-return {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 0;
+  border-top: 1px solid var(--rule);
+}
+.sale-return-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 650;
+}
+.sale-return-label .slabline-mark {
+  color: var(--green);
+  flex: none;
+}
+.sale-average {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.sale-return > strong {
+  color: var(--green);
+  font-size: 32px;
+  line-height: 1.15;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.prediction-surface .ticket-action.trade-sell-submit {
+  width: 100%;
+  min-height: 46px;
+  margin: 8px 0 0;
+  border-radius: 8px;
+  background: var(--lime);
+  color: var(--paper);
+  font-size: 15px;
+  font-weight: 650;
+}
+.prediction-surface .ticket-action.trade-sell-submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.sale-receipt {
+  margin: 14px 0 0;
+  color: var(--green);
+  font-size: 14px;
+}
+.sale-error {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.sale-error[role="alert"] {
+  color: var(--red);
+}
+.ticket-held-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.ticket-held-summary > :last-child {
+  margin-left: auto;
+}
