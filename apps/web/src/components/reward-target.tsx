@@ -145,7 +145,7 @@ export function RewardTarget({
             })}{" "}
             <span>USDC</span>
           </div>
-          <CardValue valuation={card.valuation} />
+          <CardValue valuation={card.valuation} ask={card.ask} />
           <span className={`reward-fit ${covered ? "covered" : ""}`}>
             {covered
               ? "Within estimated payout"

@@ -129,21 +129,26 @@ export function RewardBrowser({
             <div className="reward-browser-results" aria-live="polite">
               {visible.length ? (
                 visible.map((c) => (
-                  <button
+                  <div
                     className="reward-browser-card"
                     key={c.mint}
-                    onClick={() => {
-                      onSelect(c.mint);
-                      setOpen(false);
-                    }}
-                    aria-label={`Choose ${c.name}`}
-                    aria-pressed={c.mint === selected?.mint}
+                    data-selected={c.mint === selected?.mint}
                   >
+                    <button
+                      type="button"
+                      className="reward-browser-select"
+                      onClick={() => {
+                        onSelect(c.mint);
+                        setOpen(false);
+                      }}
+                      aria-label={`Choose ${c.name}`}
+                      aria-pressed={c.mint === selected?.mint}
+                    />
                     <CardImage src={c.frontImage} alt={c.name} />
                     <span className="reward-browser-card-copy">
                       <strong>{c.name}</strong>
                       <span>Team on card: {cardTeam(c) ?? "Not verified"}</span>
-                      <CardValue valuation={c.valuation} />
+                      <CardValue valuation={c.valuation} ask={c.ask} />
                       <span className="reward-browser-price">
                         {usd(c.ask)} USDC
                       </span>
@@ -155,7 +160,7 @@ export function RewardBrowser({
                             : "Above estimated payout"}
                       </span>
                     </span>
-                  </button>
+                  </div>
                 ))
               ) : (
                 <div className="reward-browser-empty">
