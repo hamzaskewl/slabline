@@ -13,6 +13,7 @@
     "@metaplex-foundation/mpl-core": "^1.10.0",
     "@metaplex-foundation/umi": "^1.6.0",
     "@metaplex-foundation/umi-bundle-defaults": "^1.6.0",
+    "@solana-program/token": "^0.18.0",
     "@solana/kit": "latest",
     "viem": "^2.57.19",
     "zod": "latest"

@@ -58,6 +58,7 @@ export type DemoPosition = {
     state: "available" | "allocated" | "claimed";
     cardSpend: string;
     remainder: string;
+    topUp?: string;
   };
 };
 export type DemoCollectible = {
@@ -74,6 +75,9 @@ export type DemoCollectible = {
   signature?: string;
   unsignedBase64?: string;
   rewardPositionId?: string;
+  topUp?: string;
+  payment?: { network: "devnet" | "mainnet"; mint: string; recipient: string };
+  paymentConfirmedAt?: string;
   valuation?: Valuation | null;
   listing?: Listing;
   confirmedAt?: string;
@@ -83,6 +87,7 @@ export type DemoAccountView = {
   positions: DemoPosition[];
   collectibles: DemoCollectible[];
   history?: { time: string; value: string }[];
+  rewardTopUpEnabled?: boolean;
 };
 
 export const activeDemoPosition = (p: Pick<DemoPosition, "state" | "reward">) =>
@@ -131,17 +136,47 @@ export function positionRewardMarket(
 }
 
 /** The minimum rounds UP to the smallest USDC unit, never below 80%. */
-export function rewardAllocation(budget: string, costs: string[]) {
+export function rewardAllocation(
+  budget: string,
+  costs: string[],
+  committedTopUp = "0",
+) {
   const cap = units(budget),
     total = costs.reduce((sum, cost) => sum + units(cost), 0n);
   const minimum = (cap * 80n + 99n) / 100n;
+  const maxTopUp = cap / 20n,
+    maximum = cap + maxTopUp;
+  const committed = units(committedTopUp);
+  const needed = total > cap ? total - cap : 0n;
+  const topUp = needed > committed ? needed : committed;
+  const funded = total - topUp;
   return {
     total: money(total),
     minimum: money(minimum),
-    remainder: money(cap > total ? cap - total : 0n),
-    valid: cap > 0n && total >= minimum && total <= cap,
-    overBudget: total > cap,
+    maximum: money(maximum),
+    maxTopUp: money(maxTopUp),
+    topUp: money(topUp),
+    additionalTopUp: money(topUp - committed),
+    remainder: money(cap > funded ? cap - funded : 0n),
+    valid:
+      cap > 0n &&
+      funded >= minimum &&
+      total <= maximum &&
+      committed >= 0n &&
+      topUp <= maxTopUp &&
+      costs.every((c) => units(c) > 0n),
+    overBudget: total > maximum || topUp > maxTopUp,
   };
+}
+
+/** Pending wallet money is not portfolio value until its atomic transfer lands. */
+export function demoCollectibleValue(
+  card: Pick<DemoCollectible, "cost" | "topUp" | "state">,
+) {
+  return (
+    units(card.cost) -
+    (card.state === "confirmed" ? 0n : units(card.topUp ?? "0"))
+  );
 }
 
 /** A full-position sale uses executable bids, never the last-traded price. */

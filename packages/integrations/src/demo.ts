@@ -19,6 +19,7 @@ import {
   units,
   money,
   rewardAllocation,
+  demoCollectibleValue,
   demoSaleQuote,
   demoPositionContext,
   marketOutcomes,
@@ -31,6 +32,7 @@ import {
 } from "@collectible/domain";
 import { geminiClient } from "./gemini";
 import { attachCachedValuations, attachWalletValuations } from "./valuations";
+import { rewardPaymentConfig } from "./reward-payment";
 
 export class DemoError extends Error {
   constructor(
@@ -104,6 +106,7 @@ export async function demoAccount(userId: string): Promise<DemoAccountView> {
         createdAt: p.createdAt.toISOString(),
       })),
       collectibles: collectibles.map((p) => collectibleView(p)),
+      rewardTopUpEnabled: !!rewardPaymentConfig("devnet"),
     };
     const activeCards = view.collectibles.filter(
       (c) => c.state !== "cancelled",
@@ -119,11 +122,14 @@ export async function demoAccount(userId: string): Promise<DemoAccountView> {
               ? units(p.reward.budget) -
                 activeCards
                   .filter((c) => c.rewardPositionId === p.id)
-                  .reduce((v, c) => v + units(c.cost), 0n)
+                  .reduce(
+                    (v, c) => v + units(c.cost) - units(c.topUp ?? "0"),
+                    0n,
+                  )
               : 0n),
         0n,
       ) +
-      activeCards.reduce((sum, c) => sum + units(c.cost), 0n);
+      activeCards.reduce((sum, c) => sum + demoCollectibleValue(c), 0n);
     const previous = account.data as {
       history?: { time: string; value: string }[];
     };
@@ -527,6 +533,9 @@ export function collectibleView(
     mint: d.mint,
     signature: d.signature,
     rewardPositionId: d.rewardPositionId,
+    topUp: d.topUp,
+    payment: d.payment,
+    paymentConfirmedAt: d.paymentConfirmedAt,
     valuation: d.valuation,
     listing: d.listing,
     confirmedAt: d.confirmedAt,
@@ -628,7 +637,14 @@ export async function cancelDemoCollectible(userId: string, id: string) {
               ...p.reward,
               state: "available",
               cardSpend: money(units(p.reward.cardSpend) - units(data.cost)),
-              remainder: money(units(p.reward.remainder) + units(data.cost)),
+              remainder: money(
+                units(p.reward.remainder) +
+                  units(data.cost) -
+                  units(data.topUp ?? "0"),
+              ),
+              topUp: money(
+                units(p.reward.topUp ?? "0") - units(data.topUp ?? "0"),
+              ),
             },
           },
         })
@@ -655,6 +671,7 @@ export async function allocateDemoReward(
   positionId: string,
   key: string,
   items: Omit<DemoCollectible, "id" | "state">[],
+  expectedTopUp = "0",
 ) {
   return getDb().transaction(async (tx) => {
     await lockedAccount(tx, userId);
@@ -705,15 +722,42 @@ export async function allocateDemoReward(
         throw new DemoError("Card price unavailable.", 409);
       seen.add(item.sourceId);
     }
-    const allocation = rewardAllocation(data.reward.budget, [
-      ...saved.map((r) => (r.data as DemoCollectible).cost),
-      ...items.map((c) => c.cost),
-    ]);
+    const committedTopUp = saved.reduce(
+      (sum, r) => sum + units((r.data as DemoCollectible).topUp ?? "0"),
+      0n,
+    );
+    const allocation = rewardAllocation(
+      data.reward.budget,
+      [
+        ...saved.map((r) => (r.data as DemoCollectible).cost),
+        ...items.map((c) => c.cost),
+      ],
+      money(committedTopUp),
+    );
     if (!allocation.valid)
       throw new DemoError(
         allocation.overBudget
-          ? "Cards exceed your reward budget."
+          ? "Cards exceed your reward plus the 5% wallet limit."
           : `Choose at least ${allocation.minimum} USDC in cards (80% of your win).`,
+        409,
+      );
+    if (units(allocation.additionalTopUp) !== units(expectedTopUp))
+      throw new DemoError(
+        "Your wallet contribution changed. Review the exact extra payment and try again.",
+        409,
+      );
+    const payment =
+      units(allocation.additionalTopUp) > 0n
+        ? rewardPaymentConfig("devnet")
+        : null;
+    if (units(allocation.additionalTopUp) > 0n && !payment)
+      throw new DemoError(
+        "Wallet top-ups are not available yet. Choose cards within your reward budget.",
+        409,
+      );
+    if (payment && items.some((item) => item.wallet === payment.recipient))
+      throw new DemoError(
+        "Use a personal wallet separate from the payment recipient.",
         409,
       );
     await tx.insert(settlements).values({
@@ -722,13 +766,31 @@ export async function allocateDemoReward(
       state: "allocated",
       data: { positionId, ...allocation },
     });
-    for (const [index, item] of items.entries())
+    let remainingBudget =
+      units(data.reward.budget) -
+      saved.reduce((sum, r) => {
+        const c = r.data as DemoCollectible;
+        return sum + units(c.cost) - units(c.topUp ?? "0");
+      }, 0n);
+    for (const [index, item] of items.entries()) {
+      const cost = units(item.cost),
+        contribution = cost < remainingBudget ? cost : remainingBudget;
+      const topUp = cost - contribution;
+      remainingBudget -= contribution;
       await tx.insert(orders).values({
         userId,
         idempotencyKey: `demo:collectible:${userId}:${key}:${index}`,
         state: "reserved",
-        data: { ...item, rewardPositionId: positionId, network: "devnet" },
+        data: {
+          ...item,
+          topUp: money(topUp),
+          payment: topUp > 0n ? payment : undefined,
+          paymentConfirmedAt: undefined,
+          rewardPositionId: positionId,
+          network: "devnet",
+        },
       });
+    }
     await tx
       .update(positions)
       .set({
@@ -739,6 +801,7 @@ export async function allocateDemoReward(
             state: "allocated",
             cardSpend: allocation.total,
             remainder: allocation.remainder,
+            topUp: allocation.topUp,
           },
         },
       })
@@ -777,10 +840,21 @@ export async function finalizeDemoReward(userId: string, orderId: string) {
     const allocation = rewardAllocation(
       data.reward.budget,
       cards.map((r) => (r.data as DemoCollectible).cost),
+      money(
+        cards.reduce(
+          (sum, r) => sum + units((r.data as DemoCollectible).topUp ?? "0"),
+          0n,
+        ),
+      ),
     );
     if (
       !cards.length ||
       cards.some((c) => c.state !== "confirmed") ||
+      units(allocation.additionalTopUp) > 0n ||
+      cards.some((c) => {
+        const d = c.data as DemoCollectible;
+        return units(d.topUp ?? "0") > 0n && !d.paymentConfirmedAt;
+      }) ||
       !allocation.valid
     )
       return;
@@ -807,6 +881,7 @@ export async function finalizeDemoReward(userId: string, orderId: string) {
             state: "claimed",
             cardSpend: allocation.total,
             remainder: allocation.remainder,
+            topUp: allocation.topUp,
           },
         },
       })

@@ -21,7 +21,11 @@ import {
 } from "@solana/kit";
 import { createPublicKey, verify, timingSafeEqual } from "node:crypto";
 import { getDb, orders, walletLinks, eq, and, sql } from "@collectible/db";
-import type { DemoCollectible } from "@collectible/domain";
+import { units, type DemoCollectible } from "@collectible/domain";
+import {
+  rewardPaymentSources,
+  rewardPaymentInstructions,
+} from "./reward-payment";
 import { solanaRpc } from "./solana";
 import { DemoError, collectibleView, finalizeDemoReward } from "./demo";
 const CORE = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d";
@@ -64,6 +68,11 @@ export async function buildDemoMint(
   name: string,
   uri: string,
   lifetime?: { blockhash: string; lastValidBlockHeight: bigint },
+  topUp?: {
+    amount: string;
+    payment: NonNullable<DemoCollectible["payment"]>;
+    sources: { address: string; amount: bigint }[];
+  },
 ) {
   const latest =
     lifetime ??
@@ -76,12 +85,25 @@ export async function buildDemoMint(
     .use(mplCore())
     .use(signerIdentity(createNoopSigner(publicKey(wallet))));
   const asset = generateSigner(umi);
-  const transaction = await create(umi, {
+  if (topUp && topUp.payment.network !== "devnet")
+    throw new DemoError("Demo rewards only accept Devnet test USDC.");
+  let builder = create(umi, {
     asset,
     owner: publicKey(wallet),
     name: name.slice(0, 64),
     uri,
-  })
+  });
+  if (topUp)
+    builder = builder.add(
+      await rewardPaymentInstructions(
+        umi,
+        wallet,
+        topUp.amount,
+        topUp.payment,
+        topUp.sources,
+      ),
+    );
+  const transaction = await builder
     .setBlockhash({
       blockhash: latest.blockhash,
       lastValidBlockHeight: Number(latest.lastValidBlockHeight),
@@ -144,7 +166,26 @@ export async function prepareDemoMint(userId: string, id: string) {
   }
   if (row.state !== "reserved") return collectibleView(row);
   const uri = `${process.env.APP_URL ?? "http://localhost:3000"}/api/demo/metadata/${row.id}`;
-  const prepared = await buildDemoMint(d.wallet, d.name, uri);
+  let topUp: Parameters<typeof buildDemoMint>[4];
+  if (units(d.topUp ?? "0") > 0n) {
+    if (!d.payment || d.payment.network !== "devnet")
+      throw new DemoError("Reward payment configuration is unavailable.", 409);
+    try {
+      topUp = {
+        amount: d.topUp!,
+        payment: d.payment,
+        sources: await rewardPaymentSources(d.wallet, d.topUp!, d.payment),
+      };
+    } catch (error) {
+      throw new DemoError(
+        error instanceof Error
+          ? error.message
+          : "Wallet funds are unavailable.",
+        409,
+      );
+    }
+  }
+  const prepared = await buildDemoMint(d.wallet, d.name, uri, undefined, topUp);
   const [updated] = await getDb()
     .update(orders)
     .set({ state: "prepared", data: { ...d, ...prepared } })
@@ -241,7 +282,13 @@ export async function checkDemoMint(userId: string, id: string) {
       .update(orders)
       .set({
         state: "confirmed",
-        data: { ...d, confirmedAt: new Date().toISOString() },
+        data: {
+          ...d,
+          confirmedAt: new Date().toISOString(),
+          ...(units(d.topUp ?? "0") > 0n
+            ? { paymentConfirmedAt: new Date().toISOString() }
+            : {}),
+        },
       })
       .where(
         and(

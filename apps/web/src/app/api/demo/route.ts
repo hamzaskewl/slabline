@@ -79,6 +79,10 @@ const bodySchema = z.discriminatedUnion("action", [
     id,
     key: id,
     wallet: z.string().min(32).max(44),
+    expectedTopUp: z
+      .string()
+      .regex(/^\d+(\.\d{1,6})?$/)
+      .default("0"),
     items: z
       .array(
         z.object({
@@ -335,7 +339,7 @@ export async function POST(request: Request) {
           );
         items.push(item);
       }
-      await allocateDemoReward(user.id, b.id, b.key, items);
+      await allocateDemoReward(user.id, b.id, b.key, items, b.expectedTopUp);
     }
     if (b.action === "collect") {
       throw new ApiError(

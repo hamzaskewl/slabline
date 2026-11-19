@@ -6,6 +6,7 @@ import { useModalStatus } from "@privy-io/react-auth";
 import {
   cardPlayer,
   units,
+  rewardAllocation,
   type DemoPosition,
   type Listing,
   type GrailToken,
@@ -239,7 +240,8 @@ function PositionRewardsContent({
               {preview
                 ? `Potential reward: ${usd(position.quantity)}.`
                 : `Reward budget: ${usd(position.reward?.budget ?? position.payout ?? "0")}.`}{" "}
-              Choose cards totaling 80–100% of the reward.
+              Choose at least 80% in cards. You can add up to 5% from your
+              wallet.
             </p>
             {inventory.isPending && (
               <p role="status">Loading matching cards…</p>
@@ -396,9 +398,11 @@ export function PositionRewardCatalog({
                   />
                 ) : (
                   <span className="claim-card-budget">
-                    {units(card.ask) > units(budget)
-                      ? "Above reward budget"
-                      : "Within reward budget"}
+                    {rewardAllocation(budget, [card.ask]).overBudget
+                      ? "Above 5% limit"
+                      : units(card.ask) > units(budget)
+                        ? `${usd(Number(card.ask) - Number(budget))} extra from wallet`
+                        : "Within reward budget"}
                   </span>
                 )}
               </div>

@@ -263,7 +263,7 @@ test.skipIf(!process.env.DATABASE_URL)(
       );
       await rejects(
         allocateDemoReward(a, p.id, rewardKey, [
-          { ...card, cost: String(budget + 1) },
+          { ...card, cost: String(budget * 1.05 + 1) },
         ]),
         "exceed",
       );
