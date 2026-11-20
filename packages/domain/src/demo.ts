@@ -113,7 +113,7 @@ export function demoPositionContext(market: Market, contract: Contract) {
     rewardMarket: outcomeRewardMarket(market, contract),
     artwork: artwork.length
       ? artwork
-      : market.contracts.length === 1 && market.imageUrl
+      : market.imageUrl
         ? [{ src: market.imageUrl, label: market.title }]
         : [],
   };
