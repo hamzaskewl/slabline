@@ -16,8 +16,9 @@ export function UsdcIcon() {
 export function UsdcAmount({ value }: { value: string | number }) {
   return (
     <span className="usdc-amount">
-      <UsdcIcon />
       {Number(value).toLocaleString("en-US", {
+        style: "currency",
+        currency: "USD",
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}

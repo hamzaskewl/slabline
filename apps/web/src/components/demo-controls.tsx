@@ -22,6 +22,7 @@ import { PositionRewards } from "./position-rewards";
 import { PositionShare } from "./position-share";
 import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
+import { CollectibleActions } from "./collectible-actions";
 import { PortfolioOverview } from "./portfolio-overview";
 import { WalletCollection } from "./wallet-collection";
 import { usePrivateRead } from "@/lib/use-private-read";
@@ -301,17 +302,6 @@ export function DemoPortfolio({
         <section className="portfolio-holdings panel">
           <div className="holdings-toolbar">
             <h2>All holdings</h2>
-            <button
-              className="text-button"
-              disabled={a.busy || snapshot.isFetching}
-              onClick={() =>
-                void a.run(async () => {
-                  await a.request({ action: "refresh" });
-                })
-              }
-            >
-              Refresh
-            </button>
           </div>
           <HoldingSection
             title="Grail holdings"
@@ -428,16 +418,14 @@ export function DemoPortfolio({
                       </span>
                     </div>
                     <div className="collection-actions">
-                      {c.state === "confirmed" && c.mint ? (
-                        <a
-                          className="text-link"
-                          href={`https://explorer.solana.com/address/${c.mint}?cluster=devnet`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          View asset <ArrowUpRight size={15} />
-                        </a>
-                      ) : (
+                      <CollectibleActions
+                        href={
+                          c.state === "confirmed" && c.mint
+                            ? `https://explorer.solana.com/address/${c.mint}?cluster=devnet`
+                            : undefined
+                        }
+                      />
+                      {!(c.state === "confirmed" && c.mint) && (
                         <DemoMintActions item={c} />
                       )}
                     </div>

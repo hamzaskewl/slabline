@@ -484,7 +484,9 @@ export function MarketApp({
           className={section === "portfolio" ? "portfolio-page" : undefined}
         >
           {section !== "markets" && !replay && !pull ? (
-            <div className="page-heading">
+            <div
+              className={`page-heading${section === "profile" ? " profile-page-heading" : ""}`}
+            >
               <div>
                 <h1>
                   {section === "rewards"
@@ -498,6 +500,9 @@ export function MarketApp({
                           : "Physical redemption"}
                 </h1>
               </div>
+              {section === "profile" && status.data?.privyConfigured && (
+                <AuthButton />
+              )}
             </div>
           ) : null}
           {notice ? (

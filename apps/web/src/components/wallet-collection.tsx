@@ -3,6 +3,7 @@ import { useSlablineAuth } from "./sign-in-dialog";
 import { Select } from "./ui/select";
 import { CardImage } from "./card-image";
 import { CardValue } from "./card-value";
+import { CollectibleActions } from "./collectible-actions";
 import { useWalletPreference } from "./wallet-preferences";
 import Link from "next/link";
 
@@ -155,14 +156,9 @@ export function WalletCollection({
                     <CardImage src={a.imageUrl} alt={a.name} />
                     <h3>{a.name}</h3>
                     <CardValue valuation={a.valuation} />
-                    <a
-                      className="text-link"
-                      target="_blank"
-                      rel="noreferrer"
+                    <CollectibleActions
                       href={`https://explorer.solana.com/address/${a.mint}${links.data?.network === "devnet" ? "?cluster=devnet" : ""}`}
-                    >
-                      View on Solana
-                    </a>
+                    />
                   </article>
                 ))}
               </div>
