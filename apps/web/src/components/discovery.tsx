@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Bookmark, ChevronDown, Radio, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   buyPercent,
   eventVolume,
@@ -104,7 +104,9 @@ export function Discovery({
       [...catalog, ...markets]
         .map((m) => m.category)
         .filter((c) => c !== "Live")
-        .sort(),
+        .sort((a, b) =>
+          a === "Sports" ? -1 : b === "Sports" ? 1 : a.localeCompare(b),
+        ),
     ),
   ];
   const leagues = [
@@ -188,13 +190,19 @@ export function Discovery({
       <section className="discovery-content" aria-label="Browse markets">
         <nav className="phone-categories" aria-label="Market categories">
           {categories.map((c) => (
-            <button
-              key={c}
-              aria-pressed={category === c}
-              onClick={() => changeCategory(c)}
-            >
-              {c === "All markets" ? "All" : c === "Live" ? <LiveBadge /> : c}
-            </button>
+            <Fragment key={c}>
+              <button
+                aria-pressed={category === c}
+                onClick={() => changeCategory(c)}
+              >
+                {c === "All markets" ? "All" : c === "Live" ? <LiveBadge /> : c}
+              </button>
+              {c === "All markets" && (
+                <Link href="/pull-predict" className="phone-pull-link">
+                  Pull &amp; Predict
+                </Link>
+              )}
+            </Fragment>
           ))}
           <button onClick={onPractice}>Practice</button>
         </nav>

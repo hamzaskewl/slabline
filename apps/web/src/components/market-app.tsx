@@ -75,6 +75,7 @@ import { retainMarketSnapshot } from "@/lib/market-snapshot";
 import { SnapshotStatus } from "./snapshot-status";
 import { MarketArt } from "./market-art";
 import { useNetwork } from "./network-settings";
+import { MobileBackButton } from "./mobile-back-button";
 import { LocalLimitOrder } from "./local-limit-order";
 const DemoOrder = dynamic(
   () => import("./demo-controls").then((m) => m.DemoOrder),
@@ -326,6 +327,7 @@ export function MarketApp({
       <div className="app-main">
         <header className="exchange-header">
           <div className="exchange-header-main">
+            <MobileBackButton />
             <Link href="/" className="exchange-brand">
               <SlablineMark />
               <span>Slabline</span>
@@ -1428,12 +1430,8 @@ function CardTile({ card, eager = false }: { card: Listing; eager?: boolean }) {
         )}
         <div className="card-price card-price-row">
           <div>
-            <small className="listing-ask-label">
-              Listing ask <UsdcIcon />
-            </small>
-            <strong>
-              <UsdcAmount value={card.ask} />
-            </strong>
+            <small className="listing-ask-label">Listing ask</small>
+            <strong>{usd(card.ask)}</strong>
           </div>
           <CardValue valuation={card.valuation} ask={card.ask} />
         </div>

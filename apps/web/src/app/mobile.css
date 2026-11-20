@@ -1,5 +1,6 @@
 .phone-tabs,
 .phone-categories,
+.mobile-back-button,
 .mobile-wallet-actions {
   display: none;
 }
@@ -19,6 +20,23 @@
     min-height: 52px;
     padding-inline: max(14px, env(safe-area-inset-left))
       max(14px, env(safe-area-inset-right));
+  }
+  .app-shell .mobile-back-button {
+    display: grid;
+    place-items: center;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .mobile-back-button:focus-visible {
+    outline: 2px solid #80c9ff;
+    outline-offset: -2px;
+    border-radius: 8px;
   }
   .app-shell .exchange-header .exchange-navigation,
   .exchange-header .mobile-menu,
@@ -99,7 +117,8 @@
     scrollbar-width: none;
     padding: 0 0 6px;
   }
-  .phone-categories button {
+  .phone-categories button,
+  .phone-categories a {
     border-radius: 18px;
     flex: none;
     background: transparent;
@@ -107,6 +126,15 @@
     padding: 6px 12px;
     min-height: 44px;
     font-size: 13px;
+  }
+  .phone-categories a {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .phone-categories .phone-pull-link {
+    color: #b1ddff;
   }
   .phone-categories button[aria-pressed="true"] {
     background: #202830;
@@ -212,9 +240,18 @@
     font-size: max(16px, 1em);
   }
   .phone-tabs button:focus-visible,
-  .phone-categories button:focus-visible {
+  .phone-categories button:focus-visible,
+  .phone-categories a:focus-visible {
     outline: 2px solid #7cd5ff;
     outline-offset: -2px;
+  }
+}
+@media (max-width: 480px) {
+  .app-shell .exchange-header-main:has(.mobile-back-button) {
+    gap: 8px;
+  }
+  .exchange-header-main:has(.mobile-back-button) .exchange-brand > span {
+    display: none;
   }
 }
 @media (display-mode: standalone) {

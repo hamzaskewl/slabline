@@ -3,6 +3,7 @@
 import { api } from "@/lib/trpc";
 import {
   activeMarket,
+  canonicalPullTheme,
   availablePullTeams,
   matchesPullTheme,
   marketMatches,
@@ -17,8 +18,6 @@ import { useMarketClock } from "@/lib/use-market-clock";
 import { retainMarketSnapshot } from "@/lib/market-snapshot";
 
 export function usePullCatalog(theme: PullTheme, search = "") {
-  const text = pullSearchQuery(theme, search);
-  const [query, setQuery] = useState(text);
   const now = useMarketClock();
   const base = api.markets.useQuery(
     { search: "", status: "active" },
@@ -31,6 +30,12 @@ export function usePullCatalog(theme: PullTheme, search = "") {
         ),
     },
   );
+  const baseTheme = useMemo(
+    () => canonicalPullTheme(theme, base.data?.data ?? []),
+    [theme, base.data],
+  );
+  const text = pullSearchQuery(baseTheme, search);
+  const [query, setQuery] = useState(text);
   useEffect(() => {
     const timer = setTimeout(() => setQuery(text), 250);
     return () => clearTimeout(timer);
@@ -58,6 +63,14 @@ export function usePullCatalog(theme: PullTheme, search = "") {
   const delayed = available
     ? !!(result.data?.stale || result.data?.error || result.error)
     : baseAvailable && !!(base.data?.stale || base.data?.error || base.error);
+  const resolvedTheme = useMemo(
+    () =>
+      canonicalPullTheme(theme, [
+        ...(baseAvailable ? (base.data?.data ?? []) : []),
+        ...(available ? (result.data?.data ?? []) : []),
+      ]),
+    [theme, baseAvailable, available, base.data, result.data],
+  );
   const markets = useMemo(
     () =>
       sortMarkets(
@@ -74,15 +87,24 @@ export function usePullCatalog(theme: PullTheme, search = "") {
             !!market.ticker &&
             (market.outcomeCount ?? market.contracts.length) > 0 &&
             (!market.closesAt || Date.parse(market.closesAt) > now) &&
-            matchesPullTheme(market, theme) &&
+            matchesPullTheme(market, resolvedTheme) &&
             (!search || marketMatches(market, search)),
         ),
         "volume",
       ),
-    [available, baseAvailable, base.data, result.data, theme, search, now],
+    [
+      available,
+      baseAvailable,
+      base.data,
+      result.data,
+      resolvedTheme,
+      search,
+      now,
+    ],
   );
   return {
     ...result,
+    theme: resolvedTheme,
     markets,
     teams: useMemo(
       () =>

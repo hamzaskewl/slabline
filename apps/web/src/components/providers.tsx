@@ -5,6 +5,7 @@ import { httpLink } from "@trpc/client";
 import { api } from "@/lib/trpc";
 import { NetworkProvider } from "./network-settings";
 import { WalletPreferencesProvider } from "./wallet-preferences";
+import { BackNavigationProvider } from "./mobile-back-button";
 import dynamic from "next/dynamic";
 const AuthProvider = dynamic(() => import("./auth-provider"), { ssr: false });
 const RewardSelectionProvider = dynamic(
@@ -36,10 +37,16 @@ export function Providers({ children }: { children: ReactNode }) {
     </api.Provider>
   );
   return (
-    <NetworkProvider>
-      <WalletPreferencesProvider>
-        {appId ? <AuthProvider appId={appId}>{content}</AuthProvider> : content}
-      </WalletPreferencesProvider>
-    </NetworkProvider>
+    <BackNavigationProvider>
+      <NetworkProvider>
+        <WalletPreferencesProvider>
+          {appId ? (
+            <AuthProvider appId={appId}>{content}</AuthProvider>
+          ) : (
+            content
+          )}
+        </WalletPreferencesProvider>
+      </NetworkProvider>
+    </BackNavigationProvider>
   );
 }

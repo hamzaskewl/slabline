@@ -123,7 +123,7 @@ export function PullBoard({
             {action(
               {
                 tier,
-                theme: canonicalPullTheme(theme, catalog.markets),
+                theme: catalog.theme,
                 edition: ((rotation % packCount) + packCount) % packCount,
                 artwork,
               },
@@ -147,7 +147,7 @@ export function PullBoard({
                 <PullMarketCards
                   key={`${theme.kind}:${theme.label}`}
                   markets={catalog.markets}
-                  theme={theme}
+                  theme={catalog.theme}
                 />
               )}
               {catalog.delayed && !catalog.searching && (

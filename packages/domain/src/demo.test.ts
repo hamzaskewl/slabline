@@ -50,44 +50,48 @@ test("sales use bids for the selected side and reject unavailable depth", () => 
   ).toThrow("Not enough buyers");
 });
 
-test("sale previews cap oversized requests to holdings and available buyers", () => {
-  const book = {
-    ...DEMO_REPLAY.book,
-    bids: [
-      { price: "0.20", quantity: "100" },
-      { price: "0.10", quantity: "150" },
-    ],
-  };
-  expect(
-    demoSalePreview({ side: "yes", quantity: "225" }, book, "999"),
-  ).toEqual({
-    maximum: "225.000000",
-    quantity: "225.000000",
-    proceeds: "32.500000",
-  });
-  expect(demoSalePreview({ side: "yes", quantity: "300" }, book)).toEqual({
-    maximum: "250.000000",
-    quantity: "250.000000",
-    proceeds: "35.000000",
-  });
-  expect(
-    demoSalePreview({ side: "yes", quantity: "300" }, book, "25").proceeds,
-  ).toBe("5.000000");
-  const thinner = { ...book, bids: [{ price: "0.20", quantity: "80" }] };
-  expect(
-    demoSalePreview({ side: "yes", quantity: "300" }, thinner, "250"),
-  ).toEqual({
-    maximum: "80.000000",
-    quantity: "80.000000",
-    proceeds: "16.000000",
-  });
-  // Execution remains strict if depth changes after the displayed quote.
-  expect(() =>
-    demoSaleQuote({ side: "yes", quantity: "250" }, thinner),
-  ).toThrow("Not enough buyers");
+test("sale Max uses the entire holding and quotes across bid levels", () => {
+  for (const side of ["yes", "no"] as const) {
+    const levels = [
+      { price: "0.20", quantity: "50" },
+      { price: "0.10", quantity: "50" },
+    ];
+    const book = {
+      ...DEMO_REPLAY.book,
+      bids: levels,
+      asks: levels.map((l) => ({ ...l, price: String(1 - Number(l.price)) })),
+    };
+    expect(demoSalePreview({ side, quantity: "79" }, book)).toEqual({
+      maximum: "79.000000",
+      available: "79.000000",
+      quantity: "79.000000",
+      proceeds: "12.900000",
+    });
+    expect(demoSaleQuote({ side, quantity: "79" }, book)).toBe("12.900000");
+    const thin = {
+      ...book,
+      bids: book.bids.slice(0, 1),
+      asks: book.asks.slice(0, 1),
+    };
+    expect(demoSalePreview({ side, quantity: "79" }, thin, "79")).toEqual({
+      maximum: "79.000000",
+      available: "50.000000",
+      quantity: "79.000000",
+      proceeds: null,
+    });
+    expect(demoSalePreview({ side, quantity: "79" }, thin, "29").proceeds).toBe(
+      "5.800000",
+    );
+    expect(() => demoSaleQuote({ side, quantity: "79" }, thin)).toThrow(
+      "Not enough buyers",
+    );
+    expect(
+      demoSalePreview({ side, quantity: "79" }, book, "999").proceeds,
+    ).toBeNull();
+  }
 });
 
-test("sale capacity uses NO bids, floors each level to its lot and handles no buyers", () => {
+test("sale inputs retain fractional quantities and respect lots and zero-price bids", () => {
   const book = {
     ...DEMO_REPLAY.book,
     quantityIncrement: "0.25",
@@ -97,19 +101,27 @@ test("sale capacity uses NO bids, floors each level to its lot and handles no bu
       { price: "1", quantity: "900" },
     ],
   };
-  expect(demoSalePreview({ side: "no", quantity: "5" }, book, "100")).toEqual({
-    maximum: "2.500000",
-    quantity: "2.500000",
-    proceeds: "0.750000",
+  expect(demoSalePreview({ side: "no", quantity: "5" }, book)).toEqual({
+    maximum: "5.000000",
+    available: "2.500000",
+    quantity: "5.000000",
+    proceeds: null,
+  });
+  expect(demoSalePreview({ side: "no", quantity: "5" }, book, "1.49")).toEqual({
+    maximum: "5.000000",
+    available: "2.500000",
+    quantity: "1.490000",
+    proceeds: null,
   });
   expect(
-    demoSalePreview({ side: "no", quantity: "5" }, book, "1.49").quantity,
-  ).toBe("1.250000");
+    demoSalePreview({ side: "no", quantity: "5" }, book, "1.25").proceeds,
+  ).toBe("0.500000");
   expect(
-    demoSalePreview({ side: "yes", quantity: "225" }, { ...book, bids: [] }),
+    demoSalePreview({ side: "yes", quantity: "79" }, { ...book, bids: [] }),
   ).toEqual({
-    maximum: "0.000000",
-    quantity: "0.000000",
+    maximum: "79.000000",
+    available: "0.000000",
+    quantity: "79.000000",
     proceeds: null,
   });
   expect(
