@@ -40,7 +40,7 @@ export function PositionRewards({
   const { isOpen: walletModalOpen } = useModalStatus();
   useEffect(() => setOpen(false), [a.user?.id, a.network]);
   const label = preview
-    ? "Potential rewards"
+    ? "View rewards"
     : position.reward?.state === "claimed"
       ? "View cards"
       : position.reward?.state === "allocated"
@@ -148,9 +148,7 @@ export function PositionRewardsFrame({
         >
           <header className="position-rewards-header">
             <div>
-              <Dialog.Title>
-                {preview ? "Potential rewards" : label}
-              </Dialog.Title>
+              <Dialog.Title>{preview ? "Rewards" : label}</Dialog.Title>
               <Dialog.Description>
                 {subject} · matching listed cards
               </Dialog.Description>
@@ -251,7 +249,7 @@ function PositionRewardsContent({
                 </div>
               )}
             <p className="claim-budget-note">
-              {preview ? "Potential reward: " : "Reward budget: "}
+              {preview ? "If correct: " : "Reward budget: "}
               <strong>
                 {usd(
                   preview
