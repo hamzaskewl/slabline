@@ -49,6 +49,15 @@ const reviewedCardTeams: Record<string, string> = {
   D7KvTTnk8dMAWhbwLNcR5E5HTnKGfSrz7b8S7HAhsiFn: "Philadelphia 76ers",
 };
 
+// Listing-specific exclusions override player history when the card is not
+// a Lakers card.
+const excludedTeamListings: Record<string, readonly string[]> = {
+  "Los Angeles Lakers": [
+    "F6As6zsDLNaaSoMsvPzqMF7k5WG9jg55mFHoQWM4VsWh",
+    "CdrJym6gEGXR3aKYUJPBz2GHddRawHzDrBeV3BCMDnJ9",
+  ],
+};
+
 export function cardPlayer(card: Listing): string | null {
   return (
     card.player ??
@@ -121,6 +130,7 @@ export function selectedRewardTeam(market: Market) {
 export function teamCardMatch(market: Market, card: Listing) {
   const team = selectedRewardTeam(market);
   if (!team || card.category !== "Basketball") return null;
+  if (excludedTeamListings[team.name]?.includes(card.mint)) return null;
   const player = cardPlayer(card);
   if (cardTeam(card) === team.name)
     return {
