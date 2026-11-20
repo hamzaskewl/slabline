@@ -16,7 +16,7 @@ import { SaleNotification } from "./sale-notification";
 
 const shares = (value: string) =>
   Number(value).toLocaleString("en-US", {
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 6,
     useGrouping: false,
   });
 
@@ -76,19 +76,14 @@ export function DemoSellOrder({
   }
   const saleQuantity = preview?.quantity ?? "0";
   const proceeds = preview?.proceeds ?? null;
-  const maximum = preview?.maximum ?? "0";
-  const adjusted =
-    preview !== null &&
-    /^\d+(\.\d{1,6})?$/.test(quantity) &&
-    units(quantity) !== units(saleQuantity);
-  // Keep edits capped when holdings or bid depth change, including between renders.
-  useEffect(() => {
-    if (adjusted) {
-      setQuantity(saleQuantity);
-      setPreset(saleQuantity === maximum ? 100 : null);
-      key.current = crypto.randomUUID();
-    }
-  }, [adjusted, saleQuantity, maximum]);
+  const quantityError =
+    preview && units(saleQuantity) > units(preview.maximum)
+      ? `You hold ${shares(preview.maximum)} shares.`
+      : preview && units(saleQuantity) > units(preview.available)
+        ? `Bids currently cover ${shares(preview.available)} of your ${shares(saleQuantity)} shares. Wait for more buyers or choose a smaller amount.`
+        : preview && units(saleQuantity) > 0n && proceeds === null
+          ? `Enter shares in increments of ${readyBook?.quantityIncrement}.`
+          : "";
   const average =
     proceeds !== null
       ? usd(money((units(proceeds) * 1000000n) / units(saleQuantity)))
@@ -113,16 +108,14 @@ export function DemoSellOrder({
           inputMode="decimal"
           autoComplete="off"
           value={
-            adjusted
-              ? shares(saleQuantity)
-              : preset === null && /^\d*(\.\d{0,2})?$/.test(quantity)
-                ? quantity
-                : shares(quantity)
+            preset === null && /^\d*(\.\d{0,6})?$/.test(quantity)
+              ? quantity
+              : shares(quantity)
           }
           maxLength={24}
           disabled={a.busy || !position}
           onChange={(event) => {
-            if (!/^\d*(\.\d{0,2})?$/.test(event.target.value)) return;
+            if (!/^\d*(\.\d{0,6})?$/.test(event.target.value)) return;
             setQuantity(event.target.value);
             setPreset(null);
             setReceipt("");
@@ -191,12 +184,17 @@ export function DemoSellOrder({
                 ? "Loading position…"
                 : !position
                   ? "No shares to sell"
-                  : preview && units(preview.maximum) === 0n
+                  : preview && units(preview.available) === 0n
                     ? "No buyers right now"
                     : `Sell ${side === "yes" ? "Yes" : "No"}`}
       </Button>
       {receipt && (
         <SaleNotification message={receipt} onDismiss={() => setReceipt("")} />
+      )}
+      {quantityError && (
+        <p className="sale-error" role="status">
+          {quantityError}
+        </p>
       )}
       {(a.error || snapshot.error || quoteError) && (
         <p className="sale-error" role="alert">

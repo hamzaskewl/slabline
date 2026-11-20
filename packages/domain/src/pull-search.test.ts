@@ -8,6 +8,7 @@ import {
   pullThemeOutcomes,
   pullMarketTitle,
   pullOutcomeLabel,
+  pullPlayerMatches,
   type Market,
 } from "./index";
 
@@ -89,6 +90,64 @@ const contract = (label: string, symbol = label) => ({
   lastPrice: null,
   quantityIncrement: "1",
   priceIncrement: "0.01",
+});
+
+test("player prefixes and a transposed first name resolve to a real catalog player", () => {
+  const football = {
+    ...market,
+    title: "Pro Football MVP",
+    subcategory: "Pro Football",
+    teams: [],
+    contracts: [
+      contract("Josh Allen"),
+      contract("Lamar Jackson"),
+      contract("Patrick Mahomes"),
+    ],
+  };
+  for (const label of ["patrick ma", "patr ma", "partick ma", "Patrick Mahom"])
+    for (const catalog of [[football], [marketPreview(football)]]) {
+      const theme = canonicalPullTheme({ kind: "player", label }, catalog);
+      expect(theme).toEqual({ kind: "player", label: "Patrick Mahomes" });
+      expect(matchesPullTheme(football, theme)).toBe(true);
+      expect(pullThemeOutcomes(football, theme).map((c) => c.label)).toEqual([
+        "Patrick Mahomes",
+      ]);
+    }
+  expect(
+    pullThemeOutcomes(football, { kind: "player", label: "partick ma" }),
+  ).toEqual([]);
+});
+
+test("player search does not combine names or silently choose ambiguous prefixes", () => {
+  const catalog = [
+    {
+      ...market,
+      teams: [],
+      title: "Player award",
+      contracts: [
+        contract("Patrick Mahomes"),
+        contract("Patrick Maroon"),
+        contract("Josh Jacobs"),
+        contract("Keenan Allen"),
+      ],
+    },
+  ];
+  expect(pullPlayerMatches("patrick ma", catalog)).toEqual([
+    "Patrick Mahomes",
+    "Patrick Maroon",
+  ]);
+  expect(
+    canonicalPullTheme({ kind: "player", label: "patrick ma" }, catalog),
+  ).toEqual({ kind: "player", label: "patrick ma" });
+  expect(pullPlayerMatches("josh allen", catalog)).toEqual([]);
+  expect(pullPlayerMatches("p m", catalog)).toEqual([]);
+  expect(pullPlayerMatches("zzzzzz ma", catalog)).toEqual([]);
+  expect(
+    pullPlayerMatches(
+      "partick ma",
+      catalog.map((m) => ({ ...m, category: "Business" })),
+    ),
+  ).toEqual([]);
 });
 
 test("team/player themes are sports-only, while All markets includes other categories", () => {

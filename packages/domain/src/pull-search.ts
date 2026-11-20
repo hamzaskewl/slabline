@@ -38,6 +38,83 @@ function playerAliasPrefix(label: string) {
   ];
   return names.length === 1 ? names[0] : undefined;
 }
+
+function oneNameEdit(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && a[i] === b[i]) i++;
+  if (i === a.length) return b.length - a.length <= 1;
+  if (a.length < b.length) return a.slice(i) === b.slice(i + 1);
+  if (a.length > b.length) return a.slice(i + 1) === b.slice(i);
+  return (
+    a.slice(i + 1) === b.slice(i + 1) ||
+    (a[i] === b[i + 1] &&
+      a[i + 1] === b[i] &&
+      a.slice(i + 2) === b.slice(i + 2))
+  );
+}
+
+/** Resolve partial names from actual sports outcomes, without inventing players. */
+export function pullPlayerMatches(label: string, markets: Market[]): string[] {
+  const query = normalize(label).split(" ");
+  if (normalize(label).length < 3 || query.some((word) => word.length < 2))
+    return [];
+  const matches = new Map<string, { label: string; edits: number }>();
+  const inspect = (market: Market) => {
+    if (!sportsPullMarket(market)) return;
+    const texts = [
+      market.title,
+      market.searchText ?? "",
+      ...market.contracts.map((c) => c.label),
+    ];
+    for (const text of texts) {
+      const words =
+        text
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .match(/[a-z0-9]+/gi) ?? [];
+      for (let start = 0; start <= words.length - query.length; start++) {
+        let edits = 0;
+        for (let offset = 0; offset < query.length; offset++) {
+          const input = query[offset]!;
+          const word = words[start + offset]!.toLowerCase();
+          if (word.startsWith(input)) continue;
+          if (
+            input.length >= 4 &&
+            word.length >= 4 &&
+            (oneNameEdit(input, word) ||
+              oneNameEdit(input, word.slice(0, input.length)))
+          ) {
+            edits++;
+          } else {
+            edits = 2;
+            break;
+          }
+        }
+        if (edits > 1) continue;
+        const name = words
+          .slice(start, start + query.length)
+          .map((word) => word[0]!.toUpperCase() + word.slice(1))
+          .join(" ");
+        const key = normalize(name);
+        const current = matches.get(key);
+        if (!current || edits < current.edits)
+          matches.set(key, { label: name, edits });
+      }
+    }
+    market.children.forEach(inspect);
+  };
+  markets.forEach(inspect);
+  const best = Math.min(...[...matches.values()].map((match) => match.edits));
+  return [...matches.values()]
+    .filter((match) => match.edits === best)
+    .map((match) => match.label);
+}
+
+function uniquePlayerMatch(label: string, markets: Market[]) {
+  const matches = pullPlayerMatches(label, markets);
+  return matches.length === 1 ? matches[0] : undefined;
+}
 const teamAliases = (team: (typeof history.teams)[number]) =>
   [
     team.name,
@@ -86,6 +163,7 @@ export function canonicalPullTheme(
           : (pullTeam(label)?.name ?? label)
         : (playerAliases[normalize(label)] ??
           playerAliasPrefix(label) ??
+          uniquePlayerMatch(label, markets) ??
           label),
   };
 }

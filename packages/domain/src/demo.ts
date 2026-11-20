@@ -186,7 +186,7 @@ export function demoCollectibleValue(
   );
 }
 
-/** Size a sale to the holding and executable selected-side bid depth. */
+/** Keep the requested holding separate from currently executable bid depth. */
 export function demoSalePreview(
   position: Pick<DemoPosition, "side" | "quantity">,
   book: Book,
@@ -201,14 +201,15 @@ export function demoSalePreview(
     0n,
   );
   const held = (units(position.quantity) / lot) * lot;
-  const maximum = held < depth ? held : depth;
-  const wanted = (units(requested) / lot) * lot;
-  const quantity = money(wanted < maximum ? wanted : maximum);
+  const available = held < depth ? held : depth;
+  const wanted = units(requested);
+  const quantity = money(wanted);
   return {
-    maximum: money(maximum),
+    maximum: money(held),
+    available: money(available),
     quantity,
     proceeds:
-      units(quantity) > 0n
+      wanted > 0n && wanted <= available && wanted % lot === 0n
         ? demoSaleQuote({ side: position.side, quantity }, book)
         : null,
   };
