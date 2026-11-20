@@ -25,7 +25,10 @@ Browse real Gemini markets, back a team or player, and see the graded cards an e
 
 **An independent build for the UBC 2026 hackathon, focused on the Gemini Prediction Markets bounty.** Public market data and collectible catalogs are real. Trading and reward rehearsals use an account-backed demo ledger; Solana devnet supports wallet-signed collectibles and verifiable pack randomness. Mainnet Gemini execution, withdrawals, bridging, and collectible purchases remain gated.
 
-`prediction-markets` `collectibles` `gemini` `solana` `magicblock` `consumer-apps` `indie-build`
+**Hackathon entries**
+
+- ✅ **Gemini Prediction Markets** — sponsor bounty
+- ✅ **Best use of Solana** — chain award
 
 ## Contents
 
@@ -60,26 +63,70 @@ The current demo follows the full product journey with persistent practice posit
 
 ## Demo
 
-**[Open slabline.xyz](https://slabline.xyz)** on desktop or mobile. Public discovery works without signing in. Sign in and select **Devnet** in settings for the saved demo account; use **Top up** to add practice cash (the amount defaults to $100).
+**[Open slabline.xyz](https://slabline.xyz)** on desktop or mobile. Browse markets and rewards without an account. To try trades, packs, and claims, sign in, select **Devnet** in settings, then use **Top up** in Portfolio to add practice cash. The starting balance is $100; top-ups let you try every pack tier.
 
-| Experience            | Try it                                                             | What it demonstrates                                                                             |
-| --------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Live market discovery | [Markets](https://slabline.xyz)                                    | Real Gemini events, outcome artwork, search, live-game discovery, prices, and depth              |
-| Prediction to slab    | [Wembanyama replay](https://slabline.xyz/demo?stake=39.90)         | A recorded $39.90 order buys 145 YES shares; a winning replay unlocks a $145 card reward preview |
-| Prediction to Grail   | [Jensen replay](https://slabline.xyz/demo?scenario=grail&stake=25) | An illustrative $25 position pays $100 on a win and becomes a saved simulated JENSEN holding     |
-| Pack opening          | [Pull & Predict](https://slabline.xyz/pull-predict)                | Pick a tier and theme, reveal a budget, then select and review a prediction                      |
-| Holdings and rewards  | [Portfolio](https://slabline.xyz/portfolio)                        | Positions, partial sales, claims, collectibles, Grail holdings, and unplayed packs               |
+**Start with the Wembanyama replay for the complete prediction-and-card demo, or Pull & Predict for the pack experience.** The replay lets you choose the result immediately, so you do not need to wait for a real game to finish.
 
-For the recorded replay, use **Finish a replay** in settings to apply Yes, No, or Void to the saved position. Ordinary live-data paper positions settle against Gemini's published result. Replay outcomes are explicitly presenter-controlled.
+### Everything you can try
 
-A demo collectible is a Solana devnet representation, not the mainnet slab or a physical-card purchase. The Jensen rehearsal does not execute an EVM swap. See the [demo walkthrough](docs/DEMO.md) for the complete presentation flow.
+| Demo                                | Where to open it                                                                                     | What to do                                                                                                                                                                        |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Discover real markets               | [Markets](https://slabline.xyz)                                                                      | Search teams and players, switch categories, sort results, browse active/resolved events, and save favorites. Open an outcome to inspect its chart and order book.                |
+| Find live games                     | [Live](https://slabline.xyz/?category=live)                                                          | Browse qualifying games in progress and the featured matchups. This view can be empty when no current games qualify.                                                              |
+| Target a particular card            | [Wembanyama replay](https://slabline.xyz/demo?stake=39.90)                                           | Change your stake to see the possible payout and matching slab. In live markets, browse matching cards and use the selected card's target action to calculate the required stake. |
+| Buy, add, and sell                  | [Position demo](https://slabline.xyz/demo?stake=25)                                                  | Buy a practice position, buy more of the same side, then sell part of it or exit fully. Watch shares, average entry, and available balance update.                                |
+| Finish a prediction                 | Settings → **Finish a replay**                                                                       | Select a saved replay position and apply Yes, No, or Void. A loss has no payout; a void refunds the remaining position cost.                                                      |
+| Claim a card                        | [Portfolio](https://slabline.xyz/portfolio) → **Claim**                                              | After a replay win, select a card, review the reward allocation, and approve the devnet collectible transaction in your wallet.                                                   |
+| Keep the cash                       | [Portfolio](https://slabline.xyz/portfolio) → **Claim**                                              | Choose the cash option on an unclaimed winning position to move the payout into your available practice balance.                                                                  |
+| Try a Grail reward                  | [Jensen replay](https://slabline.xyz/demo?scenario=grail&stake=25)                                   | Buy the Omniverse YES position and finish it as a win to see the payout become a simulated JENSEN holding.                                                                        |
+| Open a prediction pack              | [Pull & Predict](https://slabline.xyz/pull-predict)                                                  | Choose $25, $50, $100, or $200, search a team/player, review the odds, and open the pack. Choose your prediction after the budget reveal.                                         |
+| Resume an unfinished pack           | [Your packs](https://slabline.xyz/pull-predict/packs) or [Portfolio](https://slabline.xyz/portfolio) | Reload after opening, recover the saved budget, select an outcome, and review the fresh quote before buying.                                                                      |
+| Browse collectible inventory        | [Rewards](https://slabline.xyz/rewards)                                                              | Explore Cards and Grail tokens, search and filter listings, and compare asking prices with available Card Hedge valuations.                                                       |
+| Share a position                    | [Portfolio](https://slabline.xyz/portfolio) → position → **Share**                                   | Preview the card, copy or download its PNG, or explicitly publish a link. Open the link while signed out to see the same snapshot.                                                |
+| Inspect your holdings               | [Portfolio](https://slabline.xyz/portfolio)                                                          | Review open/settled predictions, available cash, collected cards, unplayed packs, and Grail holdings. Refresh to check that saved state persists.                                 |
+| Connect a wallet and edit a profile | [Profile](https://slabline.xyz/profile)                                                              | Connect or verify a wallet, change network preferences, and optionally publish a username, name, and bio. Public profiles can be found in profile search.                         |
+| View wallet assets                  | Profile and Portfolio                                                                                | With a verified wallet, inspect network-specific SOL/native USDC balances and paginated collection assets.                                                                        |
+| Try the mobile app                  | [Slabline](https://slabline.xyz) on your phone                                                       | Use bottom navigation, swipe featured markets, and add the app to your home screen. Prices and account actions still require a connection.                                        |
+
+### Walkthrough: win a Wembanyama card
+
+1. Open the [Wembanyama replay](https://slabline.xyz/demo?stake=39.90), sign in, and select Devnet. Start with no open YES position in this replay for the exact figures below.
+2. Review and confirm the $39.90 order. The recorded book gives you **145 YES shares**, with a **$145 payout if correct**.
+3. Open settings → **Finish a replay**, select the San Antonio position, and apply **Yes wins**.
+4. Open Portfolio → **Claim**, select the archived $145 Wembanyama PSA 10 card, and follow the wallet confirmation to create its devnet representation. A funded devnet wallet is needed for the network fee.
+5. Return to Portfolio to inspect the card and saved claim. To demonstrate cash instead, use a separate winning replay and choose the cash option before allocating its reward to a card.
+
+The replay uses recorded Gemini depth and an archived listing, so the demonstration remains repeatable when the live listing changes. The resulting devnet collectible does not purchase or redeem the physical card.
+
+### Walkthrough: grow or sell a position
+
+Open the [position demo](https://slabline.xyz/demo?stake=25), buy once, then enter another stake and buy the same side again. Your existing position grows and its average entry updates. The reward preview includes the shares you already hold.
+
+Switch to Sell, enter part of your shares, review the bid quote, and confirm. Proceeds return to practice cash while the remaining position stays open. Use Max to exit completely, or buy more to rebuild the position. YES and NO positions remain separate.
+
+### Walkthrough: win a Grail holding
+
+Open the [Jensen replay](https://slabline.xyz/demo?scenario=grail&stake=25). Its illustrative 25¢ entry turns **$25 into 100 YES shares**. Confirm the order, then use **Finish a replay** on the Omniverse position and apply **Yes wins**. The **$100 payout** becomes a saved simulated JENSEN holding in Portfolio. Reload to see it persist.
+
+This demonstrates the Grail reward path when there is no matching slab. It does not perform a real EVM swap or acquire real JENSEN tokens.
+
+### Walkthrough: open a pack and choose a prediction
+
+1. Open [Pull & Predict](https://slabline.xyz/pull-predict), choose a tier, and search for a team or player with available markets.
+2. Review the price and all four reward probabilities. Top up your practice balance if needed, then open the pack.
+3. In MagicBlock mode, approve the devnet randomness request in your wallet and wait for the verified result. Request and receipt links let you inspect the onchain proof. Server-randomness practice mode is labeled separately.
+4. Watch or skip the reveal. The result is a **buying budget**, not a winning prediction.
+5. Continue to **Your packs**, choose a market and side, review the current quote, and confirm. The position appears in Portfolio; any unspent budget returns to practice cash.
+6. To demonstrate recovery, reload after the reveal and reopen the saved pack from Portfolio. You keep the same opening and budget.
+
+Ordinary positions based on live markets settle only when Gemini publishes the result. **Finish a replay** applies to the recorded demo scenarios. All practice balances and payouts are simulated; wallet actions described above use Solana devnet. Advanced Collector Crypt inspection/simulation tools are under [About → Transaction tools](https://slabline.xyz/about); signing remains restricted to the configured test wallet.
 
 ## Features
 
 | Feature                     | What is implemented                                                                                                                                  |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Market discovery            | Active and resolved market search, categories, favorites, outcome artwork, featured matchups, and provider-reported live games with freshness checks |
-| Live order books            | Gemini WebSocket books relayed through the worker and server-sent events, with reconnect handling                                                    |
+| Live order books            | Gemini WebSocket books delivered through the worker and server-sent events, with reconnect handling                                                  |
 | Exact trade estimates       | Integer-based depth walking, partial-fill estimates, quantity increments, winning payout, and explicit unknown-fee states                            |
 | Collectible targets         | Relevant team/player listings, actual slab images, card filters, target-card stake calculation, and separately displayed Card Hedge FMV/comps        |
 | Persistent practice trading | Account-backed $100 demo ledger, top-ups, position increases, weighted entries, partial sales, and settlement                                        |
@@ -90,16 +137,16 @@ A demo collectible is a Solana devnet representation, not the mainnet slab or a 
 | Identity and profiles       | Privy sign-in, embedded/external wallets, signed ownership proofs, and opt-in public profiles with username search                                   |
 | Wallet reads                | Network-scoped SOL/native USDC balances and paginated Solana asset inventory                                                                         |
 | Grail integration           | Public catalog and pool verification, direct Uniswap transaction preparation, recovery and reconciliation; live execution gated                      |
-| Funding previews            | Authenticated Relay quote reviews for supported mainnet and testnet routes; execution disabled                                                       |
 | Mobile experience           | Responsive layouts, bottom navigation, installable home-screen app metadata, and an offline launch message                                           |
 
 Implementation and verification are tracked separately in [integration evidence](docs/INTEGRATION_VERIFICATION.md). A prepared transaction or successful simulation is not a completed purchase.
 
 ## Hackathon tracks and integrations
 
-**Target bounty: Best Project built with Gemini Prediction Markets.** Slabline uses Gemini's official SDK for public event discovery, live order books, executable-depth previews, and published outcomes. The collectible matching and pack experience build directly on that data.
+- ✅ **Gemini Prediction Markets** — real event discovery, live order books, depth-based trade previews, and published settlement results through Gemini's official SDK.
+- ✅ **Best use of Solana** — wallet-signed devnet collectibles and a deployed MagicBlock VRF consumer for pack openings, with finalized receipts verified by the app.
 
-The [UBC hackathon guide](https://docs.google.com/document/d/1QaySCo7u3VxMVNdk3C5Ab3ewc2E46AuLntti-Uzx5EY/edit?tab=t.0#heading=h.ykfx32xz9suf) lists Gemini as a sponsor bounty and accepts market-data and/or trading API integrations. It also requires one main track. The project aligns with **Consumer Applications** through its collector-facing experience and with **Best use of Solana** through devnet collectibles and VRF. These describe project fit; the confirmed bounty focus is Gemini, and this README does not record a completed Devpost entry.
+See the [UBC hackathon guide](https://docs.google.com/document/d/1QaySCo7u3VxMVNdk3C5Ab3ewc2E46AuLntti-Uzx5EY/edit?tab=t.0#heading=h.ykfx32xz9suf) for the bounty and chain-award requirements.
 
 | Integration               | Role in Slabline                                                     | Current boundary                                                                                                 |
 | ------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
@@ -110,33 +157,11 @@ The [UBC hackathon guide](https://docs.google.com/document/d/1QaySCo7u3VxMVNdk3C
 | Solana / Metaplex Core    | User-owned devnet collectible representations and asset verification | Devnet assets do not redeem physical cards                                                                       |
 | MagicBlock                | VRF requests and immutable onchain randomness receipts               | Consumer deployed and request/fulfillment verified on devnet                                                     |
 | Privy                     | Google/email login, embedded wallets, external wallet connections    | Authenticated actions still require account and wallet ownership checks                                          |
-| QuickNode                 | Budgeted RPC and DAS reads for chain state and inventory             | Streams remain disabled; RPC use is not a QuickNode Streams bounty claim                                         |
-| Relay                     | Cross-chain funding quotes and provider status reads                 | Quote-only; no signing or broadcast endpoint                                                                     |
 | Railway                   | Web service, worker, and managed PostgreSQL                          | Separate services with private worker networking                                                                 |
 
 Phygitals read adapters also exist in the repository, but its packs are outside the current UI scope and purchases remain disabled.
 
 ## How it works
-
-### From a prediction to a collectible
-
-```mermaid
-flowchart TD
-    A[Browse real Gemini markets] --> B[Choose outcome and stake]
-    B --> C[Walk current order-book depth]
-    C --> D[Preview winning payout and matching collectibles]
-    D --> E[Confirm a practice position]
-    E --> F[Saved portfolio position]
-    F --> G{Settlement result}
-    G -->|Win| H[Available demo reward]
-    G -->|Loss| I[Close with no payout]
-    G -->|Void| J[Refund remaining position cost]
-    H --> K[Claim demo cash]
-    H --> L[Select collectible rewards]
-    L --> M[Wallet-signed devnet collectible]
-```
-
-A binary winning share pays $1. Estimates use available depth rather than assuming the displayed price fills the entire order. Matching listings are previews; availability and price can change before checkout. Live Gemini USD, demo cash, Solana USDC, and EVM assets are distinct balances.
 
 ### Application architecture
 
@@ -149,7 +174,6 @@ flowchart LR
     C[Collector Crypt, Card Hedge, Grail] --> K
     W --> D[(PostgreSQL)]
     K --> D
-    W --> R[Relay quote API]
     W --> S[Solana RPC and DAS]
     U -->|Signed devnet request| V[Pull receipt program]
     V --> B[MagicBlock VRF]
@@ -212,20 +236,20 @@ Source and build instructions: [programs/pull-randomness](programs/pull-randomne
 
 ## Tech stack
 
-| Layer                    | Technologies                                                                               |
-| ------------------------ | ------------------------------------------------------------------------------------------ |
-| Runtime and workspace    | Bun 1.3.11, Bun workspaces, strict TypeScript 5.9                                          |
-| Frontend                 | Next.js App Router, React, Tailwind CSS, Radix UI / shadcn-style components, Lucide, Inter |
-| Charts                   | TradingView Lightweight Charts                                                             |
-| API and client state     | tRPC, Zod, TanStack Query, HTTP routes, server-sent events                                 |
-| Data                     | PostgreSQL, Drizzle ORM and migrations, exact decimal strings / integer smallest units     |
-| Prediction markets       | Official `@gemini-markets/sdk` 0.1.1 and WebSocket order books                             |
-| Identity                 | Privy React and Node SDKs, signed Solana wallet proofs                                     |
-| Solana                   | `@solana/kit`, Metaplex Core / Umi, native Rust program, MagicBlock VRF                    |
-| EVM                      | viem, Base and Robinhood RPC, Uniswap v3 SwapRouter02 and v4 UniversalRouter / Permit2     |
-| Collectibles and funding | Collector Crypt, Card Hedge, Grail, Relay quote API, QuickNode RPC / DAS                   |
-| Share images             | Server-side image rendering, Sharp, bundled Inter fonts, persisted PNG snapshots           |
-| Hosting and checks       | Railway web + worker + PostgreSQL, GitHub Actions, Bun tests, TypeScript, Prettier         |
+| Layer                 | Technologies                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| Runtime and workspace | Bun 1.3.11, Bun workspaces, strict TypeScript 5.9                                          |
+| Frontend              | Next.js App Router, React, Tailwind CSS, Radix UI / shadcn-style components, Lucide, Inter |
+| Charts                | TradingView Lightweight Charts                                                             |
+| API and client state  | tRPC, Zod, TanStack Query, HTTP routes, server-sent events                                 |
+| Data                  | PostgreSQL, Drizzle ORM and migrations, exact decimal strings / integer smallest units     |
+| Prediction markets    | Official `@gemini-markets/sdk` 0.1.1 and WebSocket order books                             |
+| Identity              | Privy React and Node SDKs, signed Solana wallet proofs                                     |
+| Solana                | `@solana/kit`, Metaplex Core / Umi, native Rust program, MagicBlock VRF                    |
+| EVM                   | viem, Base and Robinhood RPC, Uniswap v3 SwapRouter02 and v4 UniversalRouter / Permit2     |
+| Collectibles          | Collector Crypt, Card Hedge, Grail                                                         |
+| Share images          | Server-side image rendering, Sharp, bundled Inter fonts, persisted PNG snapshots           |
+| Hosting and checks    | Railway web + worker + PostgreSQL, GitHub Actions, Bun tests, TypeScript, Prettier         |
 
 ## Quick start
 
@@ -259,13 +283,11 @@ PULL_RANDOMNESS=demo-csprng
 
 Set matching `NEXT_PUBLIC_PRIVY_APP_ID` and `PRIVY_APP_ID`, plus server-only `PRIVY_APP_SECRET`, to enable sign-in. Add `http://localhost:3000` to Privy's allowed origins. See [identity setup](docs/IDENTITY_SETUP.md) for wallet proofs, Gemini OAuth, and token encryption.
 
-| Optional configuration                                                                              | Enables                                                              |
-| --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `CARD_HEDGE_API_KEY`, `ENABLE_PUBLIC_FMV`                                                           | Licensed public FMV/comps display for matched cards                  |
-| `QUICKNODE_RPC_URL`, `QUICKNODE_DAS_RPC_URL`, `QUICKNODE_BUDGET_*` and credit settings              | Metered RPC and wallet inventory reads within a persistent allowance |
-| `RELAY_API_KEY`                                                                                     | Server-side funding quote previews                                   |
-| `PULL_RANDOMNESS=magicblock-devnet`, `PULL_MAGICBLOCK_PROGRAM_ID`, `PULL_MAGICBLOCK_DEVNET_RPC_URL` | Verified devnet VRF openings; users need devnet SOL                  |
-| Gemini OAuth credentials, `TOKEN_ENCRYPTION_KEY`, and verified production approval                  | Authorized private account reads                                     |
+| Optional configuration                                                                              | Enables                                             |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `CARD_HEDGE_API_KEY`, `ENABLE_PUBLIC_FMV`                                                           | Licensed public FMV/comps display for matched cards |
+| `PULL_RANDOMNESS=magicblock-devnet`, `PULL_MAGICBLOCK_PROGRAM_ID`, `PULL_MAGICBLOCK_DEVNET_RPC_URL` | Verified devnet VRF openings; users need devnet SOL |
+| Gemini OAuth credentials, `TOKEN_ENCRYPTION_KEY`, and verified production approval                  | Authorized private account reads                    |
 
 The full configuration and disabled-by-default execution flags are in [.env.example](.env.example). Keep secrets in ignored environment files or Railway service variables.
 
@@ -330,11 +352,7 @@ collectiblemarkets/
 
 **Gemini:** production OAuth approval, account scopes, jurisdiction, and funding permissions remain release gates. Selecting Mainnet does not enable orders or withdrawals.
 
-**Relay:** previews expire after 30 seconds. Supported previews include Ethereum/Base native USDC to Solana mainnet USDC and test ETH between Sepolia and Base Sepolia. Solana devnet is not listed by the integrated testnet API. Provider status is not proof of received funds; execution, sponsorship, permits, and deposit-address flows remain off.
-
 **Collector Crypt and Grail:** devnet Collector Crypt signing requires both `ENABLE_CC_DEVNET_TESTS=true` and an exact `CC_DEVNET_TEST_WALLET` match. Its test-USDC mint differs from Circle's devnet USDC. Grail flows require exact approvals, bounded slippage, user-paid ETH, wallet signatures, and independent transfer reconciliation. Mainnet purchase release remains gated; unknown submissions require recovery before another attempt.
-
-**QuickNode:** web and worker share a PostgreSQL credit ledger for a verified billing period. Each allowed RPC call reserves 1,000 credits, including batch members, retries, and failures; unknown methods are rejected. The cutoff cannot exceed 75% of included credits. Missing, expired, or exhausted budgets use supported public RPC fallbacks, while DAS ownership checks stop. Other applications' usage and Streams are outside this RPC allowance; Streams stay disabled.
 
 See [security boundaries](docs/SECURITY.md) and [integration verification](docs/INTEGRATION_VERIFICATION.md) for implementation evidence and remaining external blockers.
 
@@ -351,12 +369,9 @@ See [security boundaries](docs/SECURITY.md) and [integration verification](docs/
 | [Identity setup](docs/IDENTITY_SETUP.md)                  | Privy, wallet proofs, and Gemini OAuth                             |
 | [Deployment](docs/DEPLOYMENT.md)                          | Railway services and public origin configuration                   |
 | [Security](docs/SECURITY.md)                              | Authentication, data, and execution boundaries                     |
-| [QuickNode Stream notes](docs/QUICKNODE_STREAM.md)        | Deferred, gated Stream setup; no active Stream claimed             |
 
 ## Acknowledgments
 
-Built independently by [hamzaskewl](https://github.com/hamzaskewl) for UBC 2026. Thanks to Gemini, Solana, MagicBlock, Privy, Collector Crypt, Card Hedge, Grail, QuickNode, Relay, Metaplex, and Railway for the APIs and infrastructure used here.
+An independent UBC 2026 project by [hamzaskewl](https://github.com/hamzaskewl), using Gemini, Solana, MagicBlock, Privy, Collector Crypt, Card Hedge, Grail, Metaplex, and Railway.
 
 Charts use [TradingView Lightweight Charts](https://www.tradingview.com/lightweight-charts/). Provider images belong to their respective owners. Slabline is independently operated and does not imply provider endorsement.
-
-README structure inspired by [Hoppy](https://github.com/hamzaskewl/hoppy).
