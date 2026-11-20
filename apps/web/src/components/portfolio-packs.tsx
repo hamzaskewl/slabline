@@ -2,7 +2,7 @@
 import Link from "next/link";
 import type { PullOpening } from "@collectible/domain";
 import { usePrivateRead } from "@/lib/use-private-read";
-import { UsdcAmount } from "./usdc-amount";
+import { usd } from "@/lib/utils";
 
 export function PortfolioPacks() {
   const account = usePrivateRead<{ openings: PullOpening[] }>("/api/pull");
@@ -27,14 +27,10 @@ export function PortfolioPacks() {
       {packs.map((pack) => (
         <div className="portfolio-pack-row" key={pack.id}>
           <div>
-            <h3>
-              <UsdcAmount value={pack.tier} /> pack
-            </h3>
+            <h3>{usd(pack.tier)} pack</h3>
             <p>
               {pack.state === "ready" ? (
-                <>
-                  <UsdcAmount value={pack.budget ?? "0"} /> ready to play
-                </>
+                <>{usd(pack.budget ?? "0")} ready to play</>
               ) : (
                 "Opening in progress"
               )}

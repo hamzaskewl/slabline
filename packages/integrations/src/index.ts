@@ -19,3 +19,4 @@ export * from "./demo";
 export * from "./demo-nft";
 export * from "./pull";
 export * from "./magicblock-randomness";
+export * from "./devnet-usdc";

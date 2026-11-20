@@ -9,6 +9,7 @@ import { Button } from "./ui/button";
 import { useNetwork } from "./network-settings";
 import Link from "next/link";
 import { Wallet, UserRound, ShieldCheck, ArrowUpRight } from "lucide-react";
+import { HeaderBalance } from "./header-balance";
 
 export function AuthButton({ header = false }: { header?: boolean }) {
   const { ready, authenticated, login, logout } = useSlablineAuth();
@@ -30,13 +31,16 @@ export function AuthButton({ header = false }: { header?: boolean }) {
     );
   if (header && authenticated)
     return (
-      <Link
-        className="profile-entry"
-        href="/profile"
-        aria-label="Profile and settings"
-      >
-        <UserRound size={21} aria-hidden="true" />
-      </Link>
+      <div className="header-authenticated">
+        <HeaderBalance />
+        <Link
+          className="profile-entry"
+          href="/profile"
+          aria-label="Profile and settings"
+        >
+          <UserRound size={21} aria-hidden="true" />
+        </Link>
+      </div>
     );
   return (
     <Button
@@ -118,7 +122,9 @@ export function ConnectedWalletPanel() {
   }
   return (
     <section className="panel funding-panel account-panel">
-      <h2>Solana wallets</h2>
+      <h2>
+        Solana wallets{links.data?.network === "devnet" ? " · Devnet" : ""}
+      </h2>
 
       {authenticated ? (
         <>

@@ -223,6 +223,7 @@
 }
 .balance-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
 }
@@ -457,4 +458,99 @@
 }
 .featured-title h2 .card-availability {
   vertical-align: 2px;
+}
+
+.usdc-transfer-history {
+  margin-top: 24px;
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
+}
+.usdc-transfer-history h3 {
+  font-size: 14px;
+}
+.usdc-transfer-row {
+  padding-block: 14px;
+  border-bottom: 1px solid var(--rule);
+}
+.usdc-transfer-row strong {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.usdc-transfer-row a {
+  font-size: 13px;
+  color: var(--accent, #80c9ff);
+  text-underline-offset: 3px;
+}
+.usdc-transfer-row .wallet-actions {
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.balance-dialog .usdc-transfer-note {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.header-authenticated {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.header-balance {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  gap: 2px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.header-balance span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.header-balance strong {
+  color: #f3f6fa;
+  font-size: 14px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.header-balance:hover strong {
+  color: #80c9ff;
+}
+@media (max-width: 480px) {
+  .header-authenticated {
+    gap: 6px;
+  }
+  .header-balance strong {
+    font-size: 13px;
+  }
+}
+@media (max-width: 760px) {
+  .balance-dialog :is(.button, .app-select) {
+    min-height: 44px;
+  }
+  .wallet-overview .portfolio-summary:has(.balance-actions) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .balance-actions {
+    min-width: 0;
+  }
+  .balance-actions .button {
+    white-space: nowrap;
+  }
+  .app-shell .exchange-header .header-account:has(.header-authenticated) {
+    display: block;
+  }
+  .header-authenticated .profile-entry {
+    display: none;
+  }
+}
+
+.balance-dialog {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
 }

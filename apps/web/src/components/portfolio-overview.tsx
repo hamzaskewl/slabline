@@ -1,7 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import type { DemoAccountView } from "@collectible/domain";
-import { UsdcAmount } from "./usdc-amount";
+import { usd } from "@/lib/utils";
 import { PortfolioChart } from "./portfolio-chart";
 
 export function PortfolioOverview({
@@ -30,11 +30,7 @@ export function PortfolioOverview({
           <div>
             <h2>{compact ? "Available balance" : "Portfolio value"}</h2>
             <strong className="portfolio-total">
-              {balance === undefined ? (
-                "—"
-              ) : (
-                <UsdcAmount value={compact ? balance : total!} />
-              )}
+              {balance === undefined ? "—" : usd(compact ? balance : total!)}
             </strong>
           </div>
           <div className="portfolio-summary-actions">{actions}</div>
@@ -49,9 +45,7 @@ export function PortfolioOverview({
             ].map(([label, value]) => (
               <div key={label}>
                 <dt>{label}</dt>
-                <dd>
-                  {balance === undefined ? "—" : <UsdcAmount value={value!} />}
-                </dd>
+                <dd>{balance === undefined ? "—" : usd(value!)}</dd>
               </div>
             ))}
           </dl>

@@ -1,0 +1,7 @@
+{
+  "name": "Slabline USDC",
+  "symbol": "USDC",
+  "description": "Slabline's Solana devnet practice token. Test funds only, with no monetary value or redemption for Circle USDC or USD.",
+  "image": "https://slabline.xyz/brand/slabline-mark-blue.png",
+  "external_url": "https://slabline.xyz"
+}
