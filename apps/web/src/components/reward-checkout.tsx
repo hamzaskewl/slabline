@@ -21,7 +21,6 @@ import {
 import { usePrivateRead } from "@/lib/use-private-read";
 import { usd } from "@/lib/utils";
 import { useDemoAction } from "./demo-controls";
-import { Select } from "./ui/select";
 import { Button } from "./ui/button";
 import { CardImage } from "./card-image";
 import { BalanceActions } from "./balance-actions";
@@ -139,17 +138,13 @@ export function AddReward({ item }: { item: RewardPick }) {
       }
       onClick={() => c.toggle(item)}
     >
-      {already ? (
-        "Selected for this win"
-      ) : selected ? (
-        "Remove from rewards"
-      ) : units(allocation.additionalTopUp) > 0n ? (
-        <>
-          Add · <UsdcAmount value={allocation.additionalTopUp} /> from balance
-        </>
-      ) : (
-        "Add to rewards"
-      )}
+      {already
+        ? "Selected for this win"
+        : selected
+          ? "Remove from rewards"
+          : units(allocation.additionalTopUp) > 0n
+            ? `Add · ${usd(allocation.additionalTopUp)} extra`
+            : "Add to rewards"}
     </button>
   );
 }
@@ -163,11 +158,10 @@ export function RewardCheckout() {
     "/api/wallet/links",
     a.network === "devnet",
   );
-  const [walletAddress, setWallet] = useState(""),
-    [verified, setVerified] = useState(""),
+  const [verified, setVerified] = useState(""),
     [complete, setComplete] = useState(false);
   const key = useRef(crypto.randomUUID());
-  const wallet = wallets.find((w) => w.address === walletAddress) ?? wallets[0];
+  const wallet = wallets[0];
   const positionId = c?.position?.id;
   useEffect(() => {
     key.current = crypto.randomUUID();
@@ -213,23 +207,7 @@ export function RewardCheckout() {
             <UsdcAmount value={allocation.total} />
           </dd>
         </div>
-        <div>
-          <dt>From balance</dt>
-          <dd>
-            <UsdcAmount value={allocation.additionalTopUp} />
-          </dd>
-        </div>
-        <div>
-          <dt>Back to balance</dt>
-          <dd>
-            <UsdcAmount value={allocation.remainder} />
-          </dd>
-        </div>
       </dl>
-      <p className="reward-range">
-        Any leftover goes straight to your balance. Use your balance for any
-        difference.
-      </p>
       {picks.length > 0 && (
         <details className="reward-basket">
           <summary>
@@ -277,37 +255,14 @@ export function RewardCheckout() {
         </div>
       )}
       <div className="reward-checkout-actions">
-        {wallet ? (
-          <Select
-            aria-label="Reward destination wallet"
-            value={wallet.address}
-            onChange={(e) => setWallet(e.target.value)}
-          >
-            {wallets.map((w) => (
-              <option key={w.address} value={w.address}>
-                {w.address.slice(0, 6)}…{w.address.slice(-4)}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <Button
-            variant="outline"
-            onClick={() => connectWallet({ walletChainType: "solana-only" })}
-          >
-            Connect a wallet
-          </Button>
-        )}
         <Button
-          disabled={
-            a.busy ||
-            !wallet ||
-            !allocation.valid ||
-            !picks.length ||
-            needsTopUp
-          }
-          onClick={() =>
+          disabled={a.busy || !allocation.valid || !picks.length || needsTopUp}
+          onClick={() => {
+            if (!wallet) {
+              connectWallet({ walletChainType: "solana-only" });
+              return;
+            }
             void a.run(async () => {
-              if (!wallet) return;
               if (!approved) {
                 const proof = await a.request<{
                   nonce: string;
@@ -341,8 +296,8 @@ export function RewardCheckout() {
               });
               c.clear();
               setComplete(true);
-            })
-          }
+            });
+          }}
         >
           {a.busy
             ? "Saving rewards…"

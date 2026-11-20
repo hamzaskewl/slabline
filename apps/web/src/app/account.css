@@ -720,6 +720,10 @@
   font-size: 13px;
   margin-bottom: 16px;
 }
+.claim-budget-note strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
 .claim-filters {
   display: flex;
   gap: 12px;
@@ -745,6 +749,11 @@
   color: var(--muted);
   font-size: 12px;
   margin-block: 16px;
+  align-items: center;
+}
+.claim-card-count > .text-button {
+  flex-shrink: 0;
+  min-height: 44px;
 }
 .claim-card-grid {
   display: grid;
@@ -863,18 +872,22 @@
 .embedded-checkout .reward-budget-totals {
   margin: 0;
   gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
-.embedded-checkout .reward-budget-totals > div:last-child {
+.embedded-checkout .reward-budget-totals > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   grid-column: auto;
 }
 .embedded-checkout .reward-budget-totals dt {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
 }
 .embedded-checkout .reward-budget-totals dd {
   font-size: 16px;
-  margin-top: 5px;
+  margin: 0;
 }
 .embedded-checkout .reward-budget-totals small {
   display: block;
@@ -882,39 +895,50 @@
   color: var(--muted);
 }
 .embedded-checkout .reward-basket {
-  margin-top: 8px;
+  margin-top: 4px;
 }
-.reward-range {
-  margin: 10px 0 0;
-  color: var(--muted);
-  font-size: 12px;
+.embedded-checkout .reward-basket summary {
+  min-height: 44px;
+  align-content: center;
 }
 .embedded-checkout .reward-checkout-actions {
   margin-top: 12px;
 }
 .embedded-checkout .reward-checkout-actions > .button {
   border-radius: 999px;
+  width: 100%;
+  min-height: 44px;
 }
 @media (max-width: 600px) {
   .position-rewards-dialog {
     inset: auto 0 0;
     transform: none;
     width: 100%;
-    max-height: calc(100dvh - 16px);
+    max-height: calc(100dvh - max(16px, env(safe-area-inset-top)));
     border-radius: 16px 16px 0 0;
   }
   .position-rewards-header {
-    padding: 16px;
+    padding: 12px 16px;
   }
   .position-rewards-header h2 {
     font-size: 18px;
+  }
+  .position-rewards-header p {
+    margin-top: 2px;
   }
   .position-rewards-header .icon-button {
     width: 44px;
     height: 44px;
   }
   .position-rewards-scroll {
-    padding: 16px;
+    padding: 12px 16px;
+  }
+  .claim-budget-note {
+    margin-bottom: 12px;
+  }
+  .claim-card-count {
+    gap: 8px;
+    margin-block: 4px;
   }
   .claim-filters {
     flex-wrap: wrap;
@@ -947,13 +971,10 @@
   }
   .position-rewards-checkout,
   .position-rewards-footer {
-    padding: 14px 16px max(16px, env(safe-area-inset-bottom));
+    padding: 12px 16px max(12px, env(safe-area-inset-bottom));
   }
   .position-rewards-checkout .reward-checkout-actions {
     flex-wrap: nowrap;
-  }
-  .position-rewards-checkout .reward-checkout-actions > .app-select {
-    width: 43%;
   }
   .position-rewards-checkout .reward-checkout-actions > .button {
     flex: 1;
@@ -1371,19 +1392,19 @@
 .claim-cash-option {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 8px 12px;
   align-items: center;
   justify-content: space-between;
-  padding: 0 0 24px;
-  margin-bottom: 24px;
+  padding: 0 0 12px;
+  margin-bottom: 12px;
   border-bottom: 1px solid var(--rule);
 }
 .claim-cash-option h3 {
-  margin: 0 0 8px;
-}
-.claim-cash-option p {
   margin: 0;
-  color: var(--muted);
+  font-size: 14px;
+}
+.claim-cash-option > .button {
+  min-height: 44px;
 }
 
 .held-position-facts {

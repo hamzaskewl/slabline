@@ -11,7 +11,7 @@ import {
   type GrailToken,
 } from "@collectible/domain";
 import { usePrivateRead } from "@/lib/use-private-read";
-import { UsdcAmount, UsdcIcon } from "./usdc-amount";
+import { UsdcAmount } from "./usdc-amount";
 import { usd } from "@/lib/utils";
 import { useDemoAction, DemoMintActions } from "./demo-controls";
 import {
@@ -232,15 +232,7 @@ function PositionRewardsContent({
               position.reward?.state === "available" &&
               selected.length === 0 && (
                 <div className="claim-cash-option">
-                  <div>
-                    <h3>
-                      <UsdcIcon /> Add to balance
-                    </h3>
-                    <p>
-                      {<UsdcAmount value={position.reward.budget} />} goes to
-                      your available balance.
-                    </p>
-                  </div>
+                  <h3>Claim reward as USDC</h3>
                   <Button
                     variant="outline"
                     disabled={a.busy}
@@ -253,28 +245,20 @@ function PositionRewardsContent({
                       })
                     }
                   >
-                    {a.busy ? (
-                      "Claiming…"
-                    ) : (
-                      <>
-                        Claim <UsdcIcon />
-                      </>
-                    )}
+                    {a.busy ? "Claiming…" : "Claim"}
                   </Button>
                   {a.error && <p role="alert">{a.error}</p>}
                 </div>
               )}
             <p className="claim-budget-note">
               {preview ? "Potential reward: " : "Reward budget: "}
-              <UsdcAmount
-                value={
+              <strong>
+                {usd(
                   preview
                     ? position.quantity
-                    : (position.reward?.budget ?? position.payout ?? "0")
-                }
-              />
-              . Choose any cards. Cover the difference with your balance, or
-              keep the full reward in your balance.
+                    : (position.reward?.budget ?? position.payout ?? "0"),
+                )}
+              </strong>
             </p>
             {inventory.isPending && (
               <p role="status">Loading matching cards…</p>
