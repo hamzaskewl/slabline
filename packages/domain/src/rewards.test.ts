@@ -160,6 +160,61 @@ test("team rewards require the exact selected NBA team and verified history", ()
   expect(teamRewardMatch(event, booker)).toBeNull();
 });
 
+test("Lakers rewards exclude the reviewed Shaq and Luka listings without hiding other cards", () => {
+  const shaq = {
+    ...card(
+      "1995 #NA Shaquille O'Neal SGC 7 Classic Rookies Basketball",
+      "Basketball",
+      "250",
+    ),
+    mint: "F6As6zsDLNaaSoMsvPzqMF7k5WG9jg55mFHoQWM4VsWh",
+  };
+  const luka = {
+    ...card(
+      "2018 #177 Luka Doncic PSA 9 Panini Court Kings",
+      "Basketball",
+      "185",
+    ),
+    mint: "CdrJym6gEGXR3aKYUJPBz2GHddRawHzDrBeV3BCMDnJ9",
+  };
+  const kobe = card(
+    "2000 #M2 Kobe Bryant PSA 8 SPx Masters",
+    "Basketball",
+    "124",
+  );
+  const inventory = [shaq, luka, kobe];
+  const contract = (symbol: string, label: string) => ({
+    symbol,
+    label,
+    status: "active",
+    lastPrice: null,
+    quantityIncrement: "1",
+    priceIncrement: "0.01",
+  });
+  for (const selected of [
+    contract("GEMI-NBA-2611210300-SAC-LAL-M-LAL", "Los Angeles L"),
+    contract("GEMI-NBAF-2627CHAMP-LAL", "LA Lakers"),
+  ]) {
+    const lakers = outcomeRewardMarket(market("Lakers", "NBA"), selected);
+    expect(relatedCards(lakers, inventory)).toEqual([kobe]);
+    expect(teamRewardMatch(lakers, shaq)).toBeNull();
+    expect(teamRewardMatch(lakers, luka)).toBeNull();
+    expect(
+      teamRewardMatch(lakers, { ...shaq, mint: "another-shaq-listing" })?.name,
+    ).toBe("Los Angeles Lakers");
+  }
+  for (const [name, listing] of [
+    ["Shaquille O'Neal", shaq],
+    ["Luka Doncic", luka],
+  ] as const) {
+    const player = outcomeRewardMarket(
+      market("Player market", "NBA"),
+      contract(name, name),
+    );
+    expect(relatedCards(player, inventory)).toEqual([listing]);
+  }
+});
+
 test("only active markets with a real inventory relationship qualify", () => {
   const nba = market("Michael Jordan award", "NBA");
   const tesla = market("Will Tesla launch a new model?");
