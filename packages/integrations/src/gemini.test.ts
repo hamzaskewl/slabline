@@ -14,7 +14,64 @@ import {
   marketOutcomes,
   eventVolume,
   buyPercent,
+  marketMatches,
+  canonicalPullTheme,
+  matchesPullTheme,
+  pullThemeOutcomes,
 } from "@collectible/domain";
+
+test("player discovery includes leagues absent from the broad feed and every outcome", async () => {
+  const calls: Array<string | undefined> = [];
+  const result = await collectMarketCategories(["Sports"], async (category) => {
+    calls.push(category);
+    const label =
+      category === "Pro Baseball"
+        ? "Shohei Ohtani"
+        : category === "Pro Hockey"
+          ? "Example Newplayer"
+          : null;
+    const data = label
+      ? [
+          {
+            id: category!,
+            ticker: category!.replaceAll(" ", "-"),
+            title: "League MVP Winner",
+            category: "Sports",
+            status: "active",
+            subcategory: { name: category },
+            contracts: ["Other Athlete", "Another Athlete", label].map(
+              (name, i) => ({
+                instrumentSymbol: `GEMI-${category!.replaceAll(" ", "-")}-${i}`,
+                label: name,
+                status: "active",
+              }),
+            ),
+          },
+        ]
+      : [];
+    return { data, pagination: { total: data.length } };
+  });
+  expect(result).toHaveLength(2);
+  expect(calls.filter((c) => c === "Pro Baseball")).toHaveLength(1);
+  for (const [league, queries] of [
+    ["Pro Baseball", ["Shohei", "Ohtani", "Shohei Ohtani", "shohei oh"]],
+    ["Pro Hockey", ["Newplayer", "Example Newplayer"]],
+  ] as const) {
+    const full = result.find((m) => m.subcategory === league)!;
+    const preview = marketPreview(full);
+    expect(preview.contracts).toHaveLength(2);
+    for (const query of queries) {
+      expect(marketMatches(preview, query)).toBe(true);
+      const theme = canonicalPullTheme({ kind: "player", label: query }, [
+        preview,
+      ]);
+      expect(matchesPullTheme(preview, theme)).toBe(true);
+      expect(pullThemeOutcomes(full, theme).map((c) => c.label)).toEqual([
+        league === "Pro Baseball" ? "Shohei Ohtani" : "Example Newplayer",
+      ]);
+    }
+  }
+});
 
 test("catalog normalization preserves explicit live and resolution metadata through previews", async () => {
   const raw = {
