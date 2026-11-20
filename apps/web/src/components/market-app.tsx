@@ -1397,7 +1397,9 @@ function CardTile({ card, eager = false }: { card: Listing; eager?: boolean }) {
         )}
         <div className="card-price card-price-row">
           <div>
-            <small>Listing ask</small>
+            <small className="listing-ask-label">
+              Listing ask <UsdcIcon />
+            </small>
             <strong>
               <UsdcAmount value={card.ask} />
             </strong>
