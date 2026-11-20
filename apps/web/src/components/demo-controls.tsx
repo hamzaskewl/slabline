@@ -292,7 +292,6 @@ export function DemoPortfolio({
           total={data ? total : undefined}
           predictionValue={money(openCost)}
           collectibleValue={money(cardCost)}
-          rewardValue={money(rewardValue)}
           packValue={data?.packValue}
           history={data?.history}
           actions={<BalanceActions balance={data?.balance} />}
@@ -303,40 +302,6 @@ export function DemoPortfolio({
           <div className="holdings-toolbar">
             <h2>All holdings</h2>
           </div>
-          <HoldingSection
-            title="Grail holdings"
-            count={grailHoldings.length}
-            storageKey={`holdings:${a.user?.id}:${a.network}:grail`}
-          >
-            {grailHoldings.length ? (
-              grailHoldings.map((p) => (
-                <div className="collection-row grail-holding-row" key={p.id}>
-                  <CardImage src={DEMO_GRAIL.image} alt={DEMO_GRAIL.name} />
-                  <div className="collection-copy">
-                    <h3>{p.grailHolding!.symbol}</h3>
-                    <p>{number(p.grailHolding!.quantity)} tokens</p>
-                  </div>
-                  <div className="collection-value">
-                    <strong>
-                      <UsdcAmount value={p.grailHolding!.cost} />
-                    </strong>
-                  </div>
-                  <a
-                    className="button button-outline button-pill"
-                    href={DEMO_GRAIL.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    View Grail <ArrowUpRight size={15} />
-                  </a>
-                </div>
-              ))
-            ) : (
-              <div className="holdings-empty">
-                <p>Your Grail holdings will appear here.</p>
-              </div>
-            )}
-          </HoldingSection>
           {snapshot.isPending && <p role="status">Loading your holdings…</p>}
           {!collection && (
             <HoldingSection
@@ -447,6 +412,40 @@ export function DemoPortfolio({
             storageKey={`holdings:${a.user?.id}:${a.network}:packs`}
           >
             <PortfolioPacks />
+          </HoldingSection>
+          <HoldingSection
+            title="Grail holdings"
+            count={grailHoldings.length}
+            storageKey={`holdings:${a.user?.id}:${a.network}:grail`}
+          >
+            {grailHoldings.length ? (
+              grailHoldings.map((p) => (
+                <div className="collection-row grail-holding-row" key={p.id}>
+                  <CardImage src={DEMO_GRAIL.image} alt={DEMO_GRAIL.name} />
+                  <div className="collection-copy">
+                    <h3>{p.grailHolding!.symbol}</h3>
+                    <p>{number(p.grailHolding!.quantity)} tokens</p>
+                  </div>
+                  <div className="collection-value">
+                    <strong>
+                      <UsdcAmount value={p.grailHolding!.cost} />
+                    </strong>
+                  </div>
+                  <a
+                    className="button button-outline button-pill"
+                    href={DEMO_GRAIL.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View Grail <ArrowUpRight size={15} />
+                  </a>
+                </div>
+              ))
+            ) : (
+              <div className="holdings-empty">
+                <p>Your Grail holdings will appear here.</p>
+              </div>
+            )}
           </HoldingSection>
         </section>
       )}

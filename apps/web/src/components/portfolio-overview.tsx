@@ -10,7 +10,6 @@ export function PortfolioOverview({
   total,
   predictionValue,
   collectibleValue,
-  rewardValue,
   packValue = "0",
   history,
   actions,
@@ -20,7 +19,6 @@ export function PortfolioOverview({
   total?: string;
   predictionValue: string;
   collectibleValue: string;
-  rewardValue: string;
   packValue?: string;
   history?: DemoAccountView["history"];
   actions: ReactNode;
@@ -47,7 +45,6 @@ export function PortfolioOverview({
               ["Balance", balance],
               ["Predictions", predictionValue],
               ["Collectibles", collectibleValue],
-              ["Rewards", rewardValue],
               ["Packs", packValue],
             ].map(([label, value]) => (
               <div key={label}>
