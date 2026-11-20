@@ -245,7 +245,7 @@ export function PullThemePicker({
             placeholder={
               theme.kind === "team"
                 ? "Search teams, e.g. Spurs"
-                : "Search players, e.g. Wemby"
+                : "Search players, e.g. Patrick Mahomes"
             }
             maxLength={100}
           />
