@@ -404,7 +404,9 @@ export function DemoPortfolio({
             )}
             <WalletCollection
               embedded
-              excludeMints={cards.flatMap((c) => (c.mint ? [c.mint] : []))}
+              excludeMints={(data?.collectibles ?? []).flatMap((c) =>
+                c.mint ? [c.mint] : [],
+              )}
             />
           </HoldingSection>
           <HoldingSection
