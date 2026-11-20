@@ -481,10 +481,12 @@ export function PositionRow({
       <PositionArtwork position={p} />
       <div className="position-identity">
         <Link
+          className="position-market-link"
+          aria-label={`Open ${p.label} · ${p.side === "yes" ? "Yes" : "No"} · ${p.eventTitle}`}
           href={
             p.replay
-              ? `/demo${p.rehearsal === "grail" ? "?scenario=grail" : ""}`
-              : `/markets/${p.eventTicker}?contract=${p.symbol}&side=${p.side}`
+              ? `/demo?${new URLSearchParams({ side: p.side, ...(p.rehearsal ? { scenario: p.rehearsal } : {}) })}`
+              : `/markets/${encodeURIComponent(p.eventTicker)}?${new URLSearchParams({ contract: p.symbol, side: p.side })}`
           }
         >
           {p.eventTitle}
@@ -516,10 +518,9 @@ export function PositionRow({
             revision={JSON.stringify(p)}
           />
         </div>
-        <span>
-          {p.state === "open"
-            ? "Potential reward"
-            : p.state === "won"
+        {p.state !== "open" && (
+          <span>
+            {p.state === "won"
               ? p.reward?.state === "claimed"
                 ? "Claimed"
                 : p.reward?.state === "allocated"
@@ -530,7 +531,8 @@ export function PositionRow({
                 : p.state === "refunded"
                   ? "Refunded"
                   : "Lost"}
-        </span>
+          </span>
+        )}
       </div>
       {p.state !== "won" && <div className="position-actions">{children}</div>}
     </div>

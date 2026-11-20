@@ -15,7 +15,7 @@ import type {
 import { SnapshotCache, type Snapshot } from "./snapshot-cache";
 
 // Refresh old snapshots that predate provider live/resolution metadata.
-const catalogKey = "gemini:markets:v7:all-active-categories";
+const catalogKey = "gemini:markets:v8:all-active-leagues";
 const flatten = (items: Market[]): Market[] =>
   items.flatMap((m) => [m, ...flatten(m.children)]);
 const known = new Map<string, Market>();

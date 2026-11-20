@@ -4,6 +4,9 @@
 .mobile-wallet-actions {
   display: none;
 }
+.standalone-phone-header {
+  display: none;
+}
 @media (max-width: 760px),
   (pointer: coarse) and (max-height: 540px) and (max-width: 1000px) {
   .app-shell {
@@ -21,7 +24,8 @@
     padding-inline: max(14px, env(safe-area-inset-left))
       max(14px, env(safe-area-inset-right));
   }
-  .app-shell .mobile-back-button {
+  .app-shell .mobile-back-button,
+  .standalone-phone-header .mobile-back-button {
     display: grid;
     place-items: center;
     flex: 0 0 44px;
@@ -37,6 +41,34 @@
     outline: 2px solid #80c9ff;
     outline-offset: -2px;
     border-radius: 8px;
+  }
+  .standalone-page-shell {
+    min-height: 100dvh;
+    padding-top: calc(60px + env(safe-area-inset-top));
+    padding-bottom: calc(65px + env(safe-area-inset-bottom));
+  }
+  .standalone-phone-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: fixed;
+    z-index: 32;
+    inset: 0 0 auto;
+    min-height: calc(60px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) max(14px, env(safe-area-inset-right)) 0
+      max(14px, env(safe-area-inset-left));
+    background: #080b0e;
+    border-bottom: 1px solid #242a30;
+  }
+  .standalone-phone-header .exchange-brand {
+    font-size: 17px;
+  }
+  .standalone-phone-account {
+    margin-left: auto;
+  }
+  .standalone-page-shell .profile-entry,
+  .standalone-page-shell > main > .exchange-brand {
+    display: none;
   }
   .app-shell .exchange-header .exchange-navigation,
   .exchange-header .mobile-menu,

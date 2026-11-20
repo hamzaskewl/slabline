@@ -16,6 +16,7 @@ import "./fmv.css";
 import "./responsive-panels.css";
 import "./portfolio-refinements.css";
 import { Providers } from "@/components/providers";
+import { StandalonePageNavigation } from "@/components/standalone-page-navigation";
 export const metadata: Metadata = {
   applicationName: "Slabline",
   appleWebApp: {
@@ -51,7 +52,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <StandalonePageNavigation>{children}</StandalonePageNavigation>
+        </Providers>
       </body>
     </html>
   );

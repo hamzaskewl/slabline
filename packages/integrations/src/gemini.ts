@@ -196,10 +196,31 @@ export async function collectMarketCategories(
   ) => PromiseLike<unknown>,
 ): Promise<Market[]> {
   const groups: Market[][] = [];
-  const queue = (categories.length ? categories : [undefined]).map(
-    (category, index) => ({ category, index }),
-  );
-  const queued = new Set(categories);
+  // The broad Sports feed and category directory can omit an entire league
+  // between games, even while its award/futures contracts remain active.
+  // Bootstrap the provider's established leagues; continue discovering all
+  // other league views from event metadata below. Never special-case players.
+  const views = [
+    ...new Set([
+      ...categories,
+      ...(categories.includes("Sports")
+        ? [
+            "Pro Baseball",
+            "Pro Basketball",
+            "College Basketball",
+            "Pro Football",
+            "College Football",
+            "Pro Hockey",
+            "Golf",
+          ]
+        : []),
+    ]),
+  ];
+  const queue = (views.length ? views : [undefined]).map((category, index) => ({
+    category,
+    index,
+  }));
+  const queued = new Set(views);
   let nextIndex = queue.length;
   await Promise.all(
     Array.from({ length: Math.min(3, queue.length) }, async () => {
