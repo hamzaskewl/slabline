@@ -1,6 +1,6 @@
 "use client";
 import { ProfileEditor } from "./profile-editor";
-import { AuthButton, ConnectedWalletPanel } from "./auth-controls";
+import { ConnectedWalletPanel } from "./auth-controls";
 import { useNetwork } from "./network-settings";
 import { WalletInventorySettings } from "./wallet-collection";
 import Link from "next/link";
@@ -51,9 +51,6 @@ export function ProfileSettings() {
       </section>
       <ConnectedWalletPanel />
       {network === "mainnet" && <RelayFunding />}
-      <div>
-        <AuthButton />
-      </div>
     </div>
   );
 }

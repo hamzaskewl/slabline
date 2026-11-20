@@ -14,7 +14,7 @@ import { Button } from "./ui/button";
 import { usd, usdc } from "@/lib/utils";
 import { usePullCatalog } from "./pull-catalog";
 import { packCount, PullPackCarousel } from "./pull-pack-carousel";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Layers3 } from "lucide-react";
 import type { PackPresentation } from "./pull-cinematic";
 
 export function PullBoard({
@@ -62,7 +62,11 @@ export function PullBoard({
           <p>Open a pack. Reveal your prediction budget.</p>
         </div>
         <div className="pull-page-links">
-          <Link href="/pull-predict/packs">Your packs</Link>
+          <Button asChild variant="outline">
+            <Link href="/pull-predict/packs">
+              <Layers3 size={18} aria-hidden="true" /> Your packs
+            </Link>
+          </Button>
         </div>
       </header>
       <div className="pull-grid">

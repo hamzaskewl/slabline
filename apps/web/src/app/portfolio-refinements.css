@@ -5,11 +5,13 @@
   vertical-align: -0.12em;
 }
 .usdc-amount {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3em;
+  display: inline;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  color: inherit;
+  font-size: inherit;
+}
+.collection-value .usdc-amount {
   color: inherit;
   font-size: inherit;
 }
@@ -23,6 +25,22 @@
 .holdings-toolbar > h2 {
   margin: 0;
   font-size: 17px;
+}
+.portfolio-page .holdings-toolbar {
+  padding-block: 20px 8px;
+  border: 0;
+}
+.portfolio-page .holding-section {
+  border: 0;
+  padding-block: 24px 8px;
+}
+.portfolio-page .holding-section .holdings-empty {
+  padding-block: 12px;
+}
+.portfolio-page .position-row:first-child,
+.portfolio-page .collection-row:first-child,
+.portfolio-page .portfolio-pack-row:first-child {
+  border-top: 0;
 }
 .holding-section {
   min-width: 0;
@@ -58,6 +76,10 @@
 }
 .portfolio-section-heading .button {
   font-size: 12px;
+}
+.portfolio-page .portfolio-section-heading > .app-select {
+  width: 184px;
+  max-width: 100%;
 }
 .portfolio-page .position-row {
   grid-template-columns: 44px minmax(0, 1fr) minmax(200px, auto);
@@ -106,6 +128,85 @@
   color: var(--muted);
   font-size: 12px;
   margin-top: 6px;
+}
+.portfolio-pack-row p .usdc-amount {
+  vertical-align: baseline;
+}
+.portfolio-pack-row > div {
+  min-width: 0;
+}
+.portfolio-pack-row > a {
+  flex-shrink: 0;
+}
+.portfolio-page .collection-row:not(.grail-holding-row) {
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+}
+.portfolio-page .collection-actions {
+  grid-column: 2 / -1;
+  align-items: flex-start;
+  text-align: left;
+}
+.collectible-asset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.collectible-asset-actions .button {
+  font-size: 12px;
+  min-height: 36px;
+}
+.ticket-position .position-value-share {
+  width: 100%;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+}
+.ticket-position .position-value-share > strong {
+  margin-right: auto;
+}
+.sale-notification {
+  position: fixed;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 180;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid #405268;
+  border-radius: 12px;
+  background: #151e28;
+  color: #f3f6fa;
+  font-size: 14px;
+}
+.sale-notification > svg {
+  color: #58d6a7;
+  flex-shrink: 0;
+}
+.sale-notification p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.sale-notification button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.sale-notification button:hover {
+  background: #293b4d;
+}
+.sale-notification button:focus-visible {
+  outline: 2px solid #80c9ff;
+  outline-offset: 2px;
 }
 .balance-actions {
   display: flex;
@@ -167,6 +268,61 @@
   max-width: 900px;
   margin-inline: auto;
 }
+.profile-page-heading,
+.profile-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.profile-page-heading {
+  max-width: 900px;
+  margin-inline: auto;
+}
+.profile-settings-page .profile-settings {
+  margin-top: 0;
+}
+.profile-settings-page > .funding-panel {
+  margin-bottom: 0;
+}
+.profile-settings-page .profile-settings-heading {
+  align-items: center;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.profile-settings-page .profile-settings-heading h2 {
+  margin: 0;
+}
+.profile-settings-page .profile-heading-actions > a {
+  margin: 0;
+}
+.profile-settings-page .install-help {
+  margin-top: 28px;
+  padding: 0;
+}
+.profile-settings-page .install-help summary {
+  cursor: pointer;
+  padding-block: 8px;
+}
+.profile-settings-page .install-help p {
+  margin-top: 8px;
+  line-height: 1.6;
+  max-width: 65ch;
+}
+.profile-settings-page .settings-replay {
+  display: grid;
+  justify-items: start;
+  gap: 20px;
+}
+.profile-settings-page .settings-replay h2,
+.profile-settings-page .settings-replay > .button {
+  margin: 0;
+}
+.profile-settings-page .settings-result {
+  width: 100%;
+  margin-top: 0;
+}
 .profile-settings-page .profile-form {
   margin-top: 20px;
 }
@@ -192,6 +348,21 @@
   outline-offset: 4px;
 }
 @media (max-width: 760px) {
+  .portfolio-page .collection-row:not(.grail-holding-row) {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+  .portfolio-page .collection-value {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    justify-self: start;
+  }
+  .portfolio-pack-row {
+    flex-wrap: wrap;
+  }
+  .sale-notification {
+    right: 16px;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
   .portfolio-page .position-row {
     grid-template-columns: 36px minmax(0, 1fr);
     gap: 12px;
@@ -204,7 +375,7 @@
     justify-content: flex-end;
   }
   .portfolio-page .grail-holding-row {
-    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-columns: 56px minmax(0, 1fr);
     gap: 12px;
   }
   .portfolio-page .grail-holding-row .collection-value {

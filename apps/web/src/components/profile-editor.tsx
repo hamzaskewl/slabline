@@ -28,6 +28,8 @@ export function ProfileEditor() {
       <div className="profile-settings-heading">
         <div>
           <h2>Public profile</h2>
+        </div>
+        <div className="profile-heading-actions">
           {read.data && (
             <Link
               href={`/${read.data.username}`}
@@ -36,18 +38,18 @@ export function ProfileEditor() {
               @{read.data.username} <ArrowUpRight size={15} />
             </Link>
           )}
+          <Button
+            variant="outline"
+            className="button-pill"
+            disabled={read.isPending || !!read.error}
+            onClick={() => {
+              setEditing(!editing);
+              setMessage("");
+            }}
+          >
+            {editing ? "Cancel" : read.data ? "Edit profile" : "Create profile"}
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          className="button-pill"
-          disabled={read.isPending || !!read.error}
-          onClick={() => {
-            setEditing(!editing);
-            setMessage("");
-          }}
-        >
-          {editing ? "Cancel" : read.data ? "Edit profile" : "Create profile"}
-        </Button>
       </div>
       {read.error && (
         <p role="alert">

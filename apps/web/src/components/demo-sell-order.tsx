@@ -12,6 +12,7 @@ import { usd } from "@/lib/utils";
 import { useDemoAction } from "./demo-controls";
 import { SlablineMark } from "./slabline-mark";
 import { Button } from "./ui/button";
+import { SaleNotification } from "./sale-notification";
 
 const shares = (value: string) =>
   Number(value).toLocaleString("en-US", {
@@ -173,7 +174,9 @@ export function DemoSellOrder({
               quantity: saleQuantity,
               minimumProceeds: proceeds,
             });
-            setReceipt("Sale complete");
+            setReceipt(
+              `You sold ${Number(saleQuantity).toLocaleString("en-US", { maximumFractionDigits: 6 })} ${side === "yes" ? "Yes" : "No"} ${Number(saleQuantity) === 1 ? "share" : "shares"} · ${position.label}`,
+            );
             key.current = crypto.randomUUID();
           });
         }}
@@ -193,9 +196,7 @@ export function DemoSellOrder({
                     : `Sell ${side === "yes" ? "Yes" : "No"}`}
       </Button>
       {receipt && (
-        <p className="sale-receipt" role="status">
-          {receipt}
-        </p>
+        <SaleNotification message={receipt} onDismiss={() => setReceipt("")} />
       )}
       {(a.error || snapshot.error || quoteError) && (
         <p className="sale-error" role="alert">
