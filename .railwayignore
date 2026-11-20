@@ -1,0 +1,14 @@
+.git/
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+.env
+.env.*
+!.env.example
+.impeccable/
+artifacts/
+design/
+test-results/
+playwright-report/
+*.tsbuildinfo

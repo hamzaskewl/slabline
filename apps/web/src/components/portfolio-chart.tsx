@@ -6,7 +6,6 @@ import {
   createChart,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { UsdcAmount } from "./usdc-amount";
 import { usd } from "@/lib/utils";
 const ranges = ["1D", "1W", "1M", "ALL"] as const;
 const emptyHistory: { time: string; value: string }[] = [];
@@ -120,13 +119,11 @@ export function PortfolioChart({
       </div>
       <div className="portfolio-chart-readout" aria-live="polite">
         <strong>
-          {hover ? (
-            <UsdcAmount value={hover.value} />
-          ) : currentValue === undefined ? (
-            "—"
-          ) : (
-            <UsdcAmount value={currentValue} />
-          )}
+          {hover
+            ? usd(hover.value)
+            : currentValue === undefined
+              ? "—"
+              : usd(currentValue)}
         </strong>
         {hover?.time && <span>{hover.time}</span>}
       </div>

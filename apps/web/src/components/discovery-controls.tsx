@@ -183,7 +183,7 @@ export function DiscoveryControls({
               aria-label={count ? `Filters, ${count} active` : "Filters"}
             >
               <SlidersHorizontal size={14} aria-hidden="true" />
-              Filters
+              <span className="filter-toggle-label">Filters</span>
               {count > 0 && <span className="filter-count">{count}</span>}
             </button>
           </Popover.Trigger>
