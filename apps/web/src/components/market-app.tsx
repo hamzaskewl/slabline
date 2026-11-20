@@ -75,6 +75,7 @@ import { retainMarketSnapshot } from "@/lib/market-snapshot";
 import { SnapshotStatus } from "./snapshot-status";
 import { MarketArt } from "./market-art";
 import { useNetwork } from "./network-settings";
+import { LocalLimitOrder } from "./local-limit-order";
 const DemoOrder = dynamic(
   () => import("./demo-controls").then((m) => m.DemoOrder),
   { ssr: false },
@@ -833,6 +834,7 @@ function MarketDetail({
     [expandedSymbol, setExpandedSymbol] = useState<string | null>(null),
     [side, setSide] = useState<"yes" | "no">(initialSide),
     [tradeMode, setTradeMode] = useState<"buy" | "sell">(initialTrade),
+    [orderType, setOrderType] = useState<"market" | "limit">("market"),
     [stake, setStake] = useState(initialStake),
     [stakeRevision, setStakeRevision] = useState(0),
     [range, setRange] = useState<ChartRange>("ALL"),
@@ -911,7 +913,7 @@ function MarketDetail({
     rehearsal === "grail" ? (
       <GrailRehearsal
         payout={
-          quote && tradeMode === "buy"
+          quote && tradeMode === "buy" && orderType === "market"
             ? money(units(heldShares) + units(quote.totalPayout))
             : units(heldShares) > 0n
               ? heldShares
@@ -938,7 +940,7 @@ function MarketDetail({
         side={side}
         stale={stale}
         payout={
-          quote && tradeMode === "buy"
+          quote && tradeMode === "buy" && orderType === "market"
             ? money(units(heldShares) + units(quote.totalPayout))
             : units(heldShares) > 0n
               ? heldShares
@@ -946,6 +948,7 @@ function MarketDetail({
         }
         onStake={(value) => {
           setTradeMode("buy");
+          setOrderType("market");
           setStake(String(Number(value)));
           setReview(false);
         }}
@@ -1136,24 +1139,37 @@ function MarketDetail({
               ))}
             </Select>
           </label>
-          <div
-            className="trade-mode-tabs"
-            role="group"
-            aria-label="Trade direction"
-          >
-            {(["buy", "sell"] as const).map((mode) => (
-              <button
-                type="button"
-                key={mode}
-                aria-pressed={tradeMode === mode}
-                onClick={() => {
-                  setTradeMode(mode);
-                  setReview(false);
-                }}
-              >
-                {mode === "buy" ? "Buy" : "Sell"}
-              </button>
-            ))}
+          <div className="trade-controls">
+            <div
+              className="trade-mode-tabs"
+              role="group"
+              aria-label="Trade direction"
+            >
+              {(["buy", "sell"] as const).map((mode) => (
+                <button
+                  type="button"
+                  key={mode}
+                  aria-pressed={tradeMode === mode}
+                  onClick={() => {
+                    setTradeMode(mode);
+                    setReview(false);
+                  }}
+                >
+                  {mode === "buy" ? "Buy" : "Sell"}
+                </button>
+              ))}
+            </div>
+            <Select
+              aria-label="Order type"
+              value={orderType}
+              onChange={(event) => {
+                setOrderType(event.target.value as "market" | "limit");
+                setReview(false);
+              }}
+            >
+              <option value="market">Market</option>
+              <option value="limit">Limit</option>
+            </Select>
           </div>
           <div className="side-toggle">
             {(["yes", "no"] as const).map((s) => (
@@ -1172,14 +1188,29 @@ function MarketDetail({
             Estimates use available depth before fees. A losing prediction pays
             zero.
           </p>
-          {!practice && (!book || stale) && (
+          {orderType === "market" && !practice && (!book || stale) && (
             <p className="snapshot-status" role="status">
               {stale
                 ? "Reconnecting to live odds…"
                 : "Connecting to live odds…"}
             </p>
           )}
-          {tradeMode === "buy" ? (
+          {orderType === "limit" ? (
+            symbol && contract ? (
+              <LocalLimitOrder
+                key={`${symbol}:${side}:${tradeMode}:${network}:${practice}`}
+                symbol={symbol}
+                label={contract.label}
+                direction={tradeMode}
+                side={side}
+                practice={practice}
+              />
+            ) : (
+              <p className="snapshot-status">
+                Choose an outcome to place a local limit order.
+              </p>
+            )
+          ) : tradeMode === "buy" ? (
             <>
               <label className="stake-label" htmlFor="stake">
                 Your stake <span>USD</span>

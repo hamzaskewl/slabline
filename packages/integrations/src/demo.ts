@@ -189,7 +189,7 @@ export async function demoAccount(userId: string): Promise<DemoAccountView> {
     return { ...view, history: history.slice(-5000) };
   });
   const missingContext = snapshot.positions.filter(
-    (p) => !p.rewardMarket || !p.artwork,
+    (p) => !p.rewardMarket || !p.artwork?.length,
   );
   if (missingContext.length) {
     const stored = await getDb()

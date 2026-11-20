@@ -233,3 +233,50 @@ test("binary positions retain their event subject and supplied artwork", () => {
     DEMO_REPLAY_CARD,
   ]);
 });
+
+test("multi-outcome positions use the provider event logo when the selected outcome has no artwork", () => {
+  for (const [ticker, title, label] of [
+    ["CFBHEISMAN2627", "College Football Heisman Trophy Winner", "Josh Hoover"],
+    [
+      "USSTAKE",
+      "Which companies will the US take a stake in before 2027?",
+      "Nvidia",
+    ],
+  ]) {
+    const selected = {
+      symbol: `GEMI-${ticker}-SELECTED`,
+      label: label!,
+      imageUrl: null,
+      status: "active",
+      lastPrice: null,
+      quantityIncrement: "1",
+      priceIncrement: "0.01",
+    };
+    const sibling = {
+      ...selected,
+      symbol: `GEMI-${ticker}-OTHER`,
+      label: "Other",
+      imageUrl: "https://assets.gemini.com/other.png",
+    };
+    const market: Market = {
+      id: ticker!,
+      title: title!,
+      category: "Other",
+      status: "active",
+      description: "",
+      imageUrl: "https://assets.gemini.com/event.png",
+      closesAt: null,
+      contracts: [selected, sibling],
+      children: [],
+    };
+    expect(demoPositionContext(market, selected).artwork).toEqual([
+      { src: market.imageUrl!, label: market.title },
+    ]);
+    expect(demoPositionContext(market, sibling).artwork).toEqual([
+      { src: sibling.imageUrl, label: sibling.label },
+    ]);
+    expect(
+      demoPositionContext({ ...market, imageUrl: null }, selected).artwork,
+    ).toEqual([]);
+  }
+});
